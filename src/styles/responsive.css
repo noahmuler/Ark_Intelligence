@@ -1,0 +1,57 @@
+/* Additional responsive utilities for Ark Intelligence */
+
+/* Custom responsive breakpoints */
+@media (max-width: 640px) {
+  /* Mobile specific styles */
+  .ark-mobile-hidden {
+    display: none;
+  }
+  
+  .ark-mobile-full {
+    width: 100%;
+  }
+  
+  .ark-mobile-text-xs {
+    font-size: 0.75rem;
+  }
+  
+  .ark-mobile-text-sm {
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  /* Tablet specific styles */
+  .ark-tablet-hidden {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop specific styles */
+  .ark-desktop-hidden {
+    display: none;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .ark-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .ark-retina-border {
+    border-width: 0.5px;
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 640px) and (orientation: landscape) {
+  .ark-landscape-mobile {
+    padding: 1rem;
+  }
+}

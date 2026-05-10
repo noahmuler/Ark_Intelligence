@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f0f23; /* Purple-950 - Very deep purple */
+  --foreground: #ffffff; /* White */
+}
+
+/* Light theme colors */
+[data-theme="light"] {
+  --background: #f8fafc; /* Light gray */
+  --foreground: #1e293b; /* Dark slate */
+}
+
+/* Dark theme colors (default) */
+[data-theme="dark"] {
+  --background: #0f0f23; /* Purple-950 - Very deep purple */
+  --foreground: #ffffff; /* White */
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", system-ui, sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ensure theme changes are applied to main layout elements */
+[data-theme="light"] .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #f8fafc, #e2e8f0, #cbd5e1) !important;
+}
+
+[data-theme="dark"] .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #0f0f23, #1e1b4b, #000000) !important;
+}
+
+/* Custom scrollbar for Ark Intelligence */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #312e81; /* Purple-900 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #7c3aed; /* Purple-600 */
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8b5cf6; /* Purple-500 */
+}
+
+/* Custom selection colors */
+::selection {
+  background: #8b5cf6; /* Purple-500 */
+  color: #ffffff; /* White */
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid #8b5cf6; /* Purple-500 */
+  outline-offset: 2px;
+}
