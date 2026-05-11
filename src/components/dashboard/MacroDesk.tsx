@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -286,40 +285,28 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [expandingCard, setExpandingCard] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [resizeTimeout, setResizeTimeout] = useState<NodeJS.Timeout | null>(null);
+  // resizeTimeout is intentionally not used (avoid extra renders while animating)
+  const [resizeTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [modalPhase, setModalPhase] = useState<'closed' | 'opening' | 'open' | 'closing'>('closed');
 
+
+
+  // Track timeouts so resize/close/open can't desync the expansion UI.
+  const expansionTimersRef = useRef<{ clearExpand?: NodeJS.Timeout; closeModal?: NodeJS.Timeout }>({});
 
 
   useEffect(() => {
     setMounted(true);
     
-    // Handle window resize with debounce
+    // Handle window resize: do not start/stop animations mid-transition.
     const handleResize = () => {
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-      
-      const timeout = setTimeout(() => {
-        // Only close expanded cards if going to/from max width to prevent jumbled layout
-        const width = typeof window !== 'undefined' ? window.innerWidth : 0;
-        if (width >= 1920) { // Max screen size threshold
-          setExpandedCards(new Set());
-          setIsModalOpen(false);
-          setExpandingCard(null);
-        }
-      }, 150);
-      
-      setResizeTimeout(timeout);
+      // Intentionally no-op (keep handler for future expansion).
     };
 
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-    };
-  }, [resizeTimeout]);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   useEffect(() => {
     if (!mounted) return;
@@ -347,6 +334,11 @@ export function MacroDesk({ className = "" }: { className?: string }) {
     }
   };
 
+  const headerTextClasses =
+    "text-white dark:text-white";
+  const headerSubTextClasses = "text-purple-300 dark:text-purple-300";
+
+
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
       case "Bullish": return "text-emerald-400";
@@ -364,28 +356,50 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   };
 
   const toggleCardExpansion = (cardId: string) => {
+    // Prevent re-entrancy during open/close animations.
+    if (modalPhase === 'opening' || modalPhase === 'closing') return;
+
+    const isAlreadyExpanded = expandedCards.has(cardId);
+
     setExpandingCard(cardId);
-    setExpandedCards(prev => {
-      // If clicking the same card, close it. Otherwise, open the new card and close others
-      if (prev.has(cardId)) {
-        setTimeout(() => {
-          setExpandingCard(null);
-          setIsModalOpen(false);
-        }, 300); // Clear expanding state after animation
-        return new Set(); // Close all cards
-      } else {
-        setIsModalOpen(true);
-        setTimeout(() => setExpandingCard(null), 600); // Clear expanding state after animation
-        return new Set([cardId]); // Only expand this card
-      }
-    });
+
+    if (isAlreadyExpanded) {
+      // Close
+      setModalPhase('closing');
+      setExpandedCards(new Set());
+
+      window.setTimeout(() => {
+        setIsModalOpen(false);
+        setExpandingCard(null);
+        setModalPhase('closed');
+      }, 300);
+    } else {
+      // Open
+      setExpandedCards(new Set([cardId]));
+      setIsModalOpen(true);
+      setModalPhase('opening');
+
+      window.setTimeout(() => {
+        setExpandingCard(null);
+        setModalPhase('open');
+      }, 550);
+    }
   };
 
+
   const closeExpandedCard = () => {
+    if (modalPhase === 'closing' || modalPhase === 'closed') return;
+    setModalPhase('closing');
     setExpandedCards(new Set());
-    setIsModalOpen(false);
-    setExpandingCard(null);
+
+    window.setTimeout(() => {
+      setIsModalOpen(false);
+      setExpandingCard(null);
+      setModalPhase('closed');
+    }, 300);
   };
+
+
 
   // Handle escape key and click outside
   useEffect(() => {
@@ -439,16 +453,22 @@ export function MacroDesk({ className = "" }: { className?: string }) {
     <div className={className} suppressHydrationWarning>
       {/* Page Header */}
       <div className="mb-12 mt-8">
-        <div className="flex items-center justify-between relative">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center max-w-4xl my-6">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 mt-4">Macro Desk</h2>
-              <p className="text-base text-purple-300 mt-2">
-                Real-time macro intelligence feed with AI-powered analysis and sentiment tracking
-              </p>
-            </div>
+        <div className="relative flex items-center justify-between">
+          {/* Dark-mode aware header glow */}
+          <div className="absolute inset-0 -z-10 pointer-events-none">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[220px] bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-transparent blur-3xl opacity-80" />
           </div>
-          <div className="flex items-center space-x-2 ml-auto">
+
+          <div className="w-full text-center">
+            <h2 className={`text-2xl sm:text-3xl font-bold mb-4 mt-4 ${headerTextClasses}`}>Macro Desk</h2>
+            <p className={`text-base ${headerSubTextClasses} mt-2`}>
+              Real-time macro intelligence feed with AI-powered analysis and sentiment tracking
+            </p>
+
+
+          </div>
+
+          <div className="flex items-center space-x-2">
             <button
               onClick={handleRefresh}
               className={`p-2 rounded-lg hover:bg-purple-800 transition-colors ${
@@ -468,9 +488,10 @@ export function MacroDesk({ className = "" }: { className?: string }) {
         </div>
       </div>
 
+
       {/* Asset Cards Grid */}
-      <div className={`max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 transition-all duration-300 ease-out ${
-        isModalOpen ? 'scale-95 opacity-60 blur-sm' : 'scale-100 opacity-100'
+  <div className={`max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 transition-transform duration-300 ease-out ${
+        isModalOpen ? 'opacity-80' : 'opacity-100'
       }`}>
         {assets.map((asset) => {
           const isExpanded = expandedCards.has(asset.symbol);
@@ -482,8 +503,8 @@ export function MacroDesk({ className = "" }: { className?: string }) {
           return (
             <div 
               key={asset.symbol} 
-              className={`group relative bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-4 transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.02] ${
-                isExpanding ? 'scale-110 shadow-xl z-40' : 'shadow-lg'
+          className={`group relative bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-4 transition-[transform,box-shadow] duration-300 ease-out hover:shadow-xl hover:transform-gpu hover:scale-[1.01] ${
+                isExpanding ? 'scale-105 shadow-xl z-40' : 'shadow-lg'
               }`}
             >
               {/* Enhanced ambient glow effect */}
@@ -653,7 +674,7 @@ export function MacroDesk({ className = "" }: { className?: string }) {
                       : 'bg-purple-800/50 text-purple-300 hover:bg-purple-700/50 hover:scale-105'
                   }`}
                   aria-label={`Quick overview for ${asset.name} (${asset.symbol})`}
-                  aria-expanded={isExpanded}
+
                 >
                   <span className="relative z-10 flex items-center">
                     <ChevronDown className={`h-3 w-3 mr-1 transition-transform duration-300 ${
@@ -688,16 +709,24 @@ export function MacroDesk({ className = "" }: { className?: string }) {
       {isModalOpen && expandedAsset && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={handleClickOutside}
+          onClick={(e) => {
+            // Clicking the overlay background closes the modal.
+            // (We also have an event listener for clicks while the modal is open.)
+            const target = e.target as HTMLElement;
+            const expandedCardElement = target.closest('[data-expanded-card="true"]');
+            if (!expandedCardElement) {
+              closeExpandedCard();
+            }
+          }}
           data-expanded-card="true"
         >
           <div
-            className="relative bg-purple-950/95 backdrop-blur-2xl rounded-3xl border border-purple-800/70 shadow-2xl w-full max-w-4xl mx-auto transform transition-all duration-500"
+            className="relative bg-purple-950/95 backdrop-blur-2xl rounded-3xl border border-purple-800/70 shadow-2xl w-full max-w-4xl mx-auto transform transition-[transform,opacity] duration-300 ease-out"
             style={{
-              transform: 'perspective(1000px) rotateX(0deg) scale(1)',
+              transform: 'translateY(0px) scale(1)',
               transformStyle: 'preserve-3d',
-              animation: 'slideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
             }}
+
           >
             {/* Subtle ambient glow effect */}
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600/15 to-blue-600/15 rounded-3xl blur-xl opacity-60"></div>

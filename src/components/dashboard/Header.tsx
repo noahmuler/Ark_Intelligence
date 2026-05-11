@@ -21,7 +21,10 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Minus, Globe, Clock, Menu, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, Menu } from "lucide-react";
+
+
+
 import Link from "next/link";
 
 /**
@@ -138,11 +141,9 @@ export function Header() {
   // State to prevent hydration mismatch during server-side rendering
   const [mounted, setMounted] = useState(false);
   
-  // State to track sidebar visibility for hamburger menu display
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
   // State to detect desktop screen size for responsive behavior
   const [isDesktop, setIsDesktop] = useState(false);
+
 
   /**
    * Component Mount Initialization
@@ -177,9 +178,10 @@ export function Header() {
    * - Cleans up event listener on component unmount
    */
   useEffect(() => {
-    const handleSidebarChange = (event: CustomEvent) => {
-      setIsSidebarOpen(event.detail.isOpen);
-    };
+    // Sidebar open state is owned by MainLayout/Sidebar now.
+    // Keep ticker/world-times logic only; remove cross-component sidebar syncing.
+  const handleSidebarChange = (_event: CustomEvent) => { return; };
+
 
     // Add custom event listener for sidebar state changes
     window.addEventListener('sidebar-state-changed', handleSidebarChange as EventListener);
@@ -218,9 +220,11 @@ export function Header() {
 
   // Sidebar toggle function
   const toggleSidebar = () => {
-    const event = new CustomEvent('toggle-sidebar');
-    window.dispatchEvent(event);
+    if (typeof window === "undefined") return;
+    // One event for both desktop rail and mobile overlay; Sidebar decides based on breakpoint.
+    window.dispatchEvent(new CustomEvent('toggle-sidebar'));
   };
+
 
   /**
    * Real-time Data Updates
@@ -433,63 +437,47 @@ export function Header() {
      * - Hamburger menu visibility toggles on mobile
      * - Layout adjusts for max-size screens (> 1920px)
      */
-    <div className="relative h-16 bg-purple-900/60 backdrop-blur-xl border-b border-purple-800/50 flex items-center shadow-2xl w-full">
+      <div className="relative h-16 bg-purple-900/60 backdrop-blur-xl border-b border-purple-800/50 flex items-center shadow-2xl w-full will-change-transform">
+
       {/* 
         Ambient Glow Effect
-        
+
         Subtle gradient overlay for visual depth and modern aesthetics.
         Creates a premium feel with light diffusion effect.
       */}
       <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-transparent to-blue-600/10"></div>
       
-      {/* 
+      {/*
         Ark Intelligence Branding Section
         
-        Contains logo, hamburger menu, and site title.
+        Contains logo and acts as the hamburger control.
         Fixed width section that doesn't grow or shrink.
-        Uses flex-shrink-0 and fixed width constraints.
       */}
       <div className="relative px-4 border-r border-purple-800/50 flex items-center space-x-3 flex-shrink-0 w-64">
-        {/* 
-          Hamburger Menu Button
-          
-          Conditional rendering based on screen size and sidebar state:
-          - Mobile: Always visible (isDesktop = false)
-          - Desktop: Only visible when sidebar is closed (isSidebarOpen = false)
-          
-          Accessibility:
-          - Proper ARIA label for screen readers
-          - Keyboard accessible with focus states
-        */}
-        {(!isDesktop || !isSidebarOpen) && (
-          <button
-            onClick={toggleSidebar}
-            className="p-2 rounded-lg hover:bg-purple-800/50 transition-colors group"
-            aria-label="Toggle sidebar"
-          >
-            {/* 
-              Hamburger Icon Container
-              
-              Styled button with gradient background and hover effects.
-              Icon changes between Menu and X based on sidebar state.
-            */}
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-              {isSidebarOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
+        {/* Logo serves as the hamburger (desktop + mobile) */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="group w-full text-left block focus:outline-none"
+          aria-label="Toggle sidebar"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+              <div className="relative h-5 w-5">
+                {/* simple hamburger/close morph */}
+                <span className="absolute left-0 top-0 block h-0.5 w-5 bg-white rounded transition-transform duration-300 origin-left" />
+                <span className="absolute left-0 top-2 block h-0.5 w-5 bg-white rounded transition-opacity duration-200" />
+                <span className="absolute left-0 top-4 block h-0.5 w-5 bg-white rounded transition-transform duration-300 origin-left" />
+              </div>
             </div>
-          </button>
-        )}
-        
-        {/* 
-          Site Branding Link
-          
-          Links to homepage with hover effects.
-          Contains main title and subtitle.
-        */}
-        <Link href="/" className="block hover:opacity-80 transition-opacity">
-          <h1 className="text-white font-bold text-lg">Ark Intelligence</h1>
-          <p className="text-purple-300 text-xs">Macro Trading Dashboard</p>
-        </Link>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-white font-bold text-lg truncate">Ark Intelligence</h1>
+              <p className="text-purple-300 text-xs truncate">Macro Trading Dashboard</p>
+            </div>
+          </div>
+        </button>
       </div>
+
 
       {/* 
         Market Tickers Section
