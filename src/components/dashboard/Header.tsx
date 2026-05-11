@@ -419,7 +419,7 @@ export function Header() {
    * 
    * TODO: Remove or replace with proper logging system in production
    */
-  console.log('Header mounted:', mounted, 'Window width:', window.innerWidth, 'Screen type:', window.innerWidth >= 1920 ? 'max-size' : 'normal');
+
 
   return (
     /**

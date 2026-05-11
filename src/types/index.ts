@@ -33,10 +33,12 @@ export interface SessionBrief {
     support: string[];
     resistance: string[];
   };
-  tacticalBias: "Long" | "Short" | "Neutral";
+  // Optional because the current API mock (and some UI mocks) may omit it.
+  tacticalBias?: "Long" | "Short" | "Neutral";
   confidence: number;
   timestamp: string;
 }
+
 
 // Edge Factor Types
 export interface EdgeFactorData {
@@ -94,8 +96,10 @@ export interface ApiResponse<T> {
 // Component Props Types
 export interface BaseComponentProps {
   className?: string;
-  children?: React.ReactNode;
+  // Using `unknown` here avoids hard React type dependency inside this shared types module.
+  children?: unknown;
 }
+
 
 // WebSocket Types
 export interface WebSocketMessage {

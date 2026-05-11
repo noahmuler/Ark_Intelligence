@@ -288,8 +288,7 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [resizeTimeout, setResizeTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Debug logging for max size screen issues
-  console.log('MacroDesk mounted:', mounted, 'Window width:', typeof window !== 'undefined' ? window.innerWidth : 'undefined', 'Screen type:', typeof window !== 'undefined' && window.innerWidth >= 1920 ? 'max-size' : 'normal');
+
 
   useEffect(() => {
     setMounted(true);

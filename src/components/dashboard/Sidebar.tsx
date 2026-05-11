@@ -159,19 +159,18 @@ export function Sidebar() {
    */
   useEffect(() => {
     const handleToggleSidebar = () => {
-      // Toggle sidebar state for both mobile and desktop
-      const newState = !isSidebarOpen;
-      setIsSidebarOpen(newState);
-      // Emit state change for Header to track
-      window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: newState } }));
+      // Toggle using functional update to avoid stale state from closure.
+      setIsSidebarOpen(prev => {
+        const newState = !prev;
+        // Emit state change for Header to track.
+        window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: newState } }));
+        return newState;
+      });
     };
 
-    // Add custom event listener for sidebar toggle requests
     window.addEventListener('toggle-sidebar', handleToggleSidebar);
-    
-    // Cleanup: remove event listener on component unmount
     return () => window.removeEventListener('toggle-sidebar', handleToggleSidebar);
-  }, [isSidebarOpen]); // Dependencies: re-run when sidebar state changes
+  }, []);
 
   return (
     /**

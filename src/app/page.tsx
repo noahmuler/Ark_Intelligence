@@ -3,6 +3,7 @@ import { AISessionBrief } from "@/components/dashboard/AISessionBrief";
 import { MacroDesk } from "@/components/dashboard/MacroDesk";
 import { EdgeFactor } from "@/components/dashboard/EdgeFactor";
 
+
 export default function Home() {
   return (
     <MainLayout>
@@ -102,9 +103,16 @@ export default function Home() {
                           : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
                         }
                       `}>
-                        <div className={`absolute inset-0 bg-gradient-to-r from-${item.color}-600/20 to-${item.color}-500/20 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+                        <div
+                          className={
+                            item.color === 'emerald'
+                              ? 'absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-emerald-500/20 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                              : 'absolute inset-0 bg-gradient-to-r from-amber-600/20 to-amber-500/20 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                          }
+                        ></div>
                         <span className="relative">{item.status}</span>
                       </div>
+
                     </div>
                   ))}
                 </div>
@@ -126,6 +134,7 @@ export default function Home() {
                     <div className="absolute -inset-1 bg-gradient-to-r from-amber-600/20 to-orange-600/20 rounded-full blur"></div>
                     <span className="relative">+2.3% from 5-day mean</span>
                   </div>
+
                 </div>
               </div>
             </div>
