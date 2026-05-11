@@ -21,11 +21,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Minus, Clock, Menu } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
 
 
 
-import Link from "next/link";
+
+
 
 /**
  * Interface for ticker data structure
@@ -137,12 +138,19 @@ export function Header() {
   
   // State for world market times
   const [worldTimes, setWorldTimes] = useState<WorldTime[]>(getWorldTimes());
-  
-  // State to prevent hydration mismatch during server-side rendering
+
+  // Avoid SSR/CSR mismatch by gating initial render on client.
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+
+
   
-  // State to detect desktop screen size for responsive behavior
-  const [isDesktop, setIsDesktop] = useState(false);
+
 
 
   /**
@@ -155,11 +163,10 @@ export function Header() {
    * - Sets mounted state to true after component mounts
    * - Detects initial screen size for desktop/mobile behavior
    */
-  useEffect(() => {
-    setMounted(true);
-    // Check initial screen size to determine desktop/mobile behavior
-    setIsDesktop(window.innerWidth >= 1024);
-  }, []);
+
+
+
+
 
   /**
    * Sidebar State Synchronization
@@ -177,18 +184,9 @@ export function Header() {
    * - Enables conditional hamburger menu rendering
    * - Cleans up event listener on component unmount
    */
-  useEffect(() => {
-    // Sidebar open state is owned by MainLayout/Sidebar now.
-    // Keep ticker/world-times logic only; remove cross-component sidebar syncing.
-  const handleSidebarChange = (_event: CustomEvent) => { return; };
+  // NOTE: sidebar-state syncing is handled by the dedicated useEffect below.
+  // (Keeping only one listener prevents stale/incorrect sidebar reflection.)
 
-
-    // Add custom event listener for sidebar state changes
-    window.addEventListener('sidebar-state-changed', handleSidebarChange as EventListener);
-    
-    // Cleanup: remove event listener on component unmount
-    return () => window.removeEventListener('sidebar-state-changed', handleSidebarChange as EventListener);
-  }, []); // Empty dependency array - effect runs only once on mount
 
   /**
    * Screen Size Change Handler
@@ -206,24 +204,35 @@ export function Header() {
    * - Triggers hamburger menu visibility recalculation
    * - Cleans up event listener on component unmount
    */
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Reflect sidebar open/closed state on the logo/hamburger
   useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 1024);
+    const handleSidebarChange = (event: Event) => {
+      const custom = event as CustomEvent<{ isDesktopExpanded?: boolean; isMobileOpen?: boolean }>;
+      const detail = custom.detail;
+      setIsSidebarOpen(!!(detail?.isDesktopExpanded || detail?.isMobileOpen));
+
     };
 
-    // Add resize event listener for screen size changes
-    window.addEventListener('resize', handleResize);
-    
-    // Cleanup: remove event listener on component unmount
-    return () => window.removeEventListener('resize', handleResize);
-  }, []); // Empty dependency array - effect runs only once on mount
+    window.addEventListener(
+      "sidebar-state-changed",
+      handleSidebarChange as EventListener
+    );
 
-  // Sidebar toggle function
+    return () =>
+      window.removeEventListener(
+        "sidebar-state-changed",
+        handleSidebarChange as EventListener
+      );
+  }, []);
+
+  // Sidebar toggle function (single source: logo)
   const toggleSidebar = () => {
     if (typeof window === "undefined") return;
-    // One event for both desktop rail and mobile overlay; Sidebar decides based on breakpoint.
-    window.dispatchEvent(new CustomEvent('toggle-sidebar'));
+    window.dispatchEvent(new CustomEvent("toggle-sidebar"));
   };
+
 
 
   /**
@@ -255,6 +264,7 @@ export function Header() {
     if (!mounted) return;
     
     // Set up interval for real-time data updates
+
     const interval = setInterval(() => {
       // Update ticker data with simulated market movements
       setTickerData(prev => 
@@ -299,28 +309,8 @@ export function Header() {
     return price.toFixed(2);
   };
 
-  /**
-   * Change Value Formatting Utility
-   * 
-   * Formats price change values with proper sign notation.
-   * Ensures consistent display of positive and negative changes.
-   * 
-   * @param {number} change - The change value to format
-   * @returns {string} Formatted change string with sign
-   * 
-   * Formatting Rules:
-   * - Positive values: Prefix with "+" sign
-   * - Negative values: Prefix with "-" sign (automatic)
-   * - Zero values: No sign prefix
-   * 
-   * @example
-   * formatChange(1.23) // Returns "+1.23"
-   * formatChange(-0.45) // Returns "-0.45"
-   */
-  const formatChange = (change: number) => {
-    const sign = change >= 0 ? "+" : "";
-    return `${sign}${change.toFixed(2)}`;
-  };
+
+
 
   /**
    * Percentage Change Formatting Utility
@@ -459,15 +449,35 @@ export function Header() {
           type="button"
           onClick={toggleSidebar}
           className="group w-full text-left block focus:outline-none"
-          aria-label="Toggle sidebar"
+          aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          aria-expanded={isSidebarOpen}
+
+
+
+
+
+
+
         >
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
               <div className="relative h-5 w-5">
-                {/* simple hamburger/close morph */}
-                <span className="absolute left-0 top-0 block h-0.5 w-5 bg-white rounded transition-transform duration-300 origin-left" />
-                <span className="absolute left-0 top-2 block h-0.5 w-5 bg-white rounded transition-opacity duration-200" />
-                <span className="absolute left-0 top-4 block h-0.5 w-5 bg-white rounded transition-transform duration-300 origin-left" />
+                {/* hamburger/close morph based on sidebar open state */}
+                <span
+                  className={`absolute left-0 top-0 block h-0.5 w-5 bg-white rounded transition-all duration-300 origin-left ${
+                    isSidebarOpen ? "rotate-45 translate-y-2" : "rotate-0"
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-2 block h-0.5 w-5 bg-white rounded transition-all duration-200 ${
+                    isSidebarOpen ? "opacity-0 scale-x-50" : "opacity-100 scale-x-100"
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-4 block h-0.5 w-5 bg-white rounded transition-all duration-300 origin-left ${
+                    isSidebarOpen ? "-rotate-45 -translate-y-2" : "rotate-0"
+                  }`}
+                />
               </div>
             </div>
             <div className="min-w-0 flex-1">
@@ -476,6 +486,7 @@ export function Header() {
             </div>
           </div>
         </button>
+
       </div>
 
 

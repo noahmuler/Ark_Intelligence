@@ -29,6 +29,20 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+const buildSidebarEventDetail = (isSidebarExpanded: boolean, isMobileOpen: boolean) => ({
+  isDesktopExpanded: isSidebarExpanded,
+  isMobileOpen,
+  isAnyOpen: isSidebarExpanded || isMobileOpen,
+});
+
+const dispatchSidebarStateChanged = (isSidebarExpanded: boolean, isMobileOpen: boolean) => {
+  window.dispatchEvent(
+    new CustomEvent("sidebar-state-changed", {
+      detail: buildSidebarEventDetail(isSidebarExpanded, isMobileOpen),
+    })
+  );
+};
+
 export function Sidebar() {
   const pathname = usePathname();
 
@@ -37,15 +51,6 @@ export function Sidebar() {
 
   // Mobile overlay state
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const updateDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    updateDesktop();
-    window.addEventListener("resize", updateDesktop);
-    return () => window.removeEventListener("resize", updateDesktop);
-  }, []);
 
   // Listen for toggle events from Header (logo)
   useEffect(() => {
@@ -61,14 +66,13 @@ export function Sidebar() {
     return () => window.removeEventListener("toggle-sidebar", handleToggleSidebar);
   }, []);
 
-  // Notify layout/header whenever sidebar state changes (desktop rail expansion)
+  // Notify layout/header whenever sidebar state changes.
+  // Provide separate flags so MainLayout can offset based on *desktop rail* only.
   useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent("sidebar-state-changed", {
-        detail: { isOpen: isSidebarExpanded },
-      })
-    );
-  }, [isSidebarExpanded]);
+    dispatchSidebarStateChanged(isSidebarExpanded, isMobileOpen);
+  }, [isSidebarExpanded, isMobileOpen]);
+
+
 
   return (
     <>
@@ -108,11 +112,7 @@ export function Sidebar() {
                   href={item.href}
                   onClick={() => {
                     // Desktop: keep rail state
-                    window.dispatchEvent(
-                      new CustomEvent("sidebar-state-changed", {
-                        detail: { isOpen: isSidebarExpanded },
-                      })
-                    );
+                    dispatchSidebarStateChanged(isSidebarExpanded, false);
                   }}
                   className={`group relative flex items-center rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200
                     ${
@@ -155,21 +155,6 @@ export function Sidebar() {
               )}
               <ThemeToggle />
             </div>
-
-            <Link
-              href="/settings"
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent("sidebar-state-changed", {
-                    detail: { isOpen: isSidebarExpanded },
-                  })
-                );
-              }}
-              className="group relative flex items-center rounded-xl px-2 py-3 text-sm font-medium text-purple-300 transition-all duration-200 hover:bg-purple-800/30 hover:text-white hover:shadow-md"
-            >
-              <Settings className="mr-3 h-5 w-5 flex-shrink-0" />
-              {isSidebarExpanded && <span>Settings</span>}
-            </Link>
           </div>
         </div>
       </aside>
@@ -243,15 +228,6 @@ export function Sidebar() {
                 <span className="text-purple-300 text-sm font-medium">Theme</span>
                 <ThemeToggle />
               </div>
-
-              <Link
-                href="/settings"
-                onClick={() => setIsMobileOpen(false)}
-                className="group relative flex items-center rounded-xl px-3 py-3 text-sm font-medium text-purple-300 transition-all duration-200 hover:bg-purple-800/30 hover:text-white hover:shadow-md"
-              >
-                <Settings className="mr-3 h-5 w-5 flex-shrink-0" />
-                <span>Settings</span>
-              </Link>
             </div>
           </div>
         </div>

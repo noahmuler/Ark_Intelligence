@@ -47,11 +47,14 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   useEffect(() => {
     const handleSidebarChanged = (event: Event) => {
-      const custom = event as CustomEvent<{ isOpen: boolean }>;
+      const custom = event as CustomEvent<{ isDesktopExpanded?: boolean }>;
       const detail = custom.detail;
+
       if (!detail) return;
 
-      setIsSidebarExpanded(!!detail.isOpen);
+      setIsSidebarExpanded(!!detail.isDesktopExpanded);
+
+
     };
 
     window.addEventListener("sidebar-state-changed", handleSidebarChanged as EventListener);
