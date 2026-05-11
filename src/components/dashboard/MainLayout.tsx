@@ -56,9 +56,6 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   // State to track current window width for responsive design decisions
   const [windowWidth, setWindowWidth] = useState(0);
-  
-  // State to track sidebar visibility for main content margin calculations
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   /**
    * Window Resize Event Handler
@@ -88,54 +85,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     };
   }, []); // Empty dependency array - effect runs only once on mount
 
-  /**
-   * Sidebar State Synchronization
-   * 
-   * Listens for custom 'sidebar-state-changed' events dispatched by the Sidebar component.
-   * This ensures the MainLayout stays synchronized with the actual sidebar visibility state.
-   * 
-   * Event Structure:
-   * - Event type: 'sidebar-state-changed'
-   * - Event.detail: { isOpen: boolean } - Current sidebar visibility state
-   * 
-   * Effects:
-   * - Updates local isSidebarOpen state when sidebar state changes
-   * - Enables proper main content margin calculations
-   * - Cleans up event listener on component unmount
-   */
-  useEffect(() => {
-    const handleSidebarChange = (event: CustomEvent) => {
-      setIsSidebarOpen(event.detail.isOpen);
-    };
-
-    // Add custom event listener for sidebar state changes
-    window.addEventListener('sidebar-state-changed', handleSidebarChange as EventListener);
-    
-    // Cleanup: remove event listener on component unmount
-    return () => window.removeEventListener('sidebar-state-changed', handleSidebarChange as EventListener);
-  }, []); // Empty dependency array - effect runs only once on mount
-
-  /**
-   * Desktop Sidebar Auto-Open
-   * 
-   * Automatically opens the sidebar when the screen size is desktop (≥1024px).
-   * This provides consistent desktop experience where the sidebar is expected
-   * to be visible by default.
-   * 
-   * Logic:
-   * - Checks if current window width meets desktop breakpoint
-   * - Sets sidebar to open state on desktop screens
-   * - Respects manual user toggle actions
-   * 
-   * Dependencies:
-   * - windowWidth: Triggers effect when screen size changes
-   */
-  useEffect(() => {
-    if (windowWidth >= 1024) {
-      setIsSidebarOpen(true);
-    }
-  }, [windowWidth]); // Dependency: re-run when windowWidth changes
-
+  
   return (
     <ThemeProvider>
       {/* 
@@ -149,7 +99,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         - Gradient background with theme-aware colors
         - Smooth transitions for theme switching
       */}
-      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-blue-950 to-black dark:from-purple-950 dark:via-blue-950 dark:to-black light:from-gray-50 light:via-white light:to-blue-50 transition-all duration-300 ease-in-out">
+      <div className="min-h-screen bg-gradient-to-br from-purple-950 via-blue-950 to-black dark:from-purple-950 dark:via-blue-950 dark:to-black light:from-gray-50 light:via-blue-50 light:to-blue-50 transition-all duration-300 ease-in-out" style={{display: 'flex', flexDirection: 'column'}}>
         {/* 
           Ambient Background Effects
           
@@ -172,77 +122,91 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
         
         {/* 
-          Sidebar Component
+          Layout Container
           
-          Renders the navigation sidebar with responsive behavior.
-          The sidebar manages its own visibility state and communicates
-          with this component via custom events.
+          Contains sidebar and main content with proper flexbox layout.
+          Uses flexbox to ensure proper positioning and spacing.
+          
+          Layout Strategy:
+          - Sidebar: Fixed width, participates in flex layout
+          - Main Content: Takes remaining space with flex-1
+          - No overlap or positioning conflicts
         */}
-        <Sidebar />
-        
-        {/* 
-          Main Content Area
-          
-          Contains the header and main page content with responsive layout.
-          Applies conditional left margin based on sidebar visibility and screen size.
-          
-          Layout Logic:
-          - On desktop (≥1024px) with open sidebar: Apply lg:ml-64 margin
-          - On mobile or closed sidebar: No left margin
-          - Smooth transitions for layout changes
-        */}
-        <div className={`min-h-screen flex flex-col relative transition-all duration-300 ${
-          windowWidth >= 1024 && isSidebarOpen ? "lg:ml-64" : ""
-        }`}>
+        <div className="flex min-h-screen">
           {/* 
-            Header Component
+            Sidebar Component
             
-            Renders the top navigation bar with market tickers and controls.
-            The header handles its own responsive behavior and state management.
+            Renders navigation sidebar with responsive behavior.
+            The sidebar manages its own visibility state and communicates
+            with this component via custom events.
           */}
-          <Header />
+          <Sidebar />
           
           {/* 
-            Page Content Container
+            Main Content Area
             
-            Main content area with gradient overlay and responsive container.
-            Provides consistent spacing and layout for all page content.
+            Contains header and main page content with responsive layout.
+            Uses flex-1 to take remaining space in flex layout.
             
-            Features:
-            - Flexible layout (flex-1) to fill remaining space
-            - Scrollable content area (overflow-auto)
-            - Gradient overlay for visual depth
-            - Responsive container with progressive padding
+            Layout Logic:
+            - Takes remaining space after sidebar with flex-1
+            - Responsive behavior handled by sidebar component
+            - Smooth transitions for layout changes
           */}
-          <main className="flex-1 overflow-auto relative w-full">
+          <div className="flex-1 flex flex-col relative transition-all duration-300">
             {/* 
-              Content Gradient Overlay
+              Header Component
+                
+                Renders the top navigation bar with full width.
+                The header handles its own responsive behavior and state management.
+                
+                Note: Header is positioned at top of main content area
+                and margin is now properly conditional on sidebar visibility.
+              */}
+              <Header />
               
-              Subtle gradient overlay for visual depth and readability.
-              Positioned absolutely to not affect content flow.
-            */}
-            <div className="absolute inset-0 bg-gradient-to-t from-purple-950/30 via-transparent to-transparent pointer-events-none"></div>
-            
-            {/* 
-              Content Container
-              
-              Responsive container with progressive padding based on screen size.
-              Ensures consistent content spacing across all devices.
-              
-              Breakpoint Strategy:
-              - Default: px-4 (16px)
-              - Small (640px+): px-6 (24px)
-              - Large (1024px+): px-8 (32px)
-              - Extra Large (1280px+): px-12 (48px)
-              - 2X Large (1536px+): px-16 (64px)
-              - Max width: max-w-screen-2xl for optimal readability
-            */}
-            <div className="relative w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
-              {/* Render child components within the content container */}
-              {children}
+              {/* 
+                Page Content Container
+                
+                Main content area with gradient overlay and responsive container.
+                Provides consistent spacing and layout for all page content.
+                
+                Features:
+                - Flexible layout (flex-1) to fill remaining space
+                - Scrollable content area (overflow-auto)
+                - Gradient overlay for visual depth
+                - Responsive container with progressive padding
+              */}
+              <main className="flex-1 overflow-auto relative w-full" style={{position: 'relative', top: 0}}>
+                {/* 
+                  Content Gradient Overlay
+                    
+                    Subtle gradient overlay for visual depth and readability.
+                    Positioned absolutely to not affect content flow.
+                */}
+                <div className="absolute inset-0 bg-gradient-to-t from-purple-950/30 via-transparent to-transparent pointer-events-none"></div>
+                
+                {/* 
+                  Content Container
+                    
+                    Responsive container with progressive padding based on screen size.
+                    Ensures consistent content spacing across all devices.
+                    
+                    Breakpoint Strategy:
+                    - Default: px-4 (16px)
+                    - Small (640px+): px-6 (24px)
+                    - Large (1024px+): px-8 (32px)
+                    - Extra Large (1280px+): px-12 (48px)
+                    - 2X Large (1536px+): px-16 (64px)
+                    - Max width: max-w-screen-2xl for optimal readability
+                  */}
+                  <div className="relative w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
+                    {/* Render child components within content container */}
+                    {children}
+                  </div>
+                </main>
+              </div>
             </div>
-          </main>
-        </div>
       </div>
     </ThemeProvider>
   );

@@ -446,9 +446,10 @@ export function Header() {
         Ark Intelligence Branding Section
         
         Contains logo, hamburger menu, and site title.
-        Positioned on the left side of the header.
+        Fixed width section that doesn't grow or shrink.
+        Uses flex-shrink-0 and fixed width constraints.
       */}
-      <div className="relative px-4 border-r border-purple-800/50 flex items-center space-x-3 min-w-fit">
+      <div className="relative px-4 border-r border-purple-800/50 flex items-center space-x-3 flex-shrink-0 w-64">
         {/* 
           Hamburger Menu Button
           
@@ -494,10 +495,11 @@ export function Header() {
         Market Tickers Section
         
         Displays real-time market data for various tickers.
-        Includes price, change, and percentage change information.
+        Uses flex-grow to fill available space between branding and world times.
+        Responsive design adapts to all screen sizes.
       */}
       {/* Market Tickers - Oil, DXY, US10Y */}
-      <div className="relative flex-1 flex items-center justify-center min-w-0 px-2 lg:px-4 xl:px-6">
+      <div className="relative flex-1 flex items-center justify-center min-w-0 px-2 lg:px-4 xl:px-6 overflow-hidden">
         <div className="flex items-center space-x-2 lg:space-x-4 xl:space-x-6 overflow-x-auto">
           {tickerData.map((item) => (
             <div 
@@ -523,8 +525,13 @@ export function Header() {
         </div>
       </div>
 
-      {/* World Times */}
-      <div className="relative px-2 lg:px-4 xl:px-6 border-l border-purple-800/50 flex items-center min-w-fit">
+      {/* 
+        World Times Section
+        
+        Displays world market times with responsive width.
+        Uses flex-shrink-0 to maintain consistent layout on all screen sizes.
+      */}
+      <div className="relative px-2 lg:px-4 xl:px-6 border-l border-purple-800/50 flex items-center flex-shrink-0 w-48">
         <div className="flex items-center space-x-2 lg:space-x-4">
           <Clock className="h-4 w-4 text-purple-400" />
           <div className="flex items-center space-x-2 lg:space-x-3">

@@ -81,10 +81,7 @@ export function Sidebar() {
   // Get current pathname for active navigation state
   const pathname = usePathname();
   
-  // State for mobile menu visibility (controlled by hamburger menu)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // State for desktop sidebar visibility (controlled by toggle button)
+  // State for sidebar visibility (single source of truth for both mobile and desktop)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // State to detect desktop screen size for responsive behavior
@@ -152,30 +149,21 @@ export function Sidebar() {
    * - No payload required (Sidebar handles toggle logic internally)
    * 
    * Toggle Logic:
-   * - Desktop: Toggle sidebar visibility state
-   * - Mobile: Toggle mobile menu visibility state
+   * - Single state for both mobile and desktop
    * - Emits state change event for Header synchronization
    * 
    * Effects:
-   * - Updates appropriate state based on screen size
+   * - Updates sidebar state
    * - Dispatches state change event for cross-component sync
    * - Cleans up event listener on component unmount
    */
   useEffect(() => {
     const handleToggleSidebar = () => {
-      if (isDesktop) {
-        // On desktop, toggle sidebar state
-        const newState = !isSidebarOpen;
-        setIsSidebarOpen(newState);
-        // Emit state change for Header to track
-        window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: newState } }));
-      } else {
-        // On mobile, toggle mobile menu
-        const newState = !isMobileMenuOpen;
-        setIsMobileMenuOpen(newState);
-        // Emit state change for Header to track
-        window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: newState } }));
-      }
+      // Toggle sidebar state for both mobile and desktop
+      const newState = !isSidebarOpen;
+      setIsSidebarOpen(newState);
+      // Emit state change for Header to track
+      window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: newState } }));
     };
 
     // Add custom event listener for sidebar toggle requests
@@ -183,7 +171,7 @@ export function Sidebar() {
     
     // Cleanup: remove event listener on component unmount
     return () => window.removeEventListener('toggle-sidebar', handleToggleSidebar);
-  }, [isSidebarOpen, isMobileMenuOpen, isDesktop]); // Dependencies: re-run when states or screen size changes
+  }, [isSidebarOpen]); // Dependencies: re-run when sidebar state changes
 
   return (
     /**
@@ -206,12 +194,11 @@ export function Sidebar() {
         - Transitions: Smooth slide-in/out animations
       */}
       <div className={`
-        fixed inset-y-0 left-0 z-40 w-64 flex-col
-        transform transition-transform duration-300 ease-in-out
         ${isDesktop ? 
-          (isSidebarOpen ? "translate-x-0 lg:relative" : "-translate-x-full lg:relative") : 
-          (isMobileMenuOpen ? "translate-x-0" : "-translate-x-full")
+          (isSidebarOpen ? "w-64 flex-col flex-shrink-0" : "w-0 overflow-hidden") : 
+          "fixed inset-y-0 left-0 z-40 w-64 flex-col " + (isSidebarOpen ? "translate-x-0" : "-translate-x-full")
         }
+        transform transition-all duration-300 ease-in-out
       `}>
         <div className="h-full bg-purple-950/95 backdrop-blur-xl border-r border-purple-800/70 shadow-2xl">
           {/* 
@@ -258,12 +245,10 @@ export function Sidebar() {
                   key={item.name}
                   href={item.href}
                   onClick={() => {
-                    // Close sidebar after navigation (different behavior for desktop/mobile)
-                    if (isDesktop) {
-                      setIsSidebarOpen(false);
-                    } else {
-                      setIsMobileMenuOpen(false);
-                    }
+                    // Close sidebar after navigation
+                    setIsSidebarOpen(false);
+                    // Emit state change event for Header synchronization
+                    window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: false } }));
                   }}
                   className={`
                     group relative flex items-center rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200
@@ -341,12 +326,10 @@ export function Sidebar() {
             <Link
               href="/settings"
               onClick={() => {
-                // Close sidebar after navigation (different behavior for desktop/mobile)
-                if (isDesktop) {
-                  setIsSidebarOpen(false);
-                } else {
-                  setIsMobileMenuOpen(false);
-                }
+                // Close sidebar after navigation
+                setIsSidebarOpen(false);
+                // Emit state change event for Header synchronization
+                window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: false } }));
               }}
               className="group relative flex items-center rounded-xl px-3 py-3 text-sm font-medium text-purple-300 transition-all duration-200 hover:bg-purple-800/30 hover:text-white hover:shadow-md"
             >
@@ -360,25 +343,27 @@ export function Sidebar() {
       {/* 
         Mobile Overlay
         
-        Backdrop overlay that appears when mobile menu is open.
+        Backdrop overlay that appears when sidebar is open on mobile.
         Provides click-outside-to-close functionality.
         
         Visibility Logic:
         - Only shows on mobile (not desktop)
-        - Only when mobile menu is open
-        - Clicking overlay closes mobile menu
+        - Only when sidebar is open
+        - Clicking overlay closes sidebar
         
         Styling:
         - Fixed positioning to cover entire screen
         - Semi-transparent background with blur effect
         - High z-index to appear above content
       */}
-      {isMobileMenuOpen && !isDesktop && (
+      {!isDesktop && isSidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
           onClick={() => {
-            // Close mobile menu when overlay is clicked
-            setIsMobileMenuOpen(false);
+            // Close sidebar when overlay is clicked
+            setIsSidebarOpen(false);
+            // Emit state change event for Header synchronization
+            window.dispatchEvent(new CustomEvent('sidebar-state-changed', { detail: { isOpen: false } }));
           }}
         />
       )}
