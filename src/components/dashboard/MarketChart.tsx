@@ -14,9 +14,10 @@ interface MarketChartProps {
   symbol: string;
   name: string;
   className?: string;
+  disabledChart?: boolean;
 }
 
-export function MarketChart({ symbol, name, className = "" }: MarketChartProps) {
+export function MarketChart({ symbol, name, className = "", disabledChart = false }: MarketChartProps) {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [priceChange, setPriceChange] = useState<number>(0);
@@ -29,67 +30,52 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  // Generate mock chart data based on symbol
-  const generateMockData = (basePrice: number, symbol: string): ChartDataPoint[] => {
-    const now = new Date();
-    const data: ChartDataPoint[] = [];
-    
-    for (let i = 59; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60000); // 1-minute intervals
-      const randomChange = (Math.random() - 0.5) * basePrice * 0.002; // Small random changes
-      const price = basePrice + randomChange + Math.sin(i * 0.1) * basePrice * 0.001; // Trend
-      const volume = Math.floor(Math.random() * 1000000) + 500000;
-      
-      data.push({
-        time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        price: parseFloat(price.toFixed(2)),
-        volume
-      });
-    }
-    
-    return data;
-  };
-
-  // Fetch real price data
+  // Fetch real chart data (using ticker endpoint; canvas series is derived from returned prices)
   useEffect(() => {
-    const fetchPriceData = async () => {
+    const fetchChartData = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // For demo purposes, use realistic mock data
-        // In production, this would fetch from real API
-        const mockPrices: { [key: string]: number } = {
-          'XAUUSD': 2752.18,
-          'XAGUSD': 31.28,
-          'BTCUSD': 67845.32,
-          'ETHUSD': 3542.19,
-          'SPX': 4528.76,
-          'AAPL': 179.82,
-          'MSFT': 379.45,
-          'GOOGL': 143.21,
-          'WTIUSD': 81.92,
-          'DXY': 105.73,
-          'EURUSD': 1.0842,
-          'GBPUSD': 1.2741,
-          'USDJPY': 149.18
-        };
-        
-        const basePrice = mockPrices[symbol] || 1000;
-        const data = generateMockData(basePrice, symbol);
-        
+
+        // Current quote
+        const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbol)}`);
+        if (!res.ok) {
+          throw new Error(`Ticker request failed: ${res.status}`);
+        }
+        const json = await res.json();
+        const quote = json?.data?.[symbol];
+        if (!quote || typeof quote.price !== 'number') {
+          throw new Error('Invalid ticker response');
+        }
+
+        // Build a synthesized mini-history for the canvas display using quote.change when possible
+        const now = new Date();
+        const data: ChartDataPoint[] = [];
+
+        const change = typeof quote.change === 'number' ? quote.change : 0;
+        const oldestPrice = quote.price - change;
+        const points = 60;
+        for (let i = points - 1; i >= 0; i--) {
+          const t = i / (points - 1);
+          const price = oldestPrice + (quote.price - oldestPrice) * t;
+          const time = new Date(now.getTime() - i * 60_000);
+          data.push({
+            time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            price: Number(price.toFixed(2)),
+            volume: typeof quote.volume === 'number' ? quote.volume : undefined,
+          });
+        }
+
         setChartData(data);
-        setCurrentPrice(basePrice);
-        
-        // Calculate price change from oldest data point
+        setCurrentPrice(quote.price);
+
         if (data.length > 1) {
           const oldestPrice = data[0].price;
-          const change = basePrice - oldestPrice;
-          const changePercent = (change / oldestPrice) * 100;
+          const change = quote.price - oldestPrice;
+          const changePercent = oldestPrice !== 0 ? (change / oldestPrice) * 100 : 0;
           setPriceChange(change);
           setPriceChangePercent(changePercent);
         }
-        
       } catch (err) {
         console.error('Failed to fetch chart data:', err);
         setError('Failed to load chart data');
@@ -98,13 +84,11 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
       }
     };
 
-    fetchPriceData();
-    
-    // Update every 30 seconds
-    const interval = setInterval(fetchPriceData, 30000);
+    fetchChartData();
+    const interval = setInterval(fetchChartData, 30000);
     return () => clearInterval(interval);
-    
-  }, [symbol, timeframe]);
+  }, [symbol]);
+
 
   // Draw chart on canvas
   useEffect(() => {
@@ -275,22 +259,30 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
           </div>
         )}
         
-        <canvas
-          ref={canvasRef}
-          className={`w-full h-48 sm:h-64 ${loading || error ? 'opacity-50' : ''}`}
-          style={{ display: 'block' }}
-        />
-        
-        {/* TradingView Widget */}
-        <TradingViewWidget
-          symbol={symbol}
-          interval={timeframe}
-          theme="light"
-          height={300}
-          width="100%"
-          studies={['RSI', 'MACD', 'BB']}
-          className="w-full"
-        />
+        {disabledChart ? (
+          <div className="w-full h-48 sm:h-64 rounded-2xl border border-purple-900/50 bg-purple-950/50 flex items-center justify-center text-purple-200">
+            Chart unavailable for this view
+          </div>
+        ) : (
+          <>
+            <canvas
+              ref={canvasRef}
+              className={`w-full h-48 sm:h-64 ${loading || error ? 'opacity-50' : ''}`}
+              style={{ display: 'block' }}
+            />
+
+            {/* TradingView Widget */}
+            <TradingViewWidget
+              symbol={symbol}
+              interval={timeframe}
+              theme="light"
+              height={300}
+              width="100%"
+              studies={['RSI', 'MACD', 'BB']}
+              className="w-full"
+            />
+          </>
+        )}
       </div>
 
       {/* Time Frame Selector */}
