@@ -16,6 +16,7 @@ import {
   Settings,
   Activity,
 } from "lucide-react";
+import { LogoIcon } from "@/components/ui/hamburger-icon";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -89,7 +90,16 @@ export function Sidebar() {
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg blur opacity-25" />
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg">
-                  <Activity className="h-5 w-5 text-white" />
+                  <LogoIcon 
+                    className="h-5 w-5 text-white" 
+                    onClick={() => {
+                      if (window.innerWidth >= 1024) {
+                        setIsSidebarExpanded(!isSidebarExpanded);
+                      } else {
+                        setIsMobileOpen(!isMobileOpen);
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
@@ -173,11 +183,10 @@ export function Sidebar() {
           <div className="h-full bg-purple-950/95 backdrop-blur-xl border-r border-purple-800/70 shadow-2xl">
             <div className="flex h-16 items-center px-6 border-b border-purple-800/50">
               <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg blur opacity-25" />
-                  <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg">
-                    <Activity className="h-5 w-5 text-white" />
-                  </div>
+                <div className="flex-1">
+                  <span className="text-lg font-bold text-white bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
+                    Ark Intelligence
+                  </span>
                 </div>
 
                 <span className="text-lg font-bold text-white bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">

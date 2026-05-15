@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/contexts/ThemeContext";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -17,6 +18,12 @@ import {
   BarChart3,
   Activity
 } from "lucide-react";
+import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
+import { StockData } from "@/services/polygonStockData";
+import { analyzeStock } from "@/services/geminiMarketAnalysis";
+import { fetchMultipleCryptoData, CRYPTO_SYMBOL_MAP, getFallbackCryptoData } from "@/services/coinGeckoCryptoData";
+
+type AssetCategory = "forex" | "crypto" | "stocks" | "metals";
 
 interface Asset {
   symbol: string;
@@ -38,94 +45,255 @@ interface Asset {
     macd: number;
     bollinger: number;
   };
+  category: AssetCategory;
 }
 
-const mockAssets: Asset[] = [
-  // Top 3 assets: XAU, XAG, BTC
+/**
+ * Determine asset category based on symbol
+ */
+const getAssetCategory = (symbol: string): AssetCategory => {
+  const cryptoSymbols = ['BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOTUSD'];
+  const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'SPX', 'QQQ', 'DIA'];
+  const metalsSymbols = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']; // Gold, Silver, Platinum, Palladium
+  
+  if (cryptoSymbols.includes(symbol)) return 'crypto';
+  if (stockSymbols.includes(symbol)) return 'stocks';
+  if (metalsSymbols.includes(symbol)) return 'metals';
+  return 'forex'; // Default to forex for currency pairs, indices, etc.
+};
+
+/**
+ * Transform StockData to Asset format
+ */
+const transformStockToAsset = (stock: StockData): Asset => {
+  const sentiment = stock.changePercent > 1 ? "Bullish" : 
+                   stock.changePercent < -1 ? "Bearish" : "Neutral";
+  const confidence = Math.min(95, Math.max(50, Math.abs(stock.changePercent) * 10 + 50));
+  
+  return {
+    symbol: stock.symbol,
+    name: stock.name,
+    price: stock.price,
+    dayChange: stock.change,
+    overallChange: stock.changePercent,
+    sentiment,
+    confidence: Math.round(confidence),
+    aiAnalysis: `${stock.name} is currently trading at $${stock.price.toFixed(2)} with a ${stock.changePercent > 0 ? 'positive' : 'negative'} sentiment. Recent price action suggests ${sentiment.toLowerCase()} conditions with ${confidence}% confidence.`,
+    volume: stock.volume > 1000000 ? `${(stock.volume / 1000000).toFixed(1)}M` : `${(stock.volume / 1000).toFixed(1)}K`,
+    marketCap: stock.marketCap > 1000000000000 ? `${(stock.marketCap / 1000000000000).toFixed(1)}T` : 
+               stock.marketCap > 1000000000 ? `${(stock.marketCap / 1000000000).toFixed(1)}B` :
+               `${(stock.marketCap / 1000000).toFixed(1)}M`,
+    dayHigh: stock.dayHigh || stock.price * 1.01,
+    dayLow: stock.dayLow || stock.price * 0.99,
+    weekHigh: stock.fiftyTwoWeekHigh || stock.price * 1.15,
+    weekLow: stock.fiftyTwoWeekLow || stock.price * 0.85,
+    technicalIndicators: {
+      rsi: 50 + (stock.changePercent * 2),
+      macd: stock.change * 10,
+      bollinger: stock.price
+    },
+    category: getAssetCategory(stock.symbol)
+  };
+};
+
+/**
+ * Fetch real crypto prices from CoinGecko
+ */
+const fetchRealCryptoPrices = async (): Promise<{ [key: string]: any }> => {
+  try {
+    const cryptoSymbols = ['bitcoin', 'ethereum'];
+    const cryptoData = await fetchMultipleCryptoData(cryptoSymbols);
+    
+    const cryptoPrices: { [key: string]: any } = {};
+    cryptoData.forEach(crypto => {
+      cryptoPrices[crypto.symbol] = {
+        price: crypto.current_price,
+        dayChange: crypto.price_change_percentage_24h * crypto.current_price / 100,
+        overallChange: crypto.price_change_percentage_7d * crypto.current_price / 100,
+        volume: crypto.total_volume.toString(),
+        marketCap: crypto.market_cap.toString(),
+        dayHigh: crypto.high_24h,
+        dayLow: crypto.low_24h
+      };
+    });
+    
+    return cryptoPrices;
+  } catch (error) {
+    console.error('Error fetching crypto prices:', error);
+    return {};
+  }
+};
+
+/**
+ * Fetch real assets from APIs
+ */
+const fetchRealAssets = async (): Promise<Asset[]> => {
+  try {
+    // Fetch both stock and crypto data
+    const [marketResponse, cryptoPrices] = await Promise.all([
+      fetchComprehensiveMarketData(),
+      fetchRealCryptoPrices()
+    ]);
+    
+    const stockData = marketResponse.data.stocks;
+    
+    // Transform stock data to assets
+    const stockAssets = stockData.map(transformStockToAsset);
+    
+    // Get fallback assets to merge with real data
+    const fallbackAssets = getFallbackAssets();
+    
+    // Merge real data with fallback for better coverage
+    const mergedAssets = fallbackAssets.map(fallbackAsset => {
+      // Check if we have real crypto data for this asset
+      if (cryptoPrices[fallbackAsset.symbol]) {
+        const cryptoData = cryptoPrices[fallbackAsset.symbol];
+        return {
+          ...fallbackAsset,
+          price: cryptoData.price,
+          dayChange: cryptoData.dayChange,
+          overallChange: cryptoData.overallChange,
+          volume: cryptoData.volume,
+          marketCap: cryptoData.marketCap,
+          dayHigh: cryptoData.dayHigh,
+          dayLow: cryptoData.dayLow
+        };
+      }
+      
+      // Check if we have real stock data for this asset
+      const stockAsset = stockAssets.find(sa => sa.symbol === fallbackAsset.symbol);
+      if (stockAsset) {
+        return stockAsset;
+      }
+      
+      // Return fallback if no real data available
+      return fallbackAsset;
+    });
+    
+    // Get AI analysis for each asset
+    const assetsWithAI = await Promise.all(
+      mergedAssets.map(async (asset) => {
+        try {
+          const analysis = await analyzeStock(asset.symbol, {
+            price: asset.price,
+            change: asset.dayChange,
+            changePercent: (asset.dayChange / asset.price) * 100,
+            volume: parseInt(asset.volume.replace(/[^0-9]/g, '')) || 0
+          });
+          
+          return {
+            ...asset,
+            aiAnalysis: analysis.analysis.summary,
+            confidence: Math.round(analysis.analysis.riskLevel === 'Low' ? 85 : 
+                                     analysis.analysis.riskLevel === 'High' ? 65 : 75),
+            sentiment: (analysis.analysis.marketOutlook === 'Positive' ? 'Bullish' : 
+                       analysis.analysis.marketOutlook === 'Negative' ? 'Bearish' : 'Neutral') as "Bullish" | "Bearish" | "Neutral"
+          };
+        } catch (error) {
+          console.warn(`Failed to get AI analysis for ${asset.symbol}:`, error);
+          return asset;
+        }
+      })
+    );
+    
+    return assetsWithAI;
+  } catch (error) {
+    console.error('Error fetching real assets:', error);
+    return [];
+  }
+};
+
+/**
+ * Fallback assets for when API fails
+ */
+const getFallbackAssets = (): Asset[] => [
   {
     symbol: "XAUUSD",
     name: "Gold / US Dollar",
-    price: 2345.67,
-    dayChange: -8.23,
-    overallChange: -2.35,
-    sentiment: "Bearish",
+    price: 2748.32,
+    dayChange: 15.23,
+    overallChange: 2.15,
+    sentiment: "Bullish",
     confidence: 78,
-    aiAnalysis: "Gold is experiencing short-term bearish pressure due to strong dollar and rising yields. However, long-term fundamentals remain supportive with central bank buying and geopolitical tensions providing a floor. Key support at $2,320, resistance at $2,380.",
+    aiAnalysis: "Gold shows strength amid geopolitical tensions and inflation concerns. Central bank buying continues to support prices. Technical indicators suggest further upside potential. Key support at $2,700, resistance at $2,800.",
     volume: "124.5K",
     marketCap: "14.2T",
-    dayHigh: 2355.00,
-    dayLow: 2340.50,
-    weekHigh: 2380.00,
-    weekLow: 2320.00,
+    dayHigh: 2765.00,
+    dayLow: 2730.50,
+    weekHigh: 2800.00,
+    weekLow: 2700.00,
     technicalIndicators: {
-      rsi: 42.3,
-      macd: -15.2,
-      bollinger: 2367.8
-    }
+      rsi: 62.3,
+      macd: 15.2,
+      bollinger: 2767.8
+    },
+    category: "metals"
   },
   {
     symbol: "XAGUSD",
     name: "Silver / US Dollar",
-    price: 28.45,
-    dayChange: 0.12,
-    overallChange: 1.58,
+    price: 31.52,
+    dayChange: 0.85,
+    overallChange: 2.34,
     sentiment: "Bullish",
     confidence: 65,
-    aiAnalysis: "Silver shows resilience amid industrial demand recovery and investment interest. Technical indicators suggest upside potential with $29.50 as key resistance level. Support at $27.80.",
+    aiAnalysis: "Silver shows strength amid industrial demand recovery and investment interest. Technical indicators suggest upside potential with $32.50 as key resistance level. Support at $31.00.",
     volume: "89.7K",
     marketCap: "1.8T",
-    dayHigh: 28.65,
-    dayLow: 28.20,
-    weekHigh: 29.10,
-    weekLow: 27.80,
+    dayHigh: 31.85,
+    dayLow: 31.20,
+    weekHigh: 32.50,
+    weekLow: 31.00,
     technicalIndicators: {
-      rsi: 58.7,
-      macd: 0.8,
-      bollinger: 28.2
-    }
+      rsi: 61.2,
+      macd: 1.2,
+      bollinger: 31.5
+    },
+    category: "metals"
   },
   {
     symbol: "BTCUSD",
     name: "Bitcoin / US Dollar",
-    price: 42856.32,
-    dayChange: 1250.45,
-    overallChange: 8.92,
+    price: 67845.32,
+    dayChange: 2341.57,
+    overallChange: 12.45,
     sentiment: "Bullish",
     confidence: 88,
-    aiAnalysis: "Bitcoin shows strong momentum as institutional adoption accelerates. ETF approval expectations drive buying. Key resistance at $45,000, support at $40,000 remains solid.",
+    aiAnalysis: "Bitcoin shows strong momentum as institutional adoption accelerates and ETF inflows continue. Recent price action suggests continuation of uptrend. Key resistance at $70,000, support at $65,000 remains solid.",
     volume: "2.8M",
-    marketCap: "835.2B",
-    dayHigh: 43500.00,
-    dayLow: 41500.00,
-    weekHigh: 45000.00,
-    weekLow: 40000.00,
+    marketCap: "1.31T",
+    dayHigh: 68500.00,
+    dayLow: 66500.00,
+    weekHigh: 70000.00,
+    weekLow: 65000.00,
     technicalIndicators: {
       rsi: 74.8,
       macd: 1250.3,
-      bollinger: 41500.0
-    }
+      bollinger: 66500.0
+    },
+    category: "crypto"
   },
-  // Second row: OIL, DXY, US10Y
   {
     symbol: "WTIUSD",
     name: "Crude Oil WTI",
-    price: 78.45,
-    dayChange: -1.23,
-    overallChange: -3.45,
-    sentiment: "Bearish",
+    price: 82.35,
+    dayChange: 1.67,
+    overallChange: 2.85,
+    sentiment: "Bullish",
     confidence: 68,
-    aiAnalysis: "Oil prices pressured by demand concerns and OPEC+ production decisions. Key support at $75, resistance at $82. Geopolitical risks remain elevated.",
+    aiAnalysis: "Oil prices gain support from supply concerns and OPEC+ production decisions. Geopolitical tensions in key producing regions provide upside. Key support at $80, resistance at $85.",
     volume: "567.8K",
     marketCap: "N/A",
-    dayHigh: 80.20,
-    dayLow: 77.85,
-    weekHigh: 82.30,
-    weekLow: 75.00,
+    dayHigh: 83.20,
+    dayLow: 81.85,
+    weekHigh: 85.30,
+    weekLow: 80.00,
     technicalIndicators: {
-      rsi: 41.7,
-      macd: -1.8,
-      bollinger: 80.2
-    }
+      rsi: 58.3,
+      macd: 1.5,
+      bollinger: 81.2
+    },
+    category: "forex"
   },
   {
     symbol: "DXY",
@@ -146,7 +314,8 @@ const mockAssets: Asset[] = [
       rsi: 68.7,
       macd: 2.4,
       bollinger: 104.2
-    }
+    },
+    category: "forex"
   },
   {
     symbol: "US10Y",
@@ -167,9 +336,9 @@ const mockAssets: Asset[] = [
       rsi: 45.2,
       macd: -0.3,
       bollinger: 4.38
-    }
+    },
+    category: "forex"
   },
-  // Remaining assets: FX then crypto
   {
     symbol: "EURUSD",
     name: "Euro / US Dollar",
@@ -189,7 +358,8 @@ const mockAssets: Asset[] = [
       rsi: 38.5,
       macd: -8.7,
       bollinger: 1.0892
-    }
+    },
+    category: "forex"
   },
   {
     symbol: "GBPUSD",
@@ -210,7 +380,8 @@ const mockAssets: Asset[] = [
       rsi: 52.1,
       macd: 1.2,
       bollinger: 1.2768
-    }
+    },
+    category: "forex"
   },
   {
     symbol: "USDJPY",
@@ -231,28 +402,74 @@ const mockAssets: Asset[] = [
       rsi: 71.3,
       macd: 3.8,
       bollinger: 147.5
-    }
+    },
+    category: "forex"
   },
   {
     symbol: "ETHUSD",
     name: "Ethereum / US Dollar",
-    price: 2284.56,
-    dayChange: 85.23,
-    overallChange: 5.67,
+    price: 3524.78,
+    dayChange: 124.67,
+    overallChange: 8.34,
     sentiment: "Bullish",
     confidence: 76,
-    aiAnalysis: "Ethereum benefits from network upgrades and DeFi growth. Shanghai upgrade success boosts confidence. Resistance at $2,400, support at $2,200.",
+    aiAnalysis: "Ethereum benefits from network upgrades and DeFi growth along with broader crypto market rally. Recent technical improvements boost confidence. Resistance at $3,600, support at $3,400.",
     volume: "1.2M",
-    marketCap: "274.1B",
-    dayHigh: 2350.00,
-    dayLow: 2200.00,
-    weekHigh: 2400.00,
-    weekLow: 2200.00,
+    marketCap: "423.5B",
+    dayHigh: 3580.00,
+    dayLow: 3450.00,
+    weekHigh: 3600.00,
+    weekLow: 3400.00,
     technicalIndicators: {
       rsi: 65.4,
       macd: 85.6,
-      bollinger: 2250.0
-    }
+      bollinger: 3450.0
+    },
+    category: "crypto"
+  },
+  {
+    symbol: "XPTUSD",
+    name: "Platinum / US Dollar",
+    price: 945.80,
+    dayChange: 5.20,
+    overallChange: 0.55,
+    sentiment: "Bullish",
+    confidence: 62,
+    aiAnalysis: "Platinum shows strength amid industrial demand recovery from automotive sector. Key resistance at $980, support at $920.",
+    volume: "45.2K",
+    marketCap: "285.6B",
+    dayHigh: 950.20,
+    dayLow: 940.50,
+    weekHigh: 965.00,
+    weekLow: 920.00,
+    technicalIndicators: {
+      rsi: 56.3,
+      macd: 2.1,
+      bollinger: 938.5
+    },
+    category: "metals"
+  },
+  {
+    symbol: "XPDUSD",
+    name: "Palladium / US Dollar",
+    price: 1234.50,
+    dayChange: -8.75,
+    overallChange: -0.70,
+    sentiment: "Bearish",
+    confidence: 58,
+    aiAnalysis: "Palladium faces pressure from substitution to platinum in automotive catalysts. Key resistance at $1,280, support at $1,200.",
+    volume: "32.8K",
+    marketCap: "67.2B",
+    dayHigh: 1243.20,
+    dayLow: 1230.80,
+    weekHigh: 1280.00,
+    weekLow: 1200.00,
+    technicalIndicators: {
+      rsi: 41.2,
+      macd: -3.4,
+      bollinger: 1238.5
+    },
+    category: "metals"
   },
   {
     symbol: "SPX",
@@ -273,13 +490,82 @@ const mockAssets: Asset[] = [
       rsi: 58.3,
       macd: 18.7,
       bollinger: 4510.5
-    }
+    },
+    category: "stocks"
+  },
+  {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    price: 178.45,
+    dayChange: 2.34,
+    overallChange: 1.33,
+    sentiment: "Bullish",
+    confidence: 72,
+    aiAnalysis: "Apple shows strength with iPhone sales and services growth. Key resistance at $185, support at $170.",
+    volume: "45.2M",
+    marketCap: "2.8T",
+    dayHigh: 180.20,
+    dayLow: 176.80,
+    weekHigh: 185.00,
+    weekLow: 170.00,
+    technicalIndicators: {
+      rsi: 62.1,
+      macd: 2.8,
+      bollinger: 175.5
+    },
+    category: "stocks"
+  },
+  {
+    symbol: "MSFT",
+    name: "Microsoft Corporation",
+    price: 378.22,
+    dayChange: 3.12,
+    overallChange: 0.83,
+    sentiment: "Bullish",
+    confidence: 68,
+    aiAnalysis: "Microsoft benefits from AI and cloud growth. Azure expansion drives revenue. Key resistance at $385, support at $370.",
+    volume: "32.1M",
+    marketCap: "2.8T",
+    dayHigh: 380.50,
+    dayLow: 375.80,
+    weekHigh: 385.00,
+    weekLow: 370.00,
+    technicalIndicators: {
+      rsi: 58.7,
+      macd: 3.5,
+      bollinger: 376.2
+    },
+    category: "stocks"
+  },
+  {
+    symbol: "GOOGL",
+    name: "Alphabet Inc.",
+    price: 142.56,
+    dayChange: -1.45,
+    overallChange: -1.01,
+    sentiment: "Bearish",
+    confidence: 65,
+    aiAnalysis: "Google faces regulatory pressure but AI investments show promise. Key resistance at $148, support at $138.",
+    volume: "28.9M",
+    marketCap: "1.8T",
+    dayHigh: 144.20,
+    dayLow: 141.80,
+    weekHigh: 148.00,
+    weekLow: 138.00,
+    technicalIndicators: {
+      rsi: 42.3,
+      macd: -1.8,
+      bollinger: 143.5
+    },
+    category: "stocks"
   }
 ];
 
 export function MacroDesk({ className = "" }: { className?: string }) {
   const router = useRouter();
-  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+  const { theme } = useTheme();
+  const [assets, setAssets] = useState<Asset[]>(getFallbackAssets());
+  const [selectedCategory, setSelectedCategory] = useState<AssetCategory | 'all'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -288,6 +574,17 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   // resizeTimeout is intentionally not used (avoid extra renders while animating)
   const [resizeTimeout] = useState<NodeJS.Timeout | null>(null);
   const [modalPhase, setModalPhase] = useState<'closed' | 'opening' | 'open' | 'closing'>('closed');
+
+  // Filter assets by selected category
+  const filteredAssets = selectedCategory === 'all' 
+    ? assets 
+    : assets.filter(asset => asset.category === selectedCategory);
+
+  // Get asset counts for each category
+  const getCategoryCount = (category: AssetCategory | 'all') => {
+    if (category === 'all') return assets.length;
+    return assets.filter(asset => asset.category === category).length;
+  };
 
 
 
@@ -311,18 +608,43 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   useEffect(() => {
     if (!mounted) return;
     
-    // Simulate periodic price updates
-    const interval = setInterval(() => {
-      setAssets(prev => 
-        prev.map(asset => ({
-          ...asset,
-          price: asset.price + (Math.random() - 0.5) * 0.5,
-          dayChange: asset.dayChange + (Math.random() - 0.5) * 0.1
-        }))
-      );
-    }, 5000); // Update every 5 seconds
+    // Ensure we have fallback data immediately
+    const fallbackAssets = getFallbackAssets();
+    setAssets(fallbackAssets);
+    console.log('Loaded fallback assets:', fallbackAssets.length);
+    
+    // Initial data fetch
+    const fetchInitialData = async () => {
+      try {
+        console.log('Attempting to fetch real assets...');
+        const realAssets = await fetchRealAssets();
+        console.log('Successfully fetched real assets:', realAssets.length);
+        setAssets(realAssets);
+      } catch (error) {
+        console.error('Initial asset data fetch failed:', error);
+        // Fallback data is already set
+      }
+    };
 
-    return () => clearInterval(interval);
+    // Delay initial fetch to allow component to render first
+    const timeoutId = setTimeout(fetchInitialData, 1000);
+    
+    // Set up interval for real-time data updates
+    const interval = setInterval(async () => {
+      try {
+        console.log('Fetching periodic asset data...');
+        const realAssets = await fetchRealAssets();
+        setAssets(realAssets);
+      } catch (error) {
+        console.error('Periodic asset data fetch failed:', error);
+        // Keep current data if periodic fetch fails
+      }
+    }, 60000); // Update every 60 seconds for real API data
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [mounted]);
 
 
@@ -348,11 +670,17 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   };
 
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
+    try {
+      const realAssets = await fetchRealAssets();
+      setAssets(realAssets);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      // Keep current data if refresh fails
+    } finally {
       setIsRefreshing(false);
-    }, 1000);
+    }
   };
 
   const toggleCardExpansion = (cardId: string) => {
@@ -443,8 +771,21 @@ export function MacroDesk({ className = "" }: { className?: string }) {
     return change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
   };
 
-  // Fix hydration mismatch by only rendering after mount
-  if (!mounted) return null;
+  // Show loading state while mounting
+  if (!mounted) {
+    return (
+      <div className={className}>
+        <div className="animate-pulse">
+          <div className="h-8 bg-purple-800 rounded w-1/3 mb-4"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-48 bg-purple-800 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const expandedCard = Array.from(expandedCards)[0];
   const expandedAsset = expandedCard ? assets.find(a => a.symbol === expandedCard) : null;
@@ -488,12 +829,101 @@ export function MacroDesk({ className = "" }: { className?: string }) {
         </div>
       </div>
 
+      {/* Category Tabs */}
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-2 p-1 bg-purple-900/30 rounded-xl backdrop-blur-sm border border-purple-800/50">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              selectedCategory === 'all'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              <span>All</span>
+              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
+                {getCategoryCount('all')}
+              </span>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setSelectedCategory('forex')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              selectedCategory === 'forex'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              <span>Forex</span>
+              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
+                {getCategoryCount('forex')}
+              </span>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setSelectedCategory('crypto')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              selectedCategory === 'crypto'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              <span>Crypto</span>
+              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
+                {getCategoryCount('crypto')}
+              </span>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setSelectedCategory('metals')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              selectedCategory === 'metals'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4" />
+              <span>Metals</span>
+              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
+                {getCategoryCount('metals')}
+              </span>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setSelectedCategory('stocks')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              selectedCategory === 'stocks'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>Stocks</span>
+              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
+                {getCategoryCount('stocks')}
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
 
       {/* Asset Cards Grid */}
-  <div className={`max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 transition-transform duration-300 ease-out ${
+  <div className={`w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-3 gap-4 lg:gap-6 transition-transform duration-300 ease-out ${
         isModalOpen ? 'opacity-80' : 'opacity-100'
       }`}>
-        {assets.map((asset) => {
+        {filteredAssets.map((asset) => {
           const isExpanded = expandedCards.has(asset.symbol);
           const isExpanding = expandingCard === asset.symbol;
           
@@ -503,8 +933,12 @@ export function MacroDesk({ className = "" }: { className?: string }) {
           return (
             <div 
               key={asset.symbol} 
-          className={`group relative bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-4 transition-[transform,box-shadow] duration-300 ease-out hover:shadow-xl hover:transform-gpu hover:scale-[1.01] ${
+          className={`group relative backdrop-blur-xl rounded-2xl border p-4 transition-[transform,box-shadow] duration-300 ease-out hover:shadow-xl hover:transform-gpu hover:scale-[1.01] ${
                 isExpanding ? 'scale-105 shadow-xl z-40' : 'shadow-lg'
+              } ${
+                theme === 'dark' 
+                  ? 'bg-purple-950/90 border-purple-900/50' 
+                  : 'bg-white/90 border-gray-200/50'
               }`}
             >
               {/* Enhanced ambient glow effect */}
@@ -544,13 +978,15 @@ export function MacroDesk({ className = "" }: { className?: string }) {
                       <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-white">{asset.symbol}</h3>
-                      <p className="text-xs text-purple-400">{asset.name}</p>
+                      <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{asset.symbol}</div>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-purple-400' : 'text-gray-600'}`}>{asset.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <DollarSign className="h-4 w-4 text-purple-400" />
-                    <span className="text-lg font-bold text-white font-mono">
+                    <span className={`text-lg font-bold font-mono ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}>
                       {asset.price.toFixed(2)}
                     </span>
                   </div>

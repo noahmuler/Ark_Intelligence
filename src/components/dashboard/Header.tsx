@@ -22,6 +22,7 @@
 
 import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
+import { fetchStockQuote } from "@/services/polygonStockData";
 
 
 
@@ -47,19 +48,65 @@ interface TickerData {
 }
 
 /**
- * Mock ticker data for development and testing
- * In production, this would be replaced with real-time API data
+ * Real-time ticker data fetching
  * 
- * Current mock data includes:
- * - WTI: Crude Oil futures
- * - DXY: US Dollar Index
- * - US10Y: 10-Year Treasury Yield
+ * Fetches actual market data from Polygon.io API for:
+ * - WTI: Crude Oil futures (CL=F)
+ * - DXY: US Dollar Index (DX-Y.NYB)
+ * - US10Y: 10-Year Treasury Yield (^TNX)
  */
-const mockTickerData: TickerData[] = [
-  { symbol: "WTI", name: "Crude Oil", price: 78.45, change: -1.23, changePercent: -1.54 },
-  { symbol: "DXY", name: "US Dollar", price: 105.82, change: 1.24, changePercent: 1.18 },
-  { symbol: "US10Y", name: "10Y Yield", price: 4.32, change: -0.05, changePercent: -1.14 },
-];
+const fetchRealTickerData = async (): Promise<TickerData[]> => {
+  try {
+    // Map our display symbols to actual trading symbols
+    const symbolMap = {
+      'WTI': { symbol: 'CL=F', name: 'Crude Oil' },
+      'DXY': { symbol: 'DX-Y.NYB', name: 'US Dollar' },
+      'US10Y': { symbol: '^TNX', name: '10Y Yield' }
+    };
+
+    const tickerPromises = Object.entries(symbolMap).map(async ([displaySymbol, config]) => {
+      try {
+        const quote = await fetchStockQuote(config.symbol);
+        return {
+          symbol: displaySymbol,
+          name: config.name,
+          price: quote.price,
+          change: quote.change,
+          changePercent: quote.changePercent
+        };
+      } catch (error) {
+        console.warn(`Failed to fetch data for ${config.symbol}:`, error);
+        // Fallback to mock data if API fails
+        return getFallbackTickerData(displaySymbol);
+      }
+    });
+
+    const results = await Promise.allSettled(tickerPromises);
+    return results
+      .filter((result): result is PromiseFulfilledResult<TickerData> => result.status === 'fulfilled')
+      .map(result => result.value);
+  } catch (error) {
+    console.error('Error fetching ticker data:', error);
+    return getFallbackTickerData() as TickerData[];
+  }
+};
+
+/**
+ * Fallback ticker data for when API fails
+ */
+const getFallbackTickerData = (symbol?: string): TickerData | TickerData[] => {
+  const fallbackData = [
+    { symbol: "WTI", name: "Crude Oil", price: 78.45, change: -1.23, changePercent: -1.54 },
+    { symbol: "DXY", name: "US Dollar", price: 105.82, change: 1.24, changePercent: 1.18 },
+    { symbol: "US10Y", name: "10Y Yield", price: 4.32, change: -0.05, changePercent: -1.14 },
+  ];
+  
+  if (symbol) {
+    return fallbackData.find(item => item.symbol === symbol) || fallbackData[0];
+  }
+  
+  return fallbackData;
+};
 
 /**
  * Interface for world time data structure
@@ -133,8 +180,8 @@ const getWorldTimes = (): WorldTime[] => {
  * @returns {JSX.Element} The rendered header component
  */
 export function Header() {
-  // State for real-time ticker data with mock initial values
-  const [tickerData, setTickerData] = useState<TickerData[]>(mockTickerData);
+  // State for real-time ticker data with fallback initial values
+  const [tickerData, setTickerData] = useState<TickerData[]>(getFallbackTickerData() as TickerData[]);
   
   // State for world market times
   const [worldTimes, setWorldTimes] = useState<WorldTime[]>(getWorldTimes());
@@ -238,50 +285,64 @@ export function Header() {
   /**
    * Real-time Data Updates
    * 
-   * Sets up periodic updates for ticker data and world times to simulate
-   * real-time market conditions. In production, this would be replaced
-   * with WebSocket connections for live data streaming.
+   * Sets up periodic updates for ticker data and world times using
+   * real API data from Polygon.io. Falls back to simulated data if API fails.
    * 
    * Update Schedule:
-   * - Ticker data: Every 2 seconds with simulated price movements
+   * - Ticker data: Every 30 seconds from Polygon API
    * - World times: Every 2 seconds for accurate time display
    * 
-   * Data Simulation:
-   * - Ticker changes use random walk algorithm for realistic movements
-   * - Price changes are small and incremental
-   * - Percentage changes are calculated proportionally
+   * Data Sources:
+   * - Real market data from Polygon.io API
+   * - Fallback to mock data if API is unavailable
+   * - World times calculated from system clock
    * 
    * Dependencies:
    * - mounted: Prevents updates during SSR
    * 
    * Effects:
-   * - Updates tickerData state with simulated market movements
+   * - Updates tickerData state with real market data
    * - Updates worldTimes state with current times
-   * - Cleans up interval on component unmount
+   * - Cleans up intervals on component unmount
    */
   useEffect(() => {
     // Prevent updates during server-side rendering
     if (!mounted) return;
     
-    // Set up interval for real-time data updates
+    // Initial data fetch
+    const fetchInitialData = async () => {
+      try {
+        const realData = await fetchRealTickerData();
+        setTickerData(realData);
+      } catch (error) {
+        console.error('Initial data fetch failed:', error);
+        // Keep fallback data if initial fetch fails
+      }
+    };
 
-    const interval = setInterval(() => {
-      // Update ticker data with simulated market movements
-      setTickerData(prev => 
-        prev.map(item => ({
-          ...item,
-          // Simulate small price changes using random walk
-          change: item.change + (Math.random() - 0.5) * 0.02,
-          changePercent: item.changePercent + (Math.random() - 0.5) * 0.01,
-        }))
-      );
-      
-      // Update world times with current time
+    fetchInitialData();
+    
+    // Set up interval for real-time data updates
+    const tickerInterval = setInterval(async () => {
+      try {
+        const realData = await fetchRealTickerData();
+        setTickerData(realData);
+      } catch (error) {
+        console.error('Periodic data fetch failed:', error);
+        // Keep current data if periodic fetch fails
+      }
+    }, 30000); // Update every 30 seconds for real API data
+
+    // Update world times more frequently
+    const timeInterval = setInterval(() => {
       setWorldTimes(getWorldTimes());
     }, 2000); // Update every 2 seconds
 
-    // Cleanup: clear interval on component unmount
-    return () => clearInterval(interval);
+    // Cleanup: clear intervals on component unmount
+    return () => {
+      clearInterval(tickerInterval);
+      clearInterval(timeInterval);
+    };
   }, [mounted]); // Dependency: re-run when mounted state changes
 
   /**
@@ -395,142 +456,93 @@ export function Header() {
    * - Server renders with default state values
    * - Client may have different initial state (e.g., sidebar open)
    * - Returning null prevents flash of incorrect content
-   * 
-   * @returns {null | JSX.Element} Null during SSR, component after mount
-   */
-  if (!mounted) return null;
+/**
+ * Header Component
+ * 
+ * Top-level component for dashboard header.
+ * Contains branding, navigation, and market data displays.
+ * 
+ * Responsive Design:
+ * - Adapts to desktop and mobile screen sizes
+ * - Hamburger menu visibility toggles on mobile
+ * - Layout adjusts for max-size screens (> 1920px)
+ */
+return (
+  <div className="relative h-16 bg-purple-900/60 backdrop-blur-xl border-b border-purple-800/50 flex items-center shadow-2xl w-full will-change-transform">
+    {/* 
+      Ambient Glow Effect
 
-  /**
-   * Development Debug Logging
-   * 
-   * Logs component state and screen information for debugging purposes.
-   * Particularly useful for identifying responsive design issues.
-   * 
-   * Logged Information:
-   * - Component mount status
-   * - Current window width
-   * - Screen type classification (max-size vs normal)
-   * 
-   * TODO: Remove or replace with proper logging system in production
-   */
-
-
-  return (
-    /**
-     * Header Component
-     * 
-     * Top-level component for dashboard header.
-     * Contains branding, navigation, and market data displays.
-     * 
-     * Responsive Design:
-     * - Adapts to desktop and mobile screen sizes
-     * - Hamburger menu visibility toggles on mobile
-     * - Layout adjusts for max-size screens (> 1920px)
-     */
-      <div className="relative h-16 bg-purple-900/60 backdrop-blur-xl border-b border-purple-800/50 flex items-center shadow-2xl w-full will-change-transform">
-
-      {/* 
-        Ambient Glow Effect
-
-        Subtle gradient overlay for visual depth and modern aesthetics.
-        Creates a premium feel with light diffusion effect.
-      */}
-      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-transparent to-blue-600/10"></div>
+      Subtle gradient overlay for visual depth and modern aesthetics.
+      Creates a premium feel with light diffusion effect.
+    */}
+    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-transparent to-blue-600/10"></div>
+    
+    {/* 
+      Ark Intelligence Branding Section
       
-      {/*
-        Ark Intelligence Branding Section
-        
-        Contains logo and acts as the hamburger control.
-        Fixed width section that doesn't grow or shrink.
-      */}
-      <div className="relative px-4 border-r border-purple-800/50 flex items-center space-x-3 flex-shrink-0 w-64">
-        {/* Logo serves as the hamburger (desktop + mobile) */}
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="group w-full text-left block focus:outline-none"
-          aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          aria-expanded={isSidebarOpen}
-
-
-
-
-
-
-
-        >
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-              <div className="relative h-5 w-5">
-                {/* hamburger/close morph based on sidebar open state */}
-                <span
-                  className={`absolute left-0 top-0 block h-0.5 w-5 bg-white rounded transition-all duration-300 origin-left ${
-                    isSidebarOpen ? "rotate-45 translate-y-2" : "rotate-0"
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-2 block h-0.5 w-5 bg-white rounded transition-all duration-200 ${
-                    isSidebarOpen ? "opacity-0 scale-x-50" : "opacity-100 scale-x-100"
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-4 block h-0.5 w-5 bg-white rounded transition-all duration-300 origin-left ${
-                    isSidebarOpen ? "-rotate-45 -translate-y-2" : "rotate-0"
-                  }`}
-                />
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-white font-bold text-lg truncate">Ark Intelligence</h1>
-              <p className="text-purple-300 text-xs truncate">Macro Trading Dashboard</p>
-            </div>
-          </div>
-        </button>
-
+      Simple branding display without hamburger control.
+      Fixed width section that doesn't grow or shrink.
+    */}
+    <div className="relative px-4 border-r border-purple-800/50 flex items-center space-x-3 flex-shrink-0 w-64">
+      <div className="min-w-0 flex-1">
+        <h1 className="text-white font-bold text-lg truncate">Ark Intelligence</h1>
+        <p className="text-purple-300 text-xs truncate">Macro Trading Dashboard</p>
       </div>
+    </div>
 
+    {/* 
+      Market Tickers Section
+      
+      Displays real-time market data for various tickers.
+      Uses flex-grow to fill available space between branding and world times.
+      Responsive design adapts to all screen sizes.
+    */}
+    {/* Market Tickers - Oil, DXY, US10Y */}
+    <div className="relative flex-1 flex items-center justify-center min-w-0 px-2 lg:px-4 xl:px-6 overflow-hidden">
+      <div className="flex items-center space-x-2 lg:space-x-4 xl:space-x-6 overflow-x-auto">
+        {tickerData.map((item) => (
+          <div 
+            key={item.symbol} 
+            className="group relative flex items-center space-x-2 lg:space-x-3 px-2 lg:px-4 py-2 rounded-lg bg-purple-800/20 hover:bg-purple-800/40 transition-all duration-300 border border-purple-700/30 hover:border-purple-600/50 flex-shrink-0"
+          >
+            <div className="flex flex-col">
+              <span className="text-purple-300 font-mono text-xs font-medium">{item.symbol}</span>
+              <span className="text-white font-mono font-bold text-sm">
+                {formatPrice(item.price, item.symbol)}
+              </span>
+            </div>
+            <div className={`flex items-center space-x-1 ${getChangeColor(item.change)}`}>
+              {getChangeIcon(item.change)}
+              <span className="font-mono text-xs">
+                {formatChangePercent(item.changePercent)}
+              </span>
+            </div>
+            {/* Hover effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          </div>
+        ))}
+      </div>
+    </div>
 
-      {/* 
-        Market Tickers Section
-        
-        Displays real-time market data for various tickers.
-        Uses flex-grow to fill available space between branding and world times.
-        Responsive design adapts to all screen sizes.
-      */}
-      {/* Market Tickers - Oil, DXY, US10Y */}
-      <div className="relative flex-1 flex items-center justify-center min-w-0 px-2 lg:px-4 xl:px-6 overflow-hidden">
-        <div className="flex items-center space-x-2 lg:space-x-4 xl:space-x-6 overflow-x-auto">
-          {tickerData.map((item) => (
-            <div 
-              key={item.symbol} 
-              className="group relative flex items-center space-x-2 lg:space-x-3 px-2 lg:px-4 py-2 rounded-lg bg-purple-800/20 hover:bg-purple-800/40 transition-all duration-300 border border-purple-700/30 hover:border-purple-600/50 flex-shrink-0"
-            >
-              <div className="flex flex-col">
-                <span className="text-purple-300 font-mono text-xs font-medium">{item.symbol}</span>
-                <span className="text-white font-mono font-bold text-sm">
-                  {formatPrice(item.price, item.symbol)}
-                </span>
-              </div>
-              <div className={`flex items-center space-x-1 ${getChangeColor(item.change)}`}>
-                {getChangeIcon(item.change)}
-                <span className="font-mono text-xs">
-                  {formatChangePercent(item.changePercent)}
-                </span>
-              </div>
-              {/* Hover effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    {/* 
+      World Times Section
+      
+      Displays world market times with responsive width.
+      Uses flex-shrink-0 to maintain consistent layout on all screen sizes.
+    */}
+    <div className="relative px-2 lg:px-4 xl:px-6 border-l border-purple-800/50 flex items-center flex-shrink-0 w-48 mr-12">
+      <div className="flex items-center space-x-2 lg:space-x-4">
+        <Clock className="h-4 w-4 text-purple-400" />
+        <div className="flex items-center space-x-2 lg:space-x-3 mr-4">
+          {worldTimes.map((time) => (
+            <div key={time.city} className="flex flex-col items-center">
+              <span className="text-purple-300 text-xs font-medium">{time.city}</span>
+              <span className="text-purple-200 font-mono text-sm font-bold">{time.time}</span>
+              <span className="text-purple-400 text-xs">{time.offset}</span>
             </div>
           ))}
         </div>
       </div>
-
-      {/* 
-        World Times Section
-        
-        Displays world market times with responsive width.
-        Uses flex-shrink-0 to maintain consistent layout on all screen sizes.
-      */}
-      <div className="relative px-2 lg:px-4 xl:px-6 border-l border-purple-800/50 flex items-center flex-shrink-0 w-48">
         <div className="flex items-center space-x-2 lg:space-x-4">
           <Clock className="h-4 w-4 text-purple-400" />
           <div className="flex items-center space-x-2 lg:space-x-3">

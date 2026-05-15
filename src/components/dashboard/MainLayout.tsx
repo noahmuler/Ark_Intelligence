@@ -17,13 +17,14 @@ import React, { useEffect, useState } from "react";
 
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
+  const { theme } = useTheme();
   const [, setWindowWidth] = useState(0);
 
   // Used only to offset layout for desktop sidebar rail.
@@ -67,12 +68,17 @@ export function MainLayout({ children }: MainLayoutProps) {
   }, []);
 
   return (
-    <ThemeProvider>
       <div
-        className="min-h-screen bg-gradient-to-br from-purple-950 via-blue-950 to-black dark:from-purple-950 dark:via-blue-950 dark:to-black light:from-gray-50 light:via-blue-50 light:to-blue-50 transition-all duration-300 ease-in-out"
+        className={`min-h-screen transition-all duration-300 ease-in-out ${
+          theme === 'dark' 
+            ? 'bg-gradient-to-br from-purple-950 via-blue-950 to-black' 
+            : 'bg-gradient-to-br from-gray-50 via-blue-50 to-blue-100'
+        }`}
         style={{ display: "flex", flexDirection: "column" }}
       >
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`fixed inset-0 overflow-hidden pointer-events-none ${
+          theme === 'dark' ? '' : 'opacity-30'
+        }`}>
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse-slow" />
           <div
             className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse-slow"
@@ -96,10 +102,14 @@ export function MainLayout({ children }: MainLayoutProps) {
             <Header />
 
             <main
-              className="flex-1 overflow-auto relative w-full"
+              className={`flex-1 overflow-auto relative w-full ${
+                theme === 'dark' ? '' : 'bg-white/80'
+              }`}
               style={{ position: "relative", top: 0, willChange: "transform" }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-purple-950/30 via-transparent to-transparent pointer-events-none" />
+              <div className={`absolute inset-0 bg-gradient-to-t from-purple-950/30 via-transparent to-transparent pointer-events-none ${
+                theme === 'dark' ? '' : 'opacity-0'
+              }`} />
 
               <div className="relative w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
                 {children}
@@ -108,7 +118,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </div>
       </div>
-    </ThemeProvider>
   );
 }
 

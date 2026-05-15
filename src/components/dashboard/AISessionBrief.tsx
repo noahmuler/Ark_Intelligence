@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { Brain, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { generateMarketOverview } from "@/services/geminiMarketAnalysis";
+import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
 
 interface SessionBrief {
   mainDriver: string;
@@ -14,19 +16,74 @@ interface SessionBrief {
   timestamp: string; // Use string instead of Date to avoid hydration issues
 }
 
-const mockSessionBrief: SessionBrief = {
-  mainDriver: "Yield-Driven USD Strength",
-  bias: "Neutral",
-  analysis: "US 10Y yields climbing to 4.32% are supporting USD strength. Gold and Silver showing resilience but facing headwinds from higher rates. Watch for DXY breakout above 105.50 for confirmation.",
-  keyLevels: {
-    support: ["$2,320.00", "$2,305.50", "$2,290.00"],
-    resistance: ["$2,355.00", "$2,370.00", "$2,385.00"]
-  },
-  timestamp: new Date().toISOString() // Convert to string for consistent SSR
+/**
+ * Transform AI analysis to SessionBrief format
+ */
+const transformAIToSessionBrief = (aiAnalysis: any, marketData: any): SessionBrief => {
+  // Validate aiAnalysis and marketData shapes
+  const isValidAI = aiAnalysis && aiAnalysis.analysis;
+  const isValidMarket = marketData && Array.isArray(marketData.stocks);
+  
+  const bias = isValidAI && aiAnalysis.analysis.marketOutlook === "Positive" ? "Bullish" : 
+               isValidAI && aiAnalysis.analysis.marketOutlook === "Negative" ? "Bearish" : "Neutral";
+  
+  // Extract key levels from market data (simplified)
+  const getTopStocks = () => {
+    if (!isValidMarket || !Array.isArray(marketData.stocks)) {
+      return [];
+    }
+    return marketData.stocks.slice(0, 3);
+  };
+  
+  const topStocks = getTopStocks();
+  const support = topStocks.map((stock: any) => `$${(stock.price * 0.98).toFixed(2)}`);
+  const resistance = topStocks.map((stock: any) => `$${(stock.price * 1.02).toFixed(2)}`);
+  
+  return {
+    mainDriver: (isValidAI && Array.isArray(aiAnalysis.analysis.keyInsights) && aiAnalysis.analysis.keyInsights[0]?.title) || "Market Analysis",
+    bias,
+    analysis: (isValidAI && aiAnalysis.analysis.summary) || "Market analysis in progress...",
+    keyLevels: {
+      support: support.slice(0, 3),
+      resistance: resistance.slice(0, 3)
+    },
+    timestamp: new Date().toISOString()
+  };
 };
 
+/**
+ * Fetch real AI session brief
+ */
+const fetchRealSessionBrief = async (): Promise<SessionBrief> => {
+  try {
+    const [aiAnalysis, marketData] = await Promise.all([
+      generateMarketOverview(),
+      fetchComprehensiveMarketData()
+    ]);
+    
+    return transformAIToSessionBrief(aiAnalysis, marketData.data);
+  } catch (error) {
+    console.error('Error fetching session brief:', error);
+    return getFallbackSessionBrief();
+  }
+};
+
+/**
+ * Fallback session brief for when API fails
+ */
+const getFallbackSessionBrief = (): SessionBrief => ({
+  mainDriver: "Market Analysis Unavailable",
+  bias: "Neutral",
+  analysis: "Unable to generate real-time analysis. Using fallback data.",
+  keyLevels: {
+    support: ["Support 1", "Support 2", "Support 3"],
+    resistance: ["Resistance 1", "Resistance 2", "Resistance 3"]
+  },
+  timestamp: new Date().toISOString()
+});
+
 export function AISessionBrief({ className = "" }: { className?: string }) {
-  const [sessionBrief, setSessionBrief] = useState<SessionBrief>(mockSessionBrief);
+  const [sessionBrief, setSessionBrief] = useState<SessionBrief>(getFallbackSessionBrief());
   const [isGenerating, setIsGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -37,18 +94,35 @@ export function AISessionBrief({ className = "" }: { className?: string }) {
   useEffect(() => {
     if (!mounted) return;
     
-    // Simulate periodic AI brief updates
-    const interval = setInterval(() => {
-      setIsGenerating(true);
-      setTimeout(() => {
-        setSessionBrief(prev => ({
-          ...prev,
-          timestamp: new Date().toISOString(),
-          analysis: prev.analysis + " [Updated]"
-        }));
+    // Initial AI brief fetch
+    const fetchInitialBrief = async () => {
+      try {
+        setIsGenerating(true);
+        const realBrief = await fetchRealSessionBrief();
+        setSessionBrief(realBrief);
+      } catch (error) {
+        console.error('Initial AI brief fetch failed:', error);
+        // Keep fallback data if initial fetch fails
+      } finally {
         setIsGenerating(false);
-      }, 2000);
-    }, 60000); // Update every minute
+      }
+    };
+
+    fetchInitialBrief();
+    
+    // Set up interval for real-time AI brief updates
+    const interval = setInterval(async () => {
+      try {
+        setIsGenerating(true);
+        const realBrief = await fetchRealSessionBrief();
+        setSessionBrief(realBrief);
+      } catch (error) {
+        console.error('Periodic AI brief fetch failed:', error);
+        // Keep current data if periodic fetch fails
+      } finally {
+        setIsGenerating(false);
+      }
+    }, 300000); // Update every 5 minutes for AI analysis
 
     return () => clearInterval(interval);
   }, [mounted]);

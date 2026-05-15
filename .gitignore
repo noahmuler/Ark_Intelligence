@@ -46,3 +46,4 @@ next-env.d.ts
 # Development log (exclude from version control)
 DEVELOPMENT.md
 TODO.md
+/ECONOMIC_CALENDAR_API_SETUP.md
