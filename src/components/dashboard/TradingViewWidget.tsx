@@ -1,5 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { createTradingViewWidget } from '@/services/tradingViewAPI';
+
+// TradingView is loaded from https://s3.tradingview.com/tv.js
+declare global {
+  interface Window {
+    TradingView?: {
+      widget: (config: unknown) => void;
+    };
+  }
+}
+
+
+
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -36,51 +47,67 @@ export function TradingViewWidget({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Track whether component is still mounted
+    let mounted = true;
 
     // Create unique container ID for this widget
     const containerId = `tradingview_widget_${symbol}_${Date.now()}`;
-    containerRef.current.id = containerId;
+    container.id = containerId;
 
-    // Create TradingView widget script
+    // Create TradingView widget script (must be an actual script node so it executes)
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src = 'https://s3.tradingview.com/tv.js';
     script.async = true;
 
-    // Create configuration script
-    const configScript = document.createElement('script');
-    configScript.type = 'text/javascript';
-    configScript.text = `
-      new TradingView.widget({
-        "symbol": "${symbol}",
-        "interval": "${interval}",
-        "theme": "${theme}",
-        "height": ${height},
-        "width": ${typeof width === 'string' ? `"${width}"` : width},
-        "studies": ${JSON.stringify(studies)},
-        "locale": "en",
-        "style": "1",
-        "autosize": true,
-        "timezone": "Etc/UTC",
-        "toolbar_bg": "#f1f3f6",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "save_image": false,
-        "container_id": "${containerId}"
-      });
-    `;
+    script.onload = () => {
+      // Guard against stale callbacks after unmount or prop changes
+      if (!mounted) return;
+      
+      // Verify container still exists in DOM
+      const currentContainer = document.getElementById(containerId);
+      if (!currentContainer) return;
 
-    // Set container content
-    containerRef.current.innerHTML = `
-      <script>${script.outerHTML}</script>
-      <script>${configScript.text}</script>
-    `;
+      // Create configuration script (as a real script node so TradingView.widget runs)
+      const configScript = document.createElement('script');
+      configScript.type = 'text/javascript';
+      configScript.text = `
+        new window.TradingView.widget({
+
+          "symbol": ${JSON.stringify(symbol)},
+          "interval": ${JSON.stringify(interval)},
+          "theme": ${JSON.stringify(theme)},
+          "height": ${height},
+          "width": ${typeof width === 'string' ? JSON.stringify(width) : width},
+          "studies": ${JSON.stringify(studies)},
+          "locale": "en",
+          "style": "1",
+          "autosize": true,
+          "timezone": "Etc/UTC",
+          "toolbar_bg": "#f1f3f6",
+          "enable_publishing": false,
+          "allow_symbol_change": true,
+          "save_image": false,
+          "container_id": ${JSON.stringify(containerId)}
+        });
+      `;
+
+      currentContainer.appendChild(configScript);
+    };
+
+    // Clear container and append scripts
+    container.innerHTML = '';
+    container.appendChild(script);
 
     // Cleanup function
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+      mounted = false;
+      script.onload = null;
+      if (container) {
+        container.innerHTML = '';
       }
     };
   }, [symbol, interval, theme, height, width, studies]);

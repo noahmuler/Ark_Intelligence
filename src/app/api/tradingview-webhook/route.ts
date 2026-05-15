@@ -136,20 +136,91 @@ async function executeCloseOrder(symbol: string): Promise<void> {
  * 
  * Prevents webhook abuse and spam.
  */
-const webhookRequests = new Map<string, number>();
+// Track recent webhook requests per IP to enforce rate limits.
+// Using a sliding window of the last 60 seconds with a max of 10 requests.
+const webhookRequests = new Map<string, number[]>();
+
+// Global cleanup task for removing stale entries from the rate limit map
+// Runs every minute to remove IPs with no recent activity (TTL: 5 minutes)
+const RATE_LIMIT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60 * 1000; // 1 minute
+
+let cleanupIntervalId: NodeJS.Timeout | null = null;
+
+const startCleanupInterval = () => {
+  if (cleanupIntervalId) return;
+  
+  cleanupIntervalId = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, timestamps] of webhookRequests.entries()) {
+      if (timestamps.length === 0) {
+        webhookRequests.delete(ip);
+      } else {
+        const lastTimestamp = timestamps[timestamps.length - 1];
+        if (now - lastTimestamp > RATE_LIMIT_TTL_MS) {
+          webhookRequests.delete(ip);
+        }
+      }
+    }
+  }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+};
+
+// Cleanup handler for graceful shutdown
+const cleanupOnShutdown = () => {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+  }
+};
+
+// Register shutdown handlers once
+let shutdownHandlersRegistered = false;
+const registerShutdownHandlers = () => {
+  if (shutdownHandlersRegistered) return;
+  shutdownHandlersRegistered = true;
+  
+  process.on('SIGINT', cleanupOnShutdown);
+  process.on('SIGTERM', cleanupOnShutdown);
+  process.on('exit', cleanupOnShutdown);
+};
+
+// Start cleanup on first request
+let cleanupStarted = false;
 
 function checkRateLimit(ip: string): boolean {
+  // Initialize cleanup on first call
+  if (!cleanupStarted) {
+    cleanupStarted = true;
+    startCleanupInterval();
+    registerShutdownHandlers();
+  }
+
   const now = Date.now();
-  const lastRequest = webhookRequests.get(ip) || 0;
-  
-  // Allow max 10 requests per minute per IP
-  if (now - lastRequest < 60000) {
+  const windowMs = 60_000;
+  const maxRequests = 10;
+
+  const timestamps = webhookRequests.get(ip) ?? [];
+
+  // Prune timestamps older than 60 seconds.
+  const pruned = timestamps.filter(ts => now - ts < windowMs);
+
+  // If empty after pruning, avoid leaking Map entries.
+  if (pruned.length === 0) {
+    webhookRequests.delete(ip);
+  }
+
+  // Allow only if fewer than maxRequests remain in the window.
+  if (pruned.length >= maxRequests) {
+    // Persist pruned timestamps for accuracy.
+    if (pruned.length > 0) webhookRequests.set(ip, pruned);
     return false;
   }
-  
-  webhookRequests.set(ip, now);
+
+  const next = [...pruned, now];
+  webhookRequests.set(ip, next);
   return true;
 }
+
 
 /**
  * Main webhook handler
@@ -158,10 +229,40 @@ function checkRateLimit(ip: string): boolean {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get client IP for rate limiting
-    const ip = request.headers.get('x-forwarded-for') || 
-                 request.headers.get('x-real-ip') || 
-                 'unknown';
+    // Get client IP for rate limiting with trusted proxy validation
+    const trustedProxies = (process.env.TRUSTED_PROXIES || '')
+      .split(',')
+      .map(p => p.trim())
+      .filter(Boolean);
+
+    const getClientIP = (headers: any): string => {
+      const xForwardedFor = headers.get('x-forwarded-for');
+      const xRealIp = headers.get('x-real-ip');
+      
+      // If TRUSTED_PROXIES is not configured, fall back to safe defaults
+      if (trustedProxies.length === 0) {
+        return xRealIp || xForwardedFor?.split(',').pop()?.trim() || 'unknown';
+      }
+
+      // If x-forwarded-for exists, parse and use rightmost untrusted IP
+      if (xForwardedFor) {
+        const ips = xForwardedFor.split(',').map((s: string) => s.trim()).filter(Boolean);
+        // Return the rightmost IP that's not in trusted proxies, or the rightmost one if all are trusted
+        for (let i = ips.length - 1; i >= 0; i--) {
+          if (!trustedProxies.includes(ips[i])) {
+            return ips[i];
+          }
+        }
+        return ips[ips.length - 1] || 'unknown';
+      }
+
+      // Fall back to x-real-ip or unknown
+      return xRealIp || 'unknown';
+    };
+
+    const ip = getClientIP(request.headers);
+
+
     
     // Check rate limiting
     if (!checkRateLimit(ip)) {

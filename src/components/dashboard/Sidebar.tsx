@@ -184,15 +184,12 @@ export function Sidebar() {
             <div className="flex h-16 items-center px-6 border-b border-purple-800/50">
               <div className="flex items-center space-x-3">
                 <div className="flex-1">
-                  <span className="text-lg font-bold text-white bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
-                    Ark Intelligence
-                  </span>
-                </div>
-
                 <span className="text-lg font-bold text-white bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
                   Ark Intelligence
                 </span>
               </div>
+              </div>
+
             </div>
 
             <nav className="flex-1 space-y-2 px-3 py-6">

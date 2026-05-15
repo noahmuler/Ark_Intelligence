@@ -169,7 +169,7 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
       const x = padding + (chartWidth / 4) * i;
       ctx.beginPath();
       ctx.moveTo(x, padding);
-      ctx.lineTo(x, canvas.height - padding);
+      ctx.lineTo(x, rect.height - padding);
       ctx.stroke();
     }
 
@@ -194,7 +194,7 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
     ctx.stroke();
 
     // Draw gradient fill under the line
-    const gradient = ctx.createLinearGradient(0, padding, 0, canvas.height - padding);
+    const gradient = ctx.createLinearGradient(0, padding, 0, rect.height - padding);
     if (priceChange >= 0) {
       gradient.addColorStop(0, 'rgba(16, 185, 129, 0.1)');
       gradient.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
@@ -217,10 +217,12 @@ export function MarketChart({ symbol, name, className = "" }: MarketChartProps) 
       }
     });
     
-    ctx.lineTo(padding + chartWidth, canvas.height - padding);
-    ctx.lineTo(padding, padding);
+    ctx.lineTo(padding + chartWidth, rect.height - padding);
+    ctx.lineTo(padding, rect.height - padding);
     ctx.closePath();
-    
+
+    ctx.fill();
+
     // Cleanup function
     return () => {
       // Any cleanup needed for canvas drawing
