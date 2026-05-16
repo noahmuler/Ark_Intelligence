@@ -272,12 +272,14 @@ export default function Calendar() {
             {/* Date Selectors */}
             <div className="flex items-center space-x-2">
               <button
+                type="button"
                 onClick={() => setSelectedDate(new Date())}
                 className="px-3 py-1.5 text-sm text-purple-300 hover:text-white hover:bg-purple-800/50 rounded transition-colors"
               >
                 Today
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const tomorrow = new Date();
                   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -287,12 +289,15 @@ export default function Calendar() {
               >
                 Tomorrow
               </button>
+              <label className="sr-only" htmlFor="calendar-custom-date">Custom date</label>
               <input
+                id="calendar-custom-date"
                 type="date"
                 value={selectedDate.toISOString().split('T')[0]}
                 onChange={(e) => setSelectedDate(new Date(e.target.value))}
                 className="bg-purple-900/30 text-white text-sm rounded px-2 py-1.5 border border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
               />
+
             </div>
 
             {/* Currency Toggles */}
@@ -332,18 +337,21 @@ export default function Calendar() {
             </div>
 
             {/* Timezone Dropper */}
-            <div className="flex items-center space-x-2 ml-auto">
-              <Globe className="h-3.5 w-3.5 text-purple-500" />
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="bg-purple-900/30 text-white text-xs rounded px-2 py-1.5 border border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
-              >
-                {TIMEZONES.map(tz => (
-                  <option key={tz.value} value={tz.value}>{tz.label}</option>
-                ))}
-              </select>
-            </div>
+              <div className="flex items-center space-x-2 ml-auto">
+                <Globe className="h-3.5 w-3.5 text-purple-500" />
+                <label className="sr-only" htmlFor="calendar-timezone">Timezone</label>
+                <select
+                  id="calendar-timezone"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="bg-purple-900/30 text-white text-xs rounded px-2 py-1.5 border border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
+                >
+                  {TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+
           </div>
 
           {/* Error Display */}
@@ -357,7 +365,7 @@ export default function Calendar() {
           )}
 
           {/* Horizontal Timeline Canvas */}
-          <div className="flex-1 w-full relative">
+          <div className="w-full relative min-h-[calc(100vh-280px)]">
             {/* Live Current-Time Tracker */}
             <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-10">
               <div 
@@ -382,7 +390,8 @@ export default function Calendar() {
             </div>
 
             {/* Timeline Container - Unified Horizontal Scroll */}
-            <div className="flex flex-row overflow-x-auto scrollbar-thin">
+            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin">
+
               {TIME_INTERVALS.map((interval, intervalIndex) => {
                 const intervalEvents = getEventsForInterval(interval);
                 
