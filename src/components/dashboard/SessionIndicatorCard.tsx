@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -226,9 +227,13 @@ function getDotClasses(color: SessionDef["dotColor"], isSessionOpen: boolean) {
 }
 
 export default function SessionIndicatorCard({ className = "" }: { className?: string }) {
-  const [now, setNow] = useState(() => new Date());
-  // Delay initial time render to reduce SSR/CSR hydration mismatches.
+  const [now, setNow] = useState(() => new Date("2024-01-01T00:00:00Z")); // Static initial time for consistent SSR
+  const [mounted, setMounted] = useState(false);
+  
+  // Update to real time only after client mount to prevent hydration mismatch
   useEffect(() => {
+    setMounted(true);
+    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -244,12 +249,12 @@ export default function SessionIndicatorCard({ className = "" }: { className?: s
 
   const active = openState.find((x) => x.open) ?? openState[0];
 
-  const renderRow = (s: SessionDef) => {
+  const renderRow = (s: SessionDef, compact: boolean = false) => {
     const openStr = formatTime(s.openHour, s.openMinute);
     const closeStr = formatTime(s.closeHour, s.closeMinute);
     const sessionOpen = isOpen(now, s);
 
-    // “Adjusted real-time”: we show countdown to next boundary.
+    // "Adjusted real-time": we show countdown to next boundary.
     // If open, countdown to close; else countdown to open.
     let countdown = "";
     try {
@@ -259,46 +264,60 @@ export default function SessionIndicatorCard({ className = "" }: { className?: s
       const hh = Math.floor(totalSeconds / 3600);
       const mm = Math.floor((totalSeconds % 3600) / 60);
       const ss = totalSeconds % 60;
-      if (hh > 0) countdown = `${hh}h ${mm}m ${ss}s`;
+      if (hh > 0) countdown = `${hh}h ${mm}m`;
       else if (mm > 0) countdown = `${mm}m ${ss}s`;
       else countdown = `${ss}s`;
     } catch {
       countdown = "--";
     }
 
+    const iconSize = compact ? "h-4 w-4" : "h-5 w-5";
+    const dotSize = compact ? "h-8 w-8" : "h-10 w-10";
+    const fontSize = compact ? "text-sm" : "font-semibold";
+    const subFontSize = compact ? "text-[10px]" : "text-xs";
+
     return (
-      <div key={s.key} className="flex items-start justify-between gap-3">
+      <motion.div
+        key={s.key}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.02, backgroundColor: "rgba(139, 92, 246, 0.1)" }}
+        transition={{ duration: 0.2 }}
+        className="flex items-center justify-between gap-2 rounded-lg p-2 cursor-pointer"
+      >
         <div className="flex items-center gap-2">
-          <div
-            className={`h-10 w-10 rounded-full flex items-center justify-center ${getDotClasses(
+          <motion.div
+            className={`${dotSize} rounded-full flex items-center justify-center ${getDotClasses(
               s.dotColor,
               sessionOpen
-            )} transition-colors`}
+            )} transition-colors flex-shrink-0`}
+            animate={sessionOpen ? { scale: [1, 1.1, 1] } : { scale: 1 }}
+            transition={{ duration: 2, repeat: sessionOpen ? Infinity : 0 }}
           >
             {sessionOpen ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+              <CheckCircle2 className={`${iconSize} text-emerald-300`} />
             ) : (
-              <Clock className="h-5 w-5 text-gray-300" />
+              <Clock className={`${iconSize} text-gray-300`} />
             )}
-          </div>
-          <div>
-            <div className="font-semibold text-white">{s.key} Session</div>
-            <div className="text-xs text-purple-200/80">Opens {openStr} • Closes {closeStr}</div>
+          </motion.div>
+          <div className="min-w-0">
+            <div className={`${fontSize} text-white truncate`}>{s.key}</div>
+            <div className={`${subFontSize} text-purple-200/80`}>{openStr}-{closeStr}</div>
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <Badge
             variant={sessionOpen ? "default" : "secondary"}
-            className={sessionOpen ? "bg-purple-600 text-white" : "bg-purple-900/40 text-purple-200"}
+            className={`${sessionOpen ? "bg-purple-600 text-white" : "bg-purple-900/40 text-purple-200"} text-[10px] px-1.5 py-0.5`}
           >
             {sessionOpen ? "OPEN" : "OFF"}
           </Badge>
-          <div className="mt-2 text-xs text-purple-300/90 font-mono">
-            Next {sessionOpen ? "close" : "open"}: {countdown}
+          <div className={`mt-1 ${subFontSize} text-purple-300/90 font-mono`}>
+            {countdown}
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
@@ -306,59 +325,130 @@ export default function SessionIndicatorCard({ className = "" }: { className?: s
     ? { label: "Live", cls: "bg-emerald-500/20 text-emerald-200 border-emerald-400/20" }
     : { label: "Next", cls: "bg-purple-500/20 text-purple-200 border-purple-400/20" };
 
+  const timeZoneOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false } as const;
+
   return (
-    <Card className={"relative overflow-hidden " + className}>
-      <CardContent className="p-6">
-        <div className="flex flex-col items-center text-center gap-4">
-          <div className="w-full">
-            <div className="flex items-center justify-center gap-3">
-              <div className="relative">
-                <div
-                  className={`h-16 w-16 rounded-full border-2 ${
-                    active.open ? "border-emerald-400/70" : "border-purple-400/50"
-                  } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Card className={"relative overflow-hidden " + className}>
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5"
+          animate={{
+            backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          style={{ backgroundSize: "200% 200%" }}
+        />
+        <CardContent className="p-6 relative">
+          <div className="flex flex-col items-center text-center gap-4">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5, type: "spring" }}
+              className="w-full"
+            >
+              <div className="flex items-center justify-center gap-3">
+                <motion.div
+                  className="relative"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  {active.open ? (
-                    <div className="h-10 w-10 rounded-full bg-emerald-400/20 flex items-center justify-center animate-pulse">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-200" />
+                  <motion.div
+                    className={`h-16 w-16 rounded-full border-2 ${
+                      active.open ? "border-emerald-400/70" : "border-purple-400/50"
+                    } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
+                    animate={active.open ? {
+                      boxShadow: ["0 0 0 0 rgba(52, 211, 153, 0.4)", "0 0 0 10px rgba(52, 211, 153, 0)"],
+                    } : {}}
+                    transition={{ duration: 2, repeat: active.open ? Infinity : 0 }}
+                  >
+                    {active.open ? (
+                      <motion.div
+                        className="h-10 w-10 rounded-full bg-emerald-400/20 flex items-center justify-center"
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <CheckCircle2 className="h-5 w-5 text-emerald-200" />
+                      </motion.div>
+                    ) : (
+                      <XCircle className="h-6 w-6 text-purple-200/90" />
+                    )}
+                  </motion.div>
+                </motion.div>
+
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <motion.span
+                      className="text-2xl font-bold text-white"
+                      initial={{ x: -20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 0.1 }}
+                    >
+                      {active.session.key}
+                    </motion.span>
+                    <motion.span
+                      className={`text-xs px-2 py-1 rounded-lg border ${activeBanner.cls}`}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ duration: 0.3, delay: 0.2 }}
+                    >
+                      {activeBanner.label}
+                    </motion.span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="text-xs text-purple-200/80">
+                      Real-time opens/closes in <span className="font-mono">America/New_York</span>.
                     </div>
-                  ) : (
-                    <XCircle className="h-6 w-6 text-purple-200/90" />
-                  )}
+                    {mounted ? (
+                      <motion.div
+                        className="text-sm font-mono text-purple-200"
+                        animate={{ opacity: [0.7, 1, 0.7] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        {now.toLocaleTimeString("en-US", timeZoneOptions)}
+                      </motion.div>
+                    ) : (
+                      <div className="text-sm font-mono text-purple-200/50">Loading...</div>
+                    )}
+                  </div>
                 </div>
               </div>
+            </motion.div>
 
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-white">
-                    {active.session.key}
-                  </span>
-                  <span className={`text-xs px-2 py-1 rounded-lg border ${activeBanner.cls}`}>{activeBanner.label}</span>
-                </div>
-                <div className="text-xs text-purple-200/80 mt-1">
-                  Real-time opens/closes in <span className="font-mono">America/New_York</span>.
-                </div>
+            <motion.div
+              className="w-full pt-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {/* Explicit sessions only */}
+                {SESSIONS
+                  .filter((s) => s.isExplicit)
+                  .map((s, index) => (
+                    <motion.div
+                      key={s.key}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.4 + index * 0.05 }}
+                    >
+                      {renderRow(s, true)}
+                    </motion.div>
+                  ))}
               </div>
-            </div>
+            </motion.div>
+
           </div>
-
-          <div className="w-full pt-2">
-            <div className="grid grid-cols-1 gap-4">
-              {/* Row 1: Implicit sessions temporarily visible */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {SESSIONS.filter((s) => !s.isExplicit).map(renderRow)}
-              </div>
-
-              {/* Row 2: Explicit sessions */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {SESSIONS.filter((s) => s.isExplicit).map(renderRow)}
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 

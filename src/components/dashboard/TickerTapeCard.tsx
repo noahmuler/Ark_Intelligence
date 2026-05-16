@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -149,23 +150,55 @@ export default function TickerTapeCard({ className = "" }: { className?: string 
   }, [segmentWidth]);
 
   return (
-    <Card className={"overflow-hidden " + className}>
-      <CardContent className="p-0">
-        <div className="px-6 pt-5 pb-3">
-          <div className="flex items-center justify-between">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ scale: 1.01 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className={"overflow-hidden " + className}>
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5"
+          animate={{
+            backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"],
+          }}
+          transition={{
+            duration: 14,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          style={{ backgroundSize: "200% 200%" }}
+        />
+        <CardContent className="p-6 relative">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-start justify-between gap-4 mb-4"
+          >
             <div>
-              <div className="text-lg font-bold text-white">Major Assets Tape</div>
-              <div className="text-xs text-purple-200/80">Horizontally scroll for the latest pricing</div>
+              <div className="text-lg font-bold text-white">Major Asset Tape</div>
+              <div className="text-xs text-purple-200/80">Real-time market snapshot</div>
             </div>
             <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
-              {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+              Live
             </Badge>
-          </div>
-        </div>
+          </motion.div>
 
-        <div className="px-4 pb-4">
-          <div className="overflow-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div ref={containerRef} className="flex gap-3 will-change-transform">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="relative overflow-hidden rounded-2xl border border-purple-900/60 bg-purple-950/40"
+          >
+            <div
+              ref={containerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+              style={{
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+              }}
+            >
               <div ref={contentRef} className="flex gap-3">
                 {segmentItems.length === 0 ? (
                   <div className="text-purple-200/80 text-sm px-4">Loading…</div>
@@ -175,32 +208,40 @@ export default function TickerTapeCard({ className = "" }: { className?: string 
                       {segmentItems.map((q: any, idx: number) => {
                         const up = q.percentChange >= 0;
                         return (
-                          <div
+                          <motion.div
                             key={q._k ?? `${q.symbol}-${idx}`}
-                            className="min-w-[220px] snap-start rounded-2xl border border-purple-900/70 bg-purple-950/70 p-4"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.05, backgroundColor: "rgba(139, 92, 246, 0.2)" }}
+                            transition={{ duration: 0.2, delay: idx * 0.05 }}
+                            className="min-w-[180px] snap-start rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="text-xs text-purple-300/90 font-mono">{q.symbol}</div>
-                                <div className="text-2xl font-bold text-white mt-1">
+                                <div className="text-xl font-bold text-white mt-1">
                                   {q.symbol.includes("BTC")
                                     ? q.price.toLocaleString("en-US", { maximumFractionDigits: 0 })
                                     : q.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                                 </div>
                               </div>
-                              <div className={up ? "text-emerald-300" : "text-rose-300"}>
+                              <motion.div
+                                className={up ? "text-emerald-300" : "text-rose-300"}
+                                animate={up ? { y: [0, -3, 0] } : { y: [0, 3, 0] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                              >
                                 {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                              </div>
+                              </motion.div>
                             </div>
 
-                            <div className="mt-3">
-                              <div className="text-sm font-semibold text-purple-200">{q.name ?? q.symbol}</div>
+                            <div className="mt-2">
+                              <div className="text-xs font-semibold text-purple-200">{q.name ?? q.symbol}</div>
                               <div className={up ? "text-emerald-300" : "text-rose-300"}>
                                 <span className="font-mono text-sm font-bold">{pctStr(q.percentChange)}</span>
                               </div>
                               <div className="text-xs text-purple-200/60">% up/down vs last reference</div>
                             </div>
-                          </div>
+                          </motion.div>
                         );
                       })}
                     </div>
@@ -210,32 +251,40 @@ export default function TickerTapeCard({ className = "" }: { className?: string 
                       {segmentItems.map((q: any, idx: number) => {
                         const up = q.percentChange >= 0;
                         return (
-                          <div
+                          <motion.div
                             key={`${q._k ?? `${q.symbol}-${idx}`}-2`}
-                            className="min-w-[220px] snap-start rounded-2xl border border-purple-900/70 bg-purple-950/70 p-4"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.05, backgroundColor: "rgba(139, 92, 246, 0.2)" }}
+                            transition={{ duration: 0.2 }}
+                            className="min-w-[180px] snap-start rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="text-xs text-purple-300/90 font-mono">{q.symbol}</div>
-                                <div className="text-2xl font-bold text-white mt-1">
+                                <div className="text-xl font-bold text-white mt-1">
                                   {q.symbol.includes("BTC")
                                     ? q.price.toLocaleString("en-US", { maximumFractionDigits: 0 })
                                     : q.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                                 </div>
                               </div>
-                              <div className={up ? "text-emerald-300" : "text-rose-300"}>
+                              <motion.div
+                                className={up ? "text-emerald-300" : "text-rose-300"}
+                                animate={up ? { y: [0, -3, 0] } : { y: [0, 3, 0] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                              >
                                 {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                              </div>
+                              </motion.div>
                             </div>
 
-                            <div className="mt-3">
-                              <div className="text-sm font-semibold text-purple-200">{q.name ?? q.symbol}</div>
+                            <div className="mt-2">
+                              <div className="text-xs font-semibold text-purple-200">{q.name ?? q.symbol}</div>
                               <div className={up ? "text-emerald-300" : "text-rose-300"}>
                                 <span className="font-mono text-sm font-bold">{pctStr(q.percentChange)}</span>
                               </div>
                               <div className="text-xs text-purple-200/60">% up/down vs last reference</div>
                             </div>
-                          </div>
+                          </motion.div>
                         );
                       })}
                     </div>
@@ -243,10 +292,9 @@ export default function TickerTapeCard({ className = "" }: { className?: string 
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
-

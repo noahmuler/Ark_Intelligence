@@ -54,11 +54,31 @@ export function MarketChart({ symbol, name, className = "", disabledChart = fals
 
         const change = typeof quote.change === 'number' ? quote.change : 0;
         const oldestPrice = quote.price - change;
-        const points = 60;
+        
+        // Adjust point count based on timeframe
+        const timeframePoints: Record<string, number> = {
+          '1m': 30,
+          '5m': 60,
+          '15m': 90,
+          '1h': 120,
+          '4h': 180
+        };
+        const points = timeframePoints[timeframe] || 60;
+        
+        // Adjust interval based on timeframe
+        const timeframeInterval: Record<string, number> = {
+          '1m': 60_000,      // 1 minute
+          '5m': 5 * 60_000,  // 5 minutes
+          '15m': 15 * 60_000, // 15 minutes
+          '1h': 60 * 60_000,  // 1 hour
+          '4h': 4 * 60 * 60_000 // 4 hours
+        };
+        const intervalMs = timeframeInterval[timeframe] || 60_000;
+        
         for (let i = points - 1; i >= 0; i--) {
           const t = i / (points - 1);
           const price = oldestPrice + (quote.price - oldestPrice) * t;
-          const time = new Date(now.getTime() - i * 60_000);
+          const time = new Date(now.getTime() - i * intervalMs);
           data.push({
             time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
             price: Number(price.toFixed(2)),
@@ -87,7 +107,7 @@ export function MarketChart({ symbol, name, className = "", disabledChart = fals
     fetchChartData();
     const interval = setInterval(fetchChartData, 30000);
     return () => clearInterval(interval);
-  }, [symbol]);
+  }, [symbol, timeframe]);
 
 
   // Draw chart on canvas
@@ -137,7 +157,7 @@ export function MarketChart({ symbol, name, className = "", disabledChart = fals
       const y = padding + (chartHeight / 5) * i;
       ctx.beginPath();
       ctx.moveTo(padding, y);
-      ctx.lineTo(canvas.width - padding, y);
+      ctx.lineTo(rect.width - padding, y);
       ctx.stroke();
       
       // Price labels
@@ -211,7 +231,7 @@ export function MarketChart({ symbol, name, className = "", disabledChart = fals
     return () => {
       // Any cleanup needed for canvas drawing
     };
-  }, [chartData]);
+  }, [chartData, priceChange]);
 
   return (
     <div className={`relative bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-4 ${className}`}>
@@ -264,24 +284,11 @@ export function MarketChart({ symbol, name, className = "", disabledChart = fals
             Chart unavailable for this view
           </div>
         ) : (
-          <>
-            <canvas
-              ref={canvasRef}
-              className={`w-full h-48 sm:h-64 ${loading || error ? 'opacity-50' : ''}`}
-              style={{ display: 'block' }}
-            />
-
-            {/* TradingView Widget */}
-            <TradingViewWidget
-              symbol={symbol}
-              interval={timeframe}
-              theme="light"
-              height={300}
-              width="100%"
-              studies={['RSI', 'MACD', 'BB']}
-              className="w-full"
-            />
-          </>
+          <canvas
+            ref={canvasRef}
+            className={`w-full h-48 sm:h-64 ${loading || error ? 'opacity-50' : ''}`}
+            style={{ display: 'block' }}
+          />
         )}
       </div>
 

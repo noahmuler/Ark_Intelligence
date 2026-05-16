@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -39,19 +40,20 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
         const json = await res.json();
         const data = json?.data ?? {};
 
-        const eur = Number(data["EURUSD"]?.percentChange ?? 0);
-        const gbp = Number(data["GBPUSD"]?.percentChange ?? 0);
-        const jpy = Number(data["USDJPY"]?.percentChange ?? 0);
+        const eur = Number(data["EURUSD"]?.changePercent ?? 0);
+        const gbp = Number(data["GBPUSD"]?.changePercent ?? 0);
+        const jpy = Number(data["USDJPY"]?.changePercent ?? 0);
 
-        // Convert to “strength” proxy around 0 center.
+        // Convert to "strength" proxy around 0 center.
         // If EURUSD is up, EUR tends stronger vs USD; if USDJPY up, USD stronger vs JPY.
+        // USD is averaged from EUR and GBP (divided by 2) to avoid double-counting since it's derived from two pairs.
         const usdProxy = -(eur + gbp) / 2;
 
         const next = [
-          { label: "EUR", color: "#34d399", value: clamp(eur / 2.5, -100, 100) },
-          { label: "GBP", color: "#60a5fa", value: clamp(gbp / 2.5, -100, 100) },
-          { label: "JPY", color: "#fbbf24", value: clamp(-jpy / 2.5, -100, 100) },
-          { label: "USD", color: "#a78bfa", value: clamp(usdProxy, -100, 100) },
+          { label: "EUR", color: "#34d399", value: clamp(eur * 10, -100, 100) },
+          { label: "GBP", color: "#60a5fa", value: clamp(gbp * 10, -100, 100) },
+          { label: "JPY", color: "#fbbf24", value: clamp(-jpy * 10, -100, 100) },
+          { label: "USD", color: "#a78bfa", value: clamp(usdProxy * 10, -100, 100) },
         ] satisfies StrengthSeries[];
 
         setStrength(next);
@@ -145,69 +147,144 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
   }, [history, labels, strength, tick]);
 
   return (
-    <Card className={"overflow-hidden " + className}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-bold text-white">Currency Strength</div>
-            <div className="text-xs text-purple-200/80">Relative performance around 0 (center line)</div>
-          </div>
-          <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
-            0-center
-          </Badge>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Card className={"overflow-hidden " + className}>
+        <motion.div
+          className="absolute inset-0"
+          animate={{
+            "--angle": ["0deg", "360deg"],
+          }}
+          transition={{
+            duration: 15,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          style={{
+            backgroundImage: "linear-gradient(var(--angle), rgba(147, 51, 234, 0.05), transparent, rgba(37, 99, 235, 0.05))",
+            backgroundSize: "200% 200%",
+          }}
+        />
+        <CardContent className="p-6 relative">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-start justify-between gap-4"
+          >
+            <div>
+              <div className="text-lg font-bold text-white">Currency Strength</div>
+              <div className="text-xs text-purple-200/80">Relative performance around 0 (center line)</div>
+            </div>
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
+              0-center
+            </Badge>
+          </motion.div>
 
-        <div className="mt-4">
-          <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[260px]">
-            {/* center line */}
-            <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
-            {/* grid */}
-            {[0.25, 0.5, 0.75].map((t) => {
-              const y = chart.pad + chart.innerH * t;
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mt-4"
+          >
+            <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[260px]">
+              {/* center line */}
+              <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
+              {/* grid */}
+              {[0.25, 0.5, 0.75].map((t) => {
+                const y = chart.pad + chart.innerH * t;
+                return (
+                  <line key={t} x1={chart.pad} x2={chart.w - chart.pad} y1={y} y2={y} stroke="rgba(167,139,250,0.12)" />
+                );
+              })}
+
+              {chart.paths.map((p, index) => (
+                <motion.path
+                  key={p.label}
+                  d={p.d}
+                  fill="none"
+                  stroke={p.color}
+                  strokeWidth="2.5"
+                  opacity={0.95}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 0.95 }}
+                  transition={{ duration: 1, delay: 0.2 + index * 0.1 }}
+                />
+              ))}
+
+              {/* latest dots */}
+              {chart.paths.map((p, index) => {
+                // latest at i=29
+                const vals = history[p.label] ?? [];
+                const arr = vals.length >= 30 ? vals.slice(-30) : [...Array(30 - vals.length).fill(0), ...vals];
+                const last = arr[arr.length - 1] ?? 0;
+                const range = 100;
+                const t = clamp((last + range) / (2 * range), 0, 1);
+                const y = chart.pad + (1 - t) * chart.innerH;
+                const x = chart.pad + (chart.innerW * 29) / 29;
+                return (
+                  <motion.circle
+                    key={p.label}
+                    cx={x}
+                    cy={y}
+                    r="4.3"
+                    fill={p.color}
+                    stroke="rgba(255,255,255,0.35)"
+                    strokeWidth="1"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.8 + index * 0.1 }}
+                  />
+                );
+              })}
+            </svg>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4"
+          >
+            {strength.map((s, index) => {
+              const up = s.value >= 0;
               return (
-                <line key={t} x1={chart.pad} x2={chart.w - chart.pad} y1={y} y2={y} stroke="rgba(167,139,250,0.12)" />
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05, backgroundColor: "rgba(139, 92, 246, 0.2)" }}
+                  transition={{ duration: 0.2, delay: 0.4 + index * 0.05 }}
+                  className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3 cursor-pointer"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-purple-200/80">{s.label}</div>
+                    <motion.div
+                      className={up ? "text-emerald-300" : "text-rose-300"}
+                      animate={up ? { y: [0, -3, 0] } : { y: [0, 3, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    </motion.div>
+                  </div>
+                  <motion.div
+                    className="mt-2 text-lg font-mono font-bold"
+                    style={{ color: s.color }}
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    {s.value >= 0 ? "+" : ""}{s.value.toFixed(1)}
+                  </motion.div>
+                </motion.div>
               );
             })}
-
-            {chart.paths.map((p) => (
-              <path key={p.label} d={p.d} fill="none" stroke={p.color} strokeWidth="2.5" opacity={0.95} />
-            ))}
-
-            {/* latest dots */}
-            {chart.paths.map((p) => {
-              // latest at i=29
-              const vals = history[p.label] ?? [];
-              const arr = vals.length >= 30 ? vals.slice(-30) : [...Array(30 - vals.length).fill(0), ...vals];
-              const last = arr[arr.length - 1] ?? 0;
-              const range = 100;
-              const t = clamp((last + range) / (2 * range), 0, 1);
-              const y = chart.pad + (1 - t) * chart.innerH;
-              const x = chart.pad + (chart.innerW * 29) / 29;
-              return <circle key={p.label} cx={x} cy={y} r="4.3" fill={p.color} stroke="rgba(255,255,255,0.35)" strokeWidth="1" />;
-            })}
-          </svg>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-          {strength.map((s) => {
-            const up = s.value >= 0;
-            return (
-              <div key={s.label} className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-purple-200/80">{s.label}</div>
-                  <div className={up ? "text-emerald-300" : "text-rose-300"}>
-                    {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  </div>
-                </div>
-                <div className="mt-2 text-lg font-mono font-bold" style={{ color: s.color }}>
-                  {s.value >= 0 ? "+" : ""}{s.value.toFixed(1)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
