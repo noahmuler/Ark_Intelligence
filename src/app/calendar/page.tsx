@@ -68,19 +68,19 @@ interface CalendarEvent {
 
 export default function Calendar() {
   const [mounted, setMounted] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 13)); // Wed, May 13th
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<string>("Loading...");
   
   // View type state: 'today', 'tomorrow', 'week', 'custom'
-  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
+  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('week');
   
   // Filter states
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(CURRENCIES);
   const [selectedImpacts, setSelectedImpacts] = useState<string[]>(["High", "Medium", "Low"]);
-  const [timezone, setTimezone] = useState<string>("Europe/London");
+  const [timezone, setTimezone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone);
   
   // Live time tracker
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -92,7 +92,7 @@ export default function Calendar() {
     setMounted(true);
   }, []);
 
-  // Live time update
+  // Live time update - uses user's local system time
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -105,6 +105,52 @@ export default function Calendar() {
     setError(null);
     
     try {
+      // Use mock data for This Week view as specified in gemini_prompt.md
+      if (viewType === 'week') {
+        const mockEvents: CalendarEvent[] = [
+          {
+            id: 'mock-1',
+            time: '14:00',
+            currency: 'USD',
+            impact: 'High',
+            title: 'FOMC Interest Rate Decision',
+            confidence: '68%',
+            date: new Date(2026, 4, 11).toISOString(), // Mon, 5/11
+          },
+          {
+            id: 'mock-2',
+            time: '8:30',
+            currency: 'USD',
+            impact: 'Medium',
+            title: 'OPEC Monthly Report',
+            confidence: '81%',
+            date: new Date(2026, 4, 12).toISOString(), // Tue, 5/12
+          },
+          {
+            id: 'mock-3',
+            time: '8:30',
+            currency: 'USD',
+            impact: 'Medium',
+            title: 'US Retail Sales',
+            confidence: '61%',
+            date: new Date(2026, 4, 12).toISOString(), // Tue, 5/12
+          },
+          {
+            id: 'mock-4',
+            time: '14:00',
+            currency: 'JPY',
+            impact: 'Medium',
+            title: 'Bank of Japan Policy Meeting',
+            confidence: '71%',
+            date: new Date(2026, 4, 13).toISOString(), // Wed, 5/13
+          },
+        ];
+        setEvents(mockEvents);
+        setDataSource('Mock Data (Alpha Vantage API)');
+        setLoading(false);
+        return;
+      }
+      
       let url = '/api/calendar?';
       
       if (viewType === 'today') {
@@ -113,8 +159,6 @@ export default function Calendar() {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         url += `viewType=day&date=${tomorrow.toISOString().split('T')[0]}`;
-      } else if (viewType === 'week') {
-        url += 'viewType=week';
       } else if (viewType === 'custom') {
         url += `viewType=day&date=${selectedDate.toISOString().split('T')[0]}`;
       }
@@ -258,22 +302,22 @@ export default function Calendar() {
     return analysis.join(" ");
   };
 
-  // Format current time with timezone
+  // Format current time with user's local system timezone
   const formatCurrentTime = () => {
     return currentTime.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit',
-      timeZone: timezone 
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
   };
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#0B0813]">
+      <div className="h-full bg-[#0B0813] -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
         <div className="w-full">
           {/* Page Header */}
-          <div className="px-4 py-4">
+          <div className="py-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Economic Calendar</h1>
@@ -316,7 +360,7 @@ export default function Calendar() {
           </div>
 
           {/* Top Filtering Utility Belt */}
-          <div className="px-4 mb-4 flex flex-wrap items-center gap-4 py-2">
+          <div className="mb-4 flex flex-wrap items-center gap-4 py-2">
             {/* Date Selectors - Today, Tomorrow, This Week */}
             <div className="flex items-center space-x-2">
               <button
@@ -435,15 +479,15 @@ export default function Calendar() {
           )}
 
           {/* Horizontal Timeline Canvas */}
-          <div className="w-full relative min-h-[calc(100vh-200px)]">
+          <div className="w-full relative min-h-[calc(100vh-200px)] mx-0 mb-0">
             {/* Live Current-Time Tracker */}
             <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-0">
               <div 
-                className="absolute top-0 bottom-0 w-px bg-purple-400/60 animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.6)]"
+                className="absolute top-0 bottom-0 w-0.5 bg-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
                 style={{
                   left: `${(() => {
                     if (viewType === 'week') {
-                      // For weekly view, position based on current day of week
+                      // For weekly view, position fixedly over the current day's column (actual current day)
                       const weekDays = getWeekDays(selectedDate);
                       const currentDayIndex = weekDays.findIndex(day => 
                         day.date.toDateString() === new Date().toDateString()
@@ -453,7 +497,7 @@ export default function Calendar() {
                       }
                       return 50; // Default to middle if today not in view
                     } else {
-                      // For daily view, position based on current hour
+                      // For daily view (Today/Tomorrow), position based on current hour with fluid movement
                       const visibleStartHour = 7; // 07:00
                       const visibleEndHour = 21; // 21:00
                       const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
@@ -466,8 +510,9 @@ export default function Calendar() {
                   })()}%`
                 }}
               >
-                <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-purple-600/90 backdrop-blur text-white text-xs font-mono px-2 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/30">
-                  {formatCurrentTime()}
+                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/30">
+                  <Clock className="h-3 w-3" />
+                  <span>{formatCurrentTime()}</span>
                 </div>
               </div>
             </div>
@@ -481,7 +526,7 @@ export default function Calendar() {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
-                    <div key={day.label} className="flex-shrink-0 w-[340px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                    <div key={day.label} className="flex-shrink-0 w-[340px] sm:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
                       {/* Day Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {day.label}
@@ -576,7 +621,7 @@ export default function Calendar() {
                   const intervalEvents = getEventsForInterval(interval);
                   
                   return (
-                    <div key={interval} className="flex-shrink-0 w-[340px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                    <div key={interval} className="flex-shrink-0 w-[340px] sm:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
                       {/* Hour Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {interval}
