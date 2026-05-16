@@ -16,16 +16,28 @@ import {
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  fetchEconomicCalendar, 
-  fetchTodayEconomicEvents, 
-  fetchWeekEconomicEvents, 
-  fetchMonthEconomicEvents,
-  type EconomicEvent 
-} from "@/services/economicCalendar";
 
-// Time intervals for horizontal timeline
+// Time intervals for horizontal timeline (daily view)
 const TIME_INTERVALS = ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "21:00"];
+
+// Helper function to get day columns for weekly view
+const getWeekDays = (startDate: Date) => {
+  const days = [];
+  const current = new Date(startDate);
+  const dayOfWeek = current.getDay();
+  const startOfWeek = new Date(current);
+  startOfWeek.setDate(current.getDate() - dayOfWeek);
+  
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    days.push({
+      date: day,
+      label: day.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
+    });
+  }
+  return days;
+};
 
 // Currency options for filtering
 const CURRENCIES = ["EUR", "USD", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY"];
@@ -38,13 +50,32 @@ const TIMEZONES = [
   { label: "Australia/Sydney", value: "Australia/Sydney" },
 ];
 
+interface CalendarEvent {
+  id: string;
+  time: string;
+  currency: string;
+  impact: string;
+  title: string;
+  confidence: string;
+  date: string;
+  actual?: string;
+  forecast?: string;
+  previous?: string;
+  description?: string;
+  category?: string;
+  assets?: string[];
+}
+
 export default function Calendar() {
   const [mounted, setMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [events, setEvents] = useState<EconomicEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<string>("Loading...");
+  
+  // View type state: 'today', 'tomorrow', 'week', 'custom'
+  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
   
   // Filter states
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(CURRENCIES);
@@ -69,35 +100,47 @@ export default function Calendar() {
     return () => clearInterval(timer);
   }, []);
 
-  // Static mock data array for layout verification (Prompt 4)
-  const sampleEvents = [
-    { id: 1, time: "07:00 AM", currency: "GBP", impact: "Low", title: "Nationwide Housing Prices s.a (MoM)", confidence: "62%", date: new Date().toISOString() },
-    { id: 2, time: "07:00 AM", currency: "GBP", impact: "Low", title: "Nationwide Housing Prices n.s.a (YoY)", confidence: "72%", date: new Date().toISOString() },
-    { id: 3, time: "09:30 AM", currency: "GBP", impact: "Low", title: "M4 Money Supply (YoY)", confidence: "62%", date: new Date().toISOString() },
-    { id: 4, time: "11:00 AM", currency: "GBP", impact: "Medium", title: "BoE's Pill speech", confidence: "62%", date: new Date().toISOString() },
-    { id: 5, time: "13:00 PM", currency: "USD", impact: "High", title: "ISM Manufacturing Prices Paid", confidence: "66%", date: new Date().toISOString() }
-  ];
-
   const loadEvents = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Use static mock data for layout verification (Prompt 4)
-      setEvents(sampleEvents as any);
-      setDataSource("Mock Data (Layout Verification)");
+      let url = '/api/calendar?';
+      
+      if (viewType === 'today') {
+        url += 'viewType=today';
+      } else if (viewType === 'tomorrow') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        url += `viewType=day&date=${tomorrow.toISOString().split('T')[0]}`;
+      } else if (viewType === 'week') {
+        url += 'viewType=week';
+      } else if (viewType === 'custom') {
+        url += `viewType=day&date=${selectedDate.toISOString().split('T')[0]}`;
+      }
+      
+      const response = await fetch(url, { signal });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch calendar data');
+      }
+      
+      const data = await response.json();
+      setEvents(data.events || []);
+      setDataSource(data.source || 'API');
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       
       setError("Failed to load economic events");
       setDataSource("Error");
       console.error("Error loading economic events:", err);
+      setEvents([]);
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [viewType, selectedDate]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -106,24 +149,38 @@ export default function Calendar() {
     loadEvents(controller.signal);
     
     return () => controller.abort();
-  }, [mounted, loadEvents]);
+  }, [mounted, viewType, selectedDate, loadEvents]);
 
   if (!mounted) return null;
 
-  // Filter events based on selected currencies, impacts, and date
+  // Filter events based on selected currencies and impacts
   const filteredEvents = events.filter(event => {
     const currencyMatch = selectedCurrencies.length === 0 || selectedCurrencies.includes(event.currency || "USD");
     const impactMatch = selectedImpacts.length === 0 || selectedImpacts.includes(event.impact);
-    const dateMatch = event.date ? new Date(event.date).toDateString() === selectedDate.toDateString() : true;
-    return currencyMatch && impactMatch && dateMatch;
+    return currencyMatch && impactMatch;
   });
 
-  // Group events by time interval
+  // Group events by time interval (for daily view)
   const getEventsForInterval = (interval: string) => {
     const [hour] = interval.split(':').map(Number);
     return filteredEvents.filter(event => {
-      const eventHour = new Date(event.date).getHours();
+      const eventDate = new Date(event.date);
+      const eventHour = parseInt(
+        eventDate.toLocaleString('en-US', { 
+          timeZone: timezone, 
+          hour: 'numeric', 
+          hour12: false 
+        })
+      );
       return eventHour >= hour && eventHour < hour + 2;
+    });
+  };
+
+  // Group events by day (for weekly view)
+  const getEventsForDay = (dayDate: Date) => {
+    return filteredEvents.filter(event => {
+      const eventDate = new Date(event.date);
+      return eventDate.toDateString() === dayDate.toDateString();
     });
   };
 
@@ -174,16 +231,7 @@ export default function Calendar() {
     }
   };
 
-  const getConfidenceScore = (event: EconomicEvent) => {
-    // Generate a confidence score based on impact and data availability
-    const baseScore = event.impact === "High" ? 85 : event.impact === "Medium" ? 70 : 55;
-    const hasActual = event.actual !== undefined && event.actual !== "";
-    const hasForecast = event.forecast !== undefined && event.forecast !== "";
-    const adjustment = (hasActual ? 10 : 0) + (hasForecast ? 5 : 0);
-    return Math.min(baseScore + adjustment, 95);
-  };
-
-  const generateAIAnalysis = (event: EconomicEvent) => {
+  const generateAIAnalysis = (event: CalendarEvent) => {
     // Generate AI analysis based on event data
     const analysis = [];
     
@@ -196,7 +244,7 @@ export default function Calendar() {
     }
     
     if (event.impact === "High") {
-      analysis.push(`Given the high impact rating, this event is likely to cause significant volatility in ${event.assets.join(", ")}.`);
+      analysis.push(`Given the high impact rating, this event is likely to cause significant volatility in ${event.currency} markets.`);
     }
     
     if (event.category === "Fed" || event.category === "Macro") {
@@ -204,7 +252,7 @@ export default function Calendar() {
     }
     
     if (analysis.length === 0) {
-      analysis.push(`This ${event.category} event may influence ${event.assets.slice(0, 2).join(" and ")} depending on the actual vs forecast deviation.`);
+      analysis.push(`This ${event.category || 'economic'} event may influence ${event.currency} depending on the actual vs forecast deviation.`);
     }
     
     return analysis.join(" ");
@@ -222,10 +270,10 @@ export default function Calendar() {
 
   return (
     <MainLayout>
-      <div className="p-3 sm:p-4 lg:p-6 h-full bg-[#0B0813]">
-        <div className="max-w-full mx-auto">
+      <div className="h-full bg-[#0B0813]">
+        <div className="w-full">
           {/* Page Header */}
-          <div className="mb-6">
+          <div className="px-4 py-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Economic Calendar</h1>
@@ -268,36 +316,58 @@ export default function Calendar() {
           </div>
 
           {/* Top Filtering Utility Belt */}
-          <div className="mb-4 flex flex-wrap items-center gap-4 py-2">
-            {/* Date Selectors */}
+          <div className="px-4 mb-4 flex flex-wrap items-center gap-4 py-2">
+            {/* Date Selectors - Today, Tomorrow, This Week */}
             <div className="flex items-center space-x-2">
               <button
                 type="button"
-                onClick={() => setSelectedDate(new Date())}
-                className="px-3 py-1.5 text-sm text-purple-300 hover:text-white hover:bg-purple-800/50 rounded transition-colors"
+                onClick={() => setViewType('today')}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                  viewType === 'today'
+                    ? 'text-white bg-purple-700/50 border border-purple-500/50'
+                    : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+                }`}
               >
                 Today
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  setSelectedDate(tomorrow);
-                }}
-                className="px-3 py-1.5 text-sm text-purple-300 hover:text-white hover:bg-purple-800/50 rounded transition-colors"
+                onClick={() => setViewType('tomorrow')}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                  viewType === 'tomorrow'
+                    ? 'text-white bg-purple-700/50 border border-purple-500/50'
+                    : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+                }`}
               >
                 Tomorrow
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewType('week')}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                  viewType === 'week'
+                    ? 'text-white bg-purple-700/50 border border-purple-500/50'
+                    : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+                }`}
+              >
+                This Week
               </button>
               <label className="sr-only" htmlFor="calendar-custom-date">Custom date</label>
               <input
                 id="calendar-custom-date"
                 type="date"
                 value={selectedDate.toISOString().split('T')[0]}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                className="bg-purple-900/30 text-white text-sm rounded px-2 py-1.5 border border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
+                onChange={(e) => {
+                  const [year, month, day] = e.target.value.split('-').map(Number);
+                  setSelectedDate(new Date(year, month - 1, day));
+                  setViewType('custom');
+                }}
+                className={`bg-purple-900/30 text-white text-sm rounded px-2 py-1.5 border transition-colors ${
+                  viewType === 'custom'
+                    ? 'border-purple-500/50 focus:ring-1 focus:ring-purple-500/30'
+                    : 'border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30'
+                }`}
               />
-
             </div>
 
             {/* Currency Toggles */}
@@ -365,21 +435,34 @@ export default function Calendar() {
           )}
 
           {/* Horizontal Timeline Canvas */}
-          <div className="w-full relative min-h-[calc(100vh-280px)]">
+          <div className="w-full relative min-h-[calc(100vh-200px)]">
             {/* Live Current-Time Tracker */}
-            <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-10">
+            <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-0">
               <div 
-                className="absolute top-0 bottom-0 w-px bg-purple-400/60"
+                className="absolute top-0 bottom-0 w-px bg-purple-400/60 animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.6)]"
                 style={{
                   left: `${(() => {
-                    const visibleStartHour = 7; // 07:00
-                    const visibleEndHour = 21; // 21:00
-                    const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
-                    const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-                    const visibleStartMinutes = visibleStartHour * 60;
-                    const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
-                    const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
-                    return fraction * 100;
+                    if (viewType === 'week') {
+                      // For weekly view, position based on current day of week
+                      const weekDays = getWeekDays(selectedDate);
+                      const currentDayIndex = weekDays.findIndex(day => 
+                        day.date.toDateString() === new Date().toDateString()
+                      );
+                      if (currentDayIndex >= 0) {
+                        return ((currentDayIndex + 0.5) / weekDays.length) * 100;
+                      }
+                      return 50; // Default to middle if today not in view
+                    } else {
+                      // For daily view, position based on current hour
+                      const visibleStartHour = 7; // 07:00
+                      const visibleEndHour = 21; // 21:00
+                      const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
+                      const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+                      const visibleStartMinutes = visibleStartHour * 60;
+                      const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
+                      const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
+                      return fraction * 100;
+                    }
                   })()}%`
                 }}
               >
@@ -390,101 +473,199 @@ export default function Calendar() {
             </div>
 
             {/* Timeline Container - Unified Horizontal Scroll */}
-            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin">
+            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20">
 
-              {TIME_INTERVALS.map((interval, intervalIndex) => {
-                const intervalEvents = getEventsForInterval(interval);
-                
-                return (
-                  <div key={interval} className="flex-shrink-0 w-[340px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
-                    {/* Hour Label at Top */}
-                    <div className="text-xs text-purple-400/60 font-medium">
-                      {interval}
-                    </div>
-
-                    {/* Event Cards */}
-                    {intervalEvents.length > 0 ? (
-                      intervalEvents.map((event, eventIndex) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
-                          className="group relative"
-                        >
-                          <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-xl p-4 shadow-lg hover:border-purple-500/60 transition-all duration-300 hover:scale-[1.02]">
-                            {/* Card Header */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-mono text-purple-300/80">
-                                {(event as any).time || event.time}
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span className="px-1.5 py-0.5 text-xs rounded font-bold text-purple-300 border border-purple-500/30">
-                                  {(event as any).asset || event.currency || "USD"}
-                                </span>
-                                <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${
-                                  (event as any).impact === "HIGH" ? "text-purple-200 border-purple-400/50" :
-                                  (event as any).impact === "MEDIUM" ? "text-purple-300 border-purple-500/40" :
-                                  "text-purple-400 border-purple-600/30"
-                                }`}>
-                                  {(event as any).impact || event.impact}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Card Title */}
-                            <h3 className="text-sm font-bold text-white mb-2 leading-tight">
-                              {(event as any).title || event.title}
-                            </h3>
-
-                            {/* AI Analysis Dropdown */}
-                            <div className="mb-2">
-                              <button
-                                onClick={() => toggleCardExpansion(event.id)}
-                                className="flex items-center space-x-1.5 text-xs text-purple-300/80 hover:text-purple-200 transition-colors"
-                              >
-                                <Sparkles className="h-3 w-3" />
-                                <span className="font-medium">✨ AI ANALYSIS</span>
-                                <ChevronDown 
-                                  className={`h-3 w-3 transition-transform ${expandedCards.has(event.id) ? 'rotate-180' : ''}`} 
-                                />
-                              </button>
-                              <AnimatePresence>
-                                {expandedCards.has(event.id) && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="mt-2 p-2 bg-purple-900/40 rounded border border-purple-700/20">
-                                      <p className="text-xs text-purple-200/80 leading-relaxed">
-                                        Historical analysis suggests this event typically causes moderate market volatility. Consensus forecasts indicate potential deviation from prior readings.
-                                      </p>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-
-                            {/* Confidence Rating Footer */}
-                            <div className="flex items-center pt-2 border-t border-purple-700/20">
-                              <span className="text-xs text-purple-400/80 font-medium">
-                                Confidence: {(event as any).confidence || "62%"}
-                              </span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-purple-500/50 text-sm">
-                        No events
+              {viewType === 'week' ? (
+                // Weekly View - Day Columns
+                getWeekDays(selectedDate).map((day, dayIndex) => {
+                  const dayEvents = getEventsForDay(day.date);
+                  
+                  return (
+                    <div key={day.label} className="flex-shrink-0 w-[340px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                      {/* Day Label at Top */}
+                      <div className="text-xs text-purple-400/60 font-medium">
+                        {day.label}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {/* Event Cards */}
+                      {dayEvents.length > 0 ? (
+                        dayEvents.map((event, eventIndex) => (
+                          <motion.div
+                            key={event.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: dayIndex * 0.05 + eventIndex * 0.03 }}
+                            className="group relative"
+                          >
+                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-xl p-4 shadow-lg hover:border-purple-500/60 transition-all duration-300 hover:scale-[1.02]">
+                              {/* Card Header */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs font-mono text-purple-300/80">
+                                  {event.time}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="px-1.5 py-0.5 text-xs rounded font-bold text-purple-300 border border-purple-500/30">
+                                    {event.currency || "USD"}
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${
+                                    event.impact === "High" ? "text-purple-200 border-purple-400/50" :
+                                    event.impact === "Medium" ? "text-purple-300 border-purple-500/40" :
+                                    "text-purple-400 border-purple-600/30"
+                                  }`}>
+                                    {event.impact}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Card Title */}
+                              <h3 className="text-sm font-bold text-white mb-2 leading-tight">
+                                {event.title}
+                              </h3>
+
+                              {/* AI Analysis Dropdown */}
+                              <div className="mb-2">
+                                <button
+                                  onClick={() => toggleCardExpansion(event.id)}
+                                  className="flex items-center space-x-1.5 text-xs text-purple-300/80 hover:text-purple-200 transition-colors"
+                                >
+                                  <Sparkles className="h-3 w-3" />
+                                  <span className="font-medium">✨ AI ANALYSIS</span>
+                                  <ChevronDown 
+                                    className={`h-3 w-3 transition-transform ${expandedCards.has(event.id) ? 'rotate-180' : ''}`} 
+                                  />
+                                </button>
+                                <AnimatePresence>
+                                  {expandedCards.has(event.id) && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.3 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="mt-2 p-2 bg-purple-900/40 rounded border border-purple-700/20">
+                                        <p className="text-xs text-purple-200/80 leading-relaxed">
+                                          {generateAIAnalysis(event)}
+                                        </p>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
+                              {/* Confidence Rating Footer */}
+                              <div className="flex items-center pt-2 border-t border-purple-700/20">
+                                <span className="text-xs text-purple-400/80 font-medium">
+                                  Confidence: {event.confidence || "62%"}
+                                </span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-purple-500/50 text-sm">
+                          No events
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                // Daily View - Hour Columns
+                TIME_INTERVALS.map((interval, intervalIndex) => {
+                  const intervalEvents = getEventsForInterval(interval);
+                  
+                  return (
+                    <div key={interval} className="flex-shrink-0 w-[340px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                      {/* Hour Label at Top */}
+                      <div className="text-xs text-purple-400/60 font-medium">
+                        {interval}
+                      </div>
+
+                      {/* Event Cards */}
+                      {intervalEvents.length > 0 ? (
+                        intervalEvents.map((event, eventIndex) => (
+                          <motion.div
+                            key={event.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
+                            className="group relative"
+                          >
+                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-xl p-4 shadow-lg hover:border-purple-500/60 transition-all duration-300 hover:scale-[1.02]">
+                              {/* Card Header */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs font-mono text-purple-300/80">
+                                  {event.time}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="px-1.5 py-0.5 text-xs rounded font-bold text-purple-300 border border-purple-500/30">
+                                    {event.currency || "USD"}
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${
+                                    event.impact === "High" ? "text-purple-200 border-purple-400/50" :
+                                    event.impact === "Medium" ? "text-purple-300 border-purple-500/40" :
+                                    "text-purple-400 border-purple-600/30"
+                                  }`}>
+                                    {event.impact}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Card Title */}
+                              <h3 className="text-sm font-bold text-white mb-2 leading-tight">
+                                {event.title}
+                              </h3>
+
+                              {/* AI Analysis Dropdown */}
+                              <div className="mb-2">
+                                <button
+                                  onClick={() => toggleCardExpansion(event.id)}
+                                  className="flex items-center space-x-1.5 text-xs text-purple-300/80 hover:text-purple-200 transition-colors"
+                                >
+                                  <Sparkles className="h-3 w-3" />
+                                  <span className="font-medium">✨ AI ANALYSIS</span>
+                                  <ChevronDown 
+                                    className={`h-3 w-3 transition-transform ${expandedCards.has(event.id) ? 'rotate-180' : ''}`} 
+                                  />
+                                </button>
+                                <AnimatePresence>
+                                  {expandedCards.has(event.id) && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.3 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="mt-2 p-2 bg-purple-900/40 rounded border border-purple-700/20">
+                                        <p className="text-xs text-purple-200/80 leading-relaxed">
+                                          {generateAIAnalysis(event)}
+                                        </p>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
+                              {/* Confidence Rating Footer */}
+                              <div className="flex items-center pt-2 border-t border-purple-700/20">
+                                <span className="text-xs text-purple-400/80 font-medium">
+                                  Confidence: {event.confidence || "62%"}
+                                </span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-purple-500/50 text-sm">
+                          No events
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
