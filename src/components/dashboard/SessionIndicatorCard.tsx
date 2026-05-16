@@ -6,24 +6,102 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
-type SessionKey = "Sydney" | "London" | "New York";
+type DotColor = "emerald" | "amber" | "rose";
+
+type SessionKey =
+  | "Sydney"
+  | "Asia"
+  | "London"
+  | "NY AM"
+  | "NY Lunch"
+  | "NY PM"
+  | "Market Close";
 
 type SessionDef = {
   key: SessionKey;
-  // Times in target timezone (US Eastern used for “opens/closes” display)
-  // These are FX-style session windows (approx).
+  isExplicit: boolean;
+  // Times are anchored to America/New_York local time exactly as in Sessions.txt.
   openHour: number;
   openMinute: number;
   closeHour: number;
   closeMinute: number;
-  dotColor: "emerald" | "amber" | "rose";
+  dotColor: DotColor;
+
+  // If true, the session is only visible when market is open (i.e. NOT during maintenance).
+  // (Used for temporary implicit row visibility rules.)
+  hideDuringMarketClose?: boolean;
 };
 
 const SESSIONS: SessionDef[] = [
-  { key: "Sydney", openHour: 17, openMinute: 0, closeHour: 2, closeMinute: 0, dotColor: "amber" },
-  { key: "London", openHour: 3, openMinute: 0, closeHour: 10, closeMinute: 0, dotColor: "emerald" },
-  { key: "New York", openHour: 8, openMinute: 0, closeHour: 17, closeMinute: 0, dotColor: "rose" },
+  // Explicit (must be in 2nd row)
+  {
+    key: "Sydney",
+    isExplicit: true,
+    openHour: 17,
+    openMinute: 0,
+    closeHour: 2,
+    closeMinute: 0,
+    dotColor: "amber",
+  },
+  {
+    key: "Asia",
+    isExplicit: true,
+    openHour: 20,
+    openMinute: 0,
+    closeHour: 0,
+    closeMinute: 0,
+    dotColor: "amber",
+  },
+  {
+    key: "London",
+    isExplicit: true,
+    openHour: 3,
+    openMinute: 0,
+    closeHour: 12,
+    closeMinute: 0,
+    dotColor: "emerald",
+  },
+  {
+    key: "NY AM",
+    isExplicit: true,
+    openHour: 8,
+    openMinute: 0,
+    closeHour: 12,
+    closeMinute: 0,
+    dotColor: "rose",
+  },
+  {
+    key: "NY PM",
+    isExplicit: true,
+    openHour: 13,
+    openMinute: 30,
+    closeHour: 16,
+    closeMinute: 0,
+    dotColor: "rose",
+  },
+
+  // Implicit (temporarily visible in 1st row)
+  {
+    key: "NY Lunch",
+    isExplicit: false,
+    openHour: 12,
+    openMinute: 0,
+    closeHour: 13,
+    closeMinute: 30,
+    dotColor: "rose",
+  },
+  {
+    key: "Market Close",
+    isExplicit: false,
+    openHour: 17,
+    openMinute: 0,
+    closeHour: 18,
+    closeMinute: 0,
+    dotColor: "emerald",
+  },
 ];
+
+
 
 function pad2(n: number) {
   return n.toString().padStart(2, "0");
@@ -86,12 +164,46 @@ function buildSessionTimesForDate(now: Date, session: SessionDef) {
   return { open: openUtc, close: closeUtc, nowParts: parts };
 }
 
+function isMarketMaintenanceOpen(now: Date) {
+  // Sessions.txt: Weekday Daily Closures (Mon–Thu) 5:00 PM – 6:00 PM NY time
+  // These are functionally “closed for active trading” windows.
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(now);
+  const partMap: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type !== "literal") partMap[p.type] = p.value;
+  }
+  const weekday = partMap.weekday; // e.g. Mon, Tue, Wed, Thu
+
+  const hour = Number(partMap.hour);
+  const minute = Number(partMap.minute);
+  const totalMinutes = hour * 60 + minute;
+
+  const isMonThu = weekday === "Mon" || weekday === "Tue" || weekday === "Wed" || weekday === "Thu";
+  if (!isMonThu) return false;
+
+  // 17:00 - 18:00
+  return totalMinutes >= 17 * 60 && totalMinutes < 18 * 60;
+}
+
 function isOpen(now: Date, session: SessionDef) {
   const { open, close } = buildSessionTimesForDate(now, session);
-  // Compare using UTC moments
-  const nowUtc = now;
-  return nowUtc >= open && nowUtc < close;
+  const baseOpen = now >= open && now < close;
+
+  // If marked to hide during market close, force OFF during maintenance window.
+  if (session.hideDuringMarketClose) {
+    if (isMarketMaintenanceOpen(now)) return false;
+  }
+
+  return baseOpen;
 }
+
 
 function msUntilNextBoundary(now: Date, session: SessionDef) {
   const { open, close } = buildSessionTimesForDate(now, session);
@@ -115,10 +227,12 @@ function getDotClasses(color: SessionDef["dotColor"], isSessionOpen: boolean) {
 
 export default function SessionIndicatorCard({ className = "" }: { className?: string }) {
   const [now, setNow] = useState(() => new Date());
+  // Delay initial time render to reduce SSR/CSR hydration mismatches.
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
 
   const openState = useMemo(() => {
     return SESSIONS.map((s) => ({
@@ -229,10 +343,19 @@ export default function SessionIndicatorCard({ className = "" }: { className?: s
           </div>
 
           <div className="w-full pt-2">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {SESSIONS.map(renderRow)}
+            <div className="grid grid-cols-1 gap-4">
+              {/* Row 1: Implicit sessions temporarily visible */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {SESSIONS.filter((s) => !s.isExplicit).map(renderRow)}
+              </div>
+
+              {/* Row 2: Explicit sessions */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {SESSIONS.filter((s) => s.isExplicit).map(renderRow)}
+              </div>
             </div>
           </div>
+
         </div>
       </CardContent>
     </Card>

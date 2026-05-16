@@ -2,7 +2,7 @@
 
 import React from "react";
 import SessionIndicatorCard from "@/components/dashboard/SessionIndicatorCard";
-import { MacroDesk } from "@/components/dashboard/MacroDesk";
+import { DashboardMacroDesk } from "@/components/dashboard/DashboardMacroDesk";
 
 import ForYouSummaryCard from "@/components/dashboard/ForYouSummaryCard";
 import TickerTapeCard from "@/components/dashboard/TickerTapeCard";
@@ -10,6 +10,7 @@ import LatestFromTwitterCard from "@/components/dashboard/LatestFromTwitterCard"
 import CurrencyStrengthCard from "@/components/dashboard/CurrencyStrengthCard";
 import CalendarUpcomingCard from "@/components/dashboard/CalendarUpcomingCard";
 import TradingAssistantCard from "@/components/dashboard/TradingAssistantCard";
+
 
 export default function Dashboard() {
   const user = "Trader";
@@ -41,7 +42,7 @@ export default function Dashboard() {
         {/* Card 2 & 3 below card 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <div className="lg:col-span-3">
-            <MacroDesk />
+            <DashboardMacroDesk />
           </div>
           <div className="lg:col-span-2">
             <ForYouSummaryCard />
