@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Loader2,
   Sparkles,
-  Globe,
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,6 +86,26 @@ export default function Calendar() {
   
   // Expanded AI analysis state
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  
+  // Filter dropdown states
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+  const [impactDropdownOpen, setImpactDropdownOpen] = useState(false);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (currencyDropdownOpen && !target.closest('.currency-dropdown')) {
+        setCurrencyDropdownOpen(false);
+      }
+      if (impactDropdownOpen && !target.closest('.impact-dropdown')) {
+        setImpactDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [currencyDropdownOpen, impactDropdownOpen]);
 
   useEffect(() => {
     setMounted(true);
@@ -311,11 +330,33 @@ export default function Calendar() {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
   };
+  
+  // Calculate spotlight position based on view type
+  const getSpotlightPosition = () => {
+    if (viewType === 'week') {
+      const weekDays = getWeekDays(selectedDate);
+      const currentDayIndex = weekDays.findIndex(day => 
+        day.date.toDateString() === new Date().toDateString()
+      );
+      if (currentDayIndex >= 0) {
+        return ((currentDayIndex + 0.5) / weekDays.length) * 100;
+      }
+      return 50;
+    } else {
+      const visibleStartHour = 7;
+      const visibleEndHour = 21;
+      const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
+      const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+      const visibleStartMinutes = visibleStartHour * 60;
+      const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
+      const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
+      return fraction * 100;
+    }
+  };
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#0B0813] -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
-        <div className="w-full">
+      <div className="h-full bg-[#0B0813] flex flex-col -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
           {/* Page Header */}
           <div className="py-4">
             <div className="flex items-center justify-between mb-4">
@@ -414,57 +455,73 @@ export default function Calendar() {
               />
             </div>
 
-            {/* Currency Toggles */}
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-purple-500">Currency</span>
-              {CURRENCIES.map(currency => (
+            {/* Right side controls */}
+            <div className="flex items-center gap-4 ml-auto">
+              {/* Currency Dropdown */}
+              <div className="relative currency-dropdown">
                 <button
-                  key={currency}
-                  onClick={() => toggleCurrency(currency)}
-                  className={`px-2 py-1 text-xs rounded transition-all ${
-                    selectedCurrencies.includes(currency)
-                      ? 'text-purple-200 border border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]'
-                      : 'text-purple-500 hover:text-purple-400'
-                  }`}
+                  type="button"
+                  onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-purple-900/30 text-purple-300 border border-purple-700/30 hover:border-purple-500/50 transition-colors"
                 >
-                  {currency}
+                  <span>Currency</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${currencyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-              ))}
-            </div>
-
-            {/* Impact Selectors */}
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-purple-500">Impact</span>
-              {["High", "Medium", "Low"].map(impact => (
-                <button
-                  key={impact}
-                  onClick={() => toggleImpact(impact)}
-                  className={`px-2 py-1 text-xs rounded transition-all ${
-                    selectedImpacts.includes(impact)
-                      ? 'text-purple-200 border border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]'
-                      : 'text-purple-500 hover:text-purple-400'
-                  }`}
-                >
-                  {impact}
-                </button>
-              ))}
-            </div>
-
-            {/* Timezone Dropper */}
-              <div className="flex items-center space-x-2 ml-auto">
-                <Globe className="h-3.5 w-3.5 text-purple-500" />
-                <label className="sr-only" htmlFor="calendar-timezone">Timezone</label>
-                <select
-                  id="calendar-timezone"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="bg-purple-900/30 text-white text-xs rounded px-2 py-1.5 border border-purple-700/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
-                >
-                  {TIMEZONES.map(tz => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                  ))}
-                </select>
+                {currencyDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 bg-[#120E24]/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
+                    {CURRENCIES.map(currency => (
+                      <label key={currency} className="flex items-center gap-2 px-2 py-1.5 hover:bg-purple-800/30 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedCurrencies.includes(currency)}
+                          onChange={() => toggleCurrency(currency)}
+                          className="w-4 h-4 rounded border-purple-500/50 bg-purple-900/50 text-purple-500 focus:ring-purple-500/50 focus:ring-offset-0"
+                        />
+                        <span className="text-sm text-purple-200">{currency}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Impact Dropdown */}
+              <div className="relative impact-dropdown">
+                <button
+                  type="button"
+                  onClick={() => setImpactDropdownOpen(!impactDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-purple-900/30 text-purple-300 border border-purple-700/30 hover:border-purple-500/50 transition-colors"
+                >
+                  <span>Impact</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${impactDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {impactDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 bg-[#120E24]/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
+                    {["High", "Medium", "Low"].map(impact => (
+                      <label key={impact} className="flex items-center gap-2 px-2 py-1.5 hover:bg-purple-800/30 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedImpacts.includes(impact)}
+                          onChange={() => toggleImpact(impact)}
+                          className="w-4 h-4 rounded border-purple-500/50 bg-purple-900/50 text-purple-500 focus:ring-purple-500/50 focus:ring-offset-0"
+                        />
+                        <span className="text-sm text-purple-200">{impact}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Timezone Static Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-900/40 border border-purple-500/30 rounded-full">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                </span>
+                <span className="text-xs text-purple-300 font-medium">
+                  Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                </span>
+              </div>
+            </div>
 
           </div>
 
@@ -480,45 +537,52 @@ export default function Calendar() {
 
           {/* Horizontal Timeline Canvas */}
           <div className="w-full relative min-h-[calc(100vh-200px)] mx-0 mb-0">
-            {/* Live Current-Time Tracker */}
-            <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-0">
-              <div 
-                className="absolute top-0 bottom-0 w-0.5 bg-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
-                style={{
-                  left: `${(() => {
-                    if (viewType === 'week') {
-                      // For weekly view, position fixedly over the current day's column (actual current day)
-                      const weekDays = getWeekDays(selectedDate);
-                      const currentDayIndex = weekDays.findIndex(day => 
-                        day.date.toDateString() === new Date().toDateString()
-                      );
-                      if (currentDayIndex >= 0) {
-                        return ((currentDayIndex + 0.5) / weekDays.length) * 100;
-                      }
-                      return 50; // Default to middle if today not in view
-                    } else {
-                      // For daily view (Today/Tomorrow), position based on current hour with fluid movement
-                      const visibleStartHour = 7; // 07:00
-                      const visibleEndHour = 21; // 21:00
-                      const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
-                      const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-                      const visibleStartMinutes = visibleStartHour * 60;
-                      const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
-                      const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
-                      return fraction * 100;
-                    }
-                  })()}%`
-                }}
-              >
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/30">
-                  <Clock className="h-3 w-3" />
-                  <span>{formatCurrentTime()}</span>
-                </div>
-              </div>
-            </div>
+            {/* Spotlight Effect - Dynamic radial gradient following current-time marker */}
+            <div 
+              className="absolute inset-0 pointer-events-none z-0 transition-all duration-1000 ease-in-out"
+              style={{
+                background: `radial-gradient(circle at ${getSpotlightPosition()}% 50%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)`
+              }}
+            />
 
             {/* Timeline Container - Unified Horizontal Scroll */}
             <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20">
+              {/* Live Current-Time Tracker - Now inside scrollable container */}
+              <div className="absolute top-0 bottom-0 left-0 pointer-events-none z-30">
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
+                  style={{
+                    left: `${(() => {
+                      if (viewType === 'week') {
+                        // For weekly view, position fixedly over the current day's column (actual current day)
+                        const weekDays = getWeekDays(selectedDate);
+                        const currentDayIndex = weekDays.findIndex(day => 
+                          day.date.toDateString() === new Date().toDateString()
+                        );
+                        if (currentDayIndex >= 0) {
+                          return ((currentDayIndex + 0.5) / weekDays.length) * 100;
+                        }
+                        return 50; // Default to middle if today not in view
+                      } else {
+                        // For daily view (Today/Tomorrow), position based on current hour with fluid movement
+                        const visibleStartHour = 7; // 07:00
+                        const visibleEndHour = 21; // 21:00
+                        const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
+                        const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+                        const visibleStartMinutes = visibleStartHour * 60;
+                        const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
+                        const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
+                        return fraction * 100;
+                      }
+                    })()}%`
+                  }}
+                >
+                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/30">
+                    <Clock className="h-3 w-3" />
+                    <span>{formatCurrentTime()}</span>
+                  </div>
+                </div>
+              </div>
 
               {viewType === 'week' ? (
                 // Weekly View - Day Columns
@@ -526,7 +590,7 @@ export default function Calendar() {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
-                    <div key={day.label} className="flex-shrink-0 w-[340px] sm:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                    <div key={day.label} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20">
                       {/* Day Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {day.label}
@@ -542,7 +606,7 @@ export default function Calendar() {
                             transition={{ delay: dayIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative"
                           >
-                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-xl p-4 shadow-lg hover:border-purple-500/60 transition-all duration-300 hover:scale-[1.02]">
+                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300">
                               {/* Card Header */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-xs font-mono text-purple-300/80">
@@ -621,7 +685,7 @@ export default function Calendar() {
                   const intervalEvents = getEventsForInterval(interval);
                   
                   return (
-                    <div key={interval} className="flex-shrink-0 w-[340px] sm:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] min-h-[550px] flex flex-col gap-4 px-4 border-r border-purple-950/20">
+                    <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20">
                       {/* Hour Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {interval}
@@ -637,7 +701,7 @@ export default function Calendar() {
                             transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative"
                           >
-                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-xl p-4 shadow-lg hover:border-purple-500/60 transition-all duration-300 hover:scale-[1.02]">
+                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300">
                               {/* Card Header */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-xs font-mono text-purple-300/80">
@@ -713,7 +777,6 @@ export default function Calendar() {
               )}
             </div>
           </div>
-        </div>
       </div>
     </MainLayout>
   );

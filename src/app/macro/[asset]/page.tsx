@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { 
@@ -403,6 +403,7 @@ export default function AssetDetailPage() {
   const [mounted, setMounted] = useState(false);
   const [assetData, setAssetData] = useState<AssetDetail | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [timeframe, setTimeframe] = useState<'1D' | '5D' | '1M'>('1D');
 
   useEffect(() => {
     setMounted(true);
@@ -418,6 +419,15 @@ export default function AssetDetailPage() {
       setIsRefreshing(false);
     }, 1000);
   };
+
+  const sparklinePath = useMemo(() => {
+    const points = [];
+    for (let i = 0; i <= 100; i += 20) {
+      const y = 15 + (Math.random() - 0.5) * 10;
+      points.push(`${i},${y}`);
+    }
+    return `M${points.join(' L')}`;
+  }, [assetData?.symbol]);
 
   const getChangeColor = (change: number) => {
     return change >= 0 ? 'text-emerald-400' : 'text-rose-400';
@@ -447,11 +457,11 @@ export default function AssetDetailPage() {
 
   return (
     <MainLayout>
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-3 sm:p-4 lg:p-5">
         {assetData && (
           <>
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            {/* Header with Edge Factor Card Docked */}
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-4">
                 <button
                   onClick={() => router.back()}
@@ -474,255 +484,124 @@ export default function AssetDetailPage() {
               </div>
             </div>
 
-            {/* Reorganized Macro View - Priority-Based Layout */}
-            <div className="grid grid-cols-12 gap-4 mb-6">
+            {/* Edge Factor Card - Docked in Header */}
+            <div className="mb-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+              <div className="flex items-center gap-4">
+                {/* Dashboard Indicator Badge */}
+                <div className="flex-shrink-0">
+                  <div className="w-14 h-14 rounded-full bg-purple-900/50 border-2 border-purple-500/50 flex items-center justify-center">
+                    <span className="text-xl font-bold text-purple-200">{assetData.confidence}</span>
+                  </div>
+                </div>
+                {/* Qualitative State Text */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
+                      assetData.sentiment === 'Bullish' ? 'bg-emerald-500/20 text-emerald-400' :
+                      assetData.sentiment === 'Bearish' ? 'bg-rose-500/20 text-rose-400' :
+                      'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {assetData.sentiment} / {assetData.confidence >= 70 ? 'High Clarity' : assetData.confidence >= 50 ? 'Medium Clarity' : 'Low Clarity'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-300 leading-tight">
+                    Technical and macro confluence indicates {assetData.sentiment.toLowerCase()} conditions with {assetData.confidence}% confidence level.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Multi-Column Dashboard Grid Layout */}
+            <div className="grid grid-cols-12 gap-2">
               
-              {/* Top Row: Price Chart, AI Overview, Edge Factor */}
-              {/* Priority 1: Price Chart - Medium Card */}
-              <div className="col-span-12 lg:col-span-4">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl hover:shadow-2xl transition-all duration-300 h-full relative overflow-hidden">
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              {/* Left Column: Price Chart & News Stories */}
+              <div className="col-span-12 lg:col-span-4 space-y-2">
+                {/* Price Chart Module */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="h-5 w-5 text-purple-300" />
+                      <h3 className="text-lg font-semibold text-purple-100">Price Chart</h3>
+                    </div>
+                    {/* Timeframe Toggles */}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setTimeframe('1D')}
+                        aria-pressed={timeframe === '1D'}
+                        className={`px-2 py-1 text-xs rounded border transition-colors ${
+                          timeframe === '1D'
+                            ? 'bg-purple-700/50 text-purple-200 border-purple-500/30'
+                            : 'bg-purple-900/30 text-purple-400 border-purple-700/30 hover:border-purple-500/50'
+                        }`}
+                      >
+                        1D
+                      </button>
+                      <button
+                        onClick={() => setTimeframe('5D')}
+                        aria-pressed={timeframe === '5D'}
+                        className={`px-2 py-1 text-xs rounded border transition-colors ${
+                          timeframe === '5D'
+                            ? 'bg-purple-700/50 text-purple-200 border-purple-500/30'
+                            : 'bg-purple-900/30 text-purple-400 border-purple-700/30 hover:border-purple-500/50'
+                        }`}
+                      >
+                        5D
+                      </button>
+                      <button
+                        onClick={() => setTimeframe('1M')}
+                        aria-pressed={timeframe === '1M'}
+                        className={`px-2 py-1 text-xs rounded border transition-colors ${
+                          timeframe === '1M'
+                            ? 'bg-purple-700/50 text-purple-200 border-purple-500/30'
+                            : 'bg-purple-900/30 text-purple-400 border-purple-700/30 hover:border-purple-500/50'
+                        }`}
+                      >
+                        1M
+                      </button>
+                    </div>
+                  </div>
+                  {/* Price Readouts */}
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-xl font-mono text-white">${assetData.price.toFixed(2)}</span>
+                    <span className={`text-sm font-mono ${getChangeColor(assetData.dayChange)}`}>
+                      {assetData.dayChange >= 0 ? '+' : ''}{assetData.dayChange.toFixed(2)}%
+                    </span>
+                  </div>
+                  {/* Responsive Line/Area Chart */}
+                  <div className="relative h-28 bg-purple-900/30 rounded-lg overflow-hidden">
+                    <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="rgba(168, 85, 247, 0.4)" />
+                          <stop offset="100%" stopColor="rgba(168, 85, 247, 0.0)" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        d="M0,30 Q10,25 20,28 T40,20 T60,15 T80,18 T100,10 L100,40 L0,40 Z"
+                        fill="url(#chartGradient)"
+                      />
+                      <path
+                        d="M0,30 Q10,25 20,28 T40,20 T60,15 T80,18 T100,10"
+                        fill="none"
+                        stroke="rgba(168, 85, 247, 0.8)"
+                        strokeWidth="0.5"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* News Stories Module */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <div className="flex items-center space-x-2 mb-3">
-                    <BarChart3 className="h-5 w-5 text-purple-300" />
-                    <h3 className="text-lg font-semibold text-purple-100">Price Chart</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Current Price</span>
-                      <span className="text-lg font-mono text-purple-100">${assetData.price.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Day Change</span>
-                      <span className={`text-sm font-mono ${getChangeColor(assetData.dayChange)}`}>
-                        {assetData.dayChange >= 0 ? '+' : ''}{assetData.dayChange.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Overall Change</span>
-                      <span className={`text-sm font-mono ${getChangeColor(assetData.overallChange)}`}>
-                        {assetData.overallChange >= 0 ? '+' : ''}{assetData.overallChange.toFixed(2)}%
-                      </span>
-                    </div>
-                    {/* Compact chart visualization */}
-                    <div className="mt-3 p-3 bg-purple-900/50 rounded-lg">
-                      <div className="flex items-end justify-between h-20">
-                        <div className="w-1 bg-purple-400" style={{height: '40%'}}></div>
-                        <div className="w-1 bg-purple-400" style={{height: '60%'}}></div>
-                        <div className="w-1 bg-purple-400" style={{height: '45%'}}></div>
-                        <div className="w-1 bg-purple-400" style={{height: '80%'}}></div>
-                        <div className="w-1 bg-purple-400" style={{height: '70%'}}></div>
-                        <div className="w-1 bg-purple-400" style={{height: '90%'}}></div>
-                        <div className="w-1 bg-emerald-400" style={{height: '100%'}}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Priority 2: AI Overview - Large Card */}
-              <div className="col-span-12 lg:col-span-4">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl hover:shadow-2xl transition-all duration-300 h-full relative overflow-hidden">
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    <Brain className="h-5 w-5 text-purple-300" />
-                    <h3 className="text-lg font-semibold text-purple-100">AI Overview</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Sentiment</span>
-                      <span className={`text-sm font-medium px-2 py-1 rounded ${
-                        assetData.sentiment === 'Bullish' ? 'bg-emerald-500/20 text-emerald-400' :
-                        assetData.sentiment === 'Bearish' ? 'bg-rose-500/20 text-rose-400' :
-                        'bg-amber-500/20 text-amber-400'
-                      }`}>
-                        {assetData.sentiment}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Confidence</span>
-                      <span className="text-lg font-mono text-purple-100">{assetData.confidence}%</span>
-                    </div>
-                    <div className="mt-3">
-                      <p className="text-sm text-purple-200 leading-relaxed">{assetData.aiAnalysis}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Priority 3: Edge Factor - Large Card */}
-              <div className="col-span-12 lg:col-span-4">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl hover:shadow-2xl transition-all duration-300 h-full relative overflow-hidden">
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    <Activity className="h-5 w-5 text-purple-300" />
-                    <h3 className="text-lg font-semibold text-purple-100">Edge Factor</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Volatility Edge</span>
-                      <span className="text-sm font-mono text-purple-100">{assetData.technicalIndicators.rsi}%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Trend Strength</span>
-                      <span className="text-sm font-mono text-purple-100">{assetData.technicalIndicators.macd}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-400">Market Edge</span>
-                      <span className="text-sm font-mono text-purple-100">${assetData.technicalIndicators.bollinger}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Second Row: Market Mood & Market Policy Group */}
-              <div className="col-span-12 lg:col-span-6">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 h-full">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Activity className="h-5 w-5 text-purple-300" />
-                    <h3 className="text-lg font-semibold text-purple-100">Market Analysis</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Market Mood */}
-                    <div>
-                      <h4 className="text-base font-medium text-purple-200 mb-3">Market Mood</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Current Mood</span>
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${
-                            assetData.sentiment === 'Bullish' ? 'bg-emerald-500/20 text-emerald-400' :
-                            assetData.sentiment === 'Bearish' ? 'bg-rose-500/20 text-rose-400' :
-                            'bg-amber-500/20 text-amber-400'
-                          }`}>
-                            {assetData.sentiment}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Momentum</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.rsi > 50 ? 'Strong' : 'Weak'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Volatility</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.macd > 0 ? 'High' : 'Low'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Market Policy */}
-                    <div>
-                      <h4 className="text-base font-medium text-purple-200 mb-3">Market Policy</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Trend Policy</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.overallChange > 0 ? 'Bullish' : 'Bearish'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Risk Level</span>
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${
-                            assetData.confidence >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
-                            assetData.confidence >= 50 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {assetData.confidence >= 70 ? 'Low' : assetData.confidence >= 50 ? 'Medium' : 'High'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Position Size</span>
-                          <span className="text-xs font-mono text-purple-200">Recommended</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Third Row: Flow, Bearing, Pulse Group */}
-              <div className="col-span-12 lg:col-span-6">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300 h-full">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Activity className="h-5 w-5 text-purple-300" />
-                    <h3 className="text-lg font-semibold text-purple-100">Market Dynamics</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Flow */}
-                    <div>
-                      <h4 className="text-base font-medium text-purple-200 mb-3">Flow</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Money Flow</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.dayChange > 0 ? 'Inflow' : 'Outflow'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Volume Trend</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.rsi > 50 ? 'Increasing' : 'Decreasing'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Liquidity</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.marketData.marketCap.includes('T') ? 'High' : 'Medium'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Bearing */}
-                    <div>
-                      <h4 className="text-base font-medium text-purple-200 mb-3">Bearing</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Direction</span>
-                          <span className={`text-xs font-medium px-1 py-0.5 rounded ${
-                            assetData.overallChange > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {assetData.overallChange > 0 ? 'North' : 'South'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Strength</span>
-                          <span className="text-xs font-mono text-purple-200">{Math.abs(assetData.overallChange).toFixed(0)}°</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Support</span>
-                          <span className="text-xs font-mono text-purple-200">${(assetData.price * 0.95).toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Pulse */}
-                    <div>
-                      <h4 className="text-base font-medium text-purple-200 mb-3">Pulse</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Market Pulse</span>
-                          <span className={`text-xs font-medium px-1 py-0.5 rounded ${
-                            assetData.technicalIndicators.rsi > 70 ? 'bg-emerald-500/20 text-emerald-400' :
-                            assetData.technicalIndicators.rsi > 30 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {assetData.technicalIndicators.rsi > 70 ? 'Strong' : assetData.technicalIndicators.rsi > 30 ? 'Moderate' : 'Weak'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Activity Level</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.dayChange > 0 ? 'High' : 'Low'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-purple-400">Signal Strength</span>
-                          <span className="text-xs font-mono text-purple-200">{assetData.confidence}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* News Stories - Full Width Bottom */}
-              <div className="col-span-12">
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-lg hover:shadow-xl transition-all duration-300">
-                  <div className="flex items-center space-x-2 mb-4">
                     <Clock className="h-5 w-5 text-purple-300" />
                     <h3 className="text-lg font-semibold text-purple-100">News Stories</h3>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto">
                     {assetData.recentNews.map((news) => (
-                      <div key={news.id} className="p-3 bg-purple-900/50 rounded-lg">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="text-sm font-medium text-purple-200">{news.title}</h4>
-                          <span className={`text-xs px-2 py-1 rounded ${
+                      <div key={news.id} className="p-1.5 bg-purple-900/30 rounded-lg hover:bg-purple-900/50 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-xs font-medium text-purple-200 flex-1 leading-tight">{news.title}</h4>
+                          <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
                             news.impact === 'High' ? 'bg-rose-500/20 text-rose-400' :
                             news.impact === 'Medium' ? 'bg-amber-500/20 text-amber-400' :
                             'bg-emerald-500/20 text-emerald-400'
@@ -730,11 +609,223 @@ export default function AssetDetailPage() {
                             {news.impact}
                           </span>
                         </div>
-                        <div className="text-xs text-purple-400">
-                          {new Date(news.timestamp).toLocaleTimeString()}
+                        <div className="flex items-center gap-2 mt-1 text-xs text-purple-400">
+                          <span>Bloomberg</span>
+                          <span>•</span>
+                          <span>{new Date(news.timestamp).toLocaleTimeString()}</span>
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Body: AI Overview, Market Mood, Market Policy */}
+              <div className="col-span-12 lg:col-span-8 space-y-2">
+                {/* AI Overview Card */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <Brain className="h-5 w-5 text-purple-300" />
+                      <h3 className="text-lg font-semibold text-purple-100">AI Overview</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                        assetData.sentiment === 'Bullish' ? 'bg-emerald-500/20 text-emerald-400' :
+                        assetData.sentiment === 'Bearish' ? 'bg-rose-500/20 text-rose-400' :
+                        'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {assetData.sentiment}
+                      </span>
+                      <span className="text-xs font-mono text-purple-300">{assetData.confidence}%</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-purple-200 leading-tight">{assetData.aiAnalysis}</p>
+                </div>
+
+                {/* Market Mood & Market Policy Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {/* Market Mood - Semi-Circular Gauge */}
+                  <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Activity className="h-5 w-5 text-purple-300" />
+                      <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
+                    </div>
+                    <div className="relative h-24 mb-2">
+                      <svg className="w-full h-full" viewBox="0 0 100 50">
+                        <defs>
+                          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="rgba(239, 68, 68, 0.8)" />
+                            <stop offset="50%" stopColor="rgba(168, 85, 247, 0.8)" />
+                            <stop offset="100%" stopColor="rgba(34, 197, 94, 0.8)" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="url(#gaugeGradient)" strokeWidth="8" strokeLinecap="round" />
+                        <line
+                          x1="50" y1="50"
+                          x2={50 + 35 * Math.cos(Math.PI * (1 - assetData.technicalIndicators.rsi / 100))}
+                          y2={50 + 35 * Math.sin(Math.PI * (1 - assetData.technicalIndicators.rsi / 100))}
+                          stroke="rgba(168, 85, 247, 1)"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                        <circle cx="50" cy="50" r="4" fill="rgba(168, 85, 247, 1)" />
+                      </svg>
+                    </div>
+                    <div className="text-center mb-1.5">
+                      <span className={`text-sm font-semibold ${
+                        assetData.sentiment === 'Bullish' ? 'text-emerald-400' :
+                        assetData.sentiment === 'Bearish' ? 'text-rose-400' :
+                        'text-amber-400'
+                      }`}>
+                        {assetData.technicalIndicators.rsi > 60 ? 'RISK-ON' : assetData.technicalIndicators.rsi < 40 ? 'RISK-OFF' : 'NEUTRAL'}
+                      </span>
+                    </div>
+                    {/* Expandable Detail Drawer */}
+                    <div className="p-1.5 bg-purple-900/30 rounded-lg text-xs text-purple-300">
+                      <div className="flex justify-between mb-1">
+                        <span>Momentum:</span>
+                        <span className="font-mono">{assetData.technicalIndicators.rsi > 50 ? 'Strong' : 'Weak'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Volatility:</span>
+                        <span className="font-mono">{assetData.technicalIndicators.macd > 0 ? 'High' : 'Low'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Market Policy - Watermark Text */}
+                  <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl relative overflow-hidden">
+                    {/* Watermark */}
+                    <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${
+                      assetData.overallChange > 0 ? 'text-emerald-500/5' : 'text-rose-500/5'
+                    }`}>
+                      <span className="text-4xl font-black uppercase tracking-wider">
+                        {assetData.overallChange > 0 ? 'DOVISH' : 'HAWKISH'}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 mb-3 relative z-10">
+                      <Activity className="h-5 w-5 text-purple-300" />
+                      <h3 className="text-lg font-semibold text-purple-100">Market Policy</h3>
+                    </div>
+                    <p className="text-xs text-purple-200 leading-tight mb-2 relative z-10">
+                      {assetData.overallChange > 0 
+                        ? 'Central bank policies remain supportive of growth with accommodative stance expected to continue.'
+                        : 'Monetary tightening cycle continues with hawkish signals from major central banks.'}
+                    </p>
+                    {/* Toggle Menu Drawer */}
+                    <div className="p-1.5 bg-purple-900/30 rounded-lg relative z-10">
+                      <div className="flex justify-between text-xs text-purple-300">
+                        <span>Trend Policy:</span>
+                        <span className="font-mono">{assetData.overallChange > 0 ? 'Bullish' : 'Bearish'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Metric Trio: Flow, Bearing, Pulse */}
+              <div className="col-span-12 lg:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-2">
+                {/* Flow Panel */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <h3 className="text-lg font-semibold text-purple-100 mb-3">Flow</h3>
+                  <div className="mb-2">
+                    <div className="flex justify-between text-xs text-purple-400 mb-1.5">
+                      <span>Thin</span>
+                      <span>Healthy</span>
+                      <span>Crowded</span>
+                    </div>
+                    <div className="relative h-2 bg-purple-900/50 rounded-full overflow-hidden">
+                      <div 
+                        className="absolute h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full transition-all duration-500"
+                        style={{ width: `${assetData.technicalIndicators.rsi}%` }}
+                      />
+                      <div 
+                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-purple-400 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)] transition-all duration-500"
+                        style={{ left: `${assetData.technicalIndicators.rsi}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-purple-300">
+                    <div className="flex justify-between">
+                      <span>Money Flow:</span>
+                      <span className="font-mono">{assetData.dayChange > 0 ? 'Inflow' : 'Outflow'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Volume Trend:</span>
+                      <span className="font-mono">{assetData.technicalIndicators.rsi > 50 ? 'Increasing' : 'Decreasing'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bearing Panel */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <h3 className="text-lg font-semibold text-purple-100 mb-3">Bearing</h3>
+                  <div className="mb-2">
+                    <span className={`text-sm font-semibold ${
+                      assetData.overallChange > 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {assetData.overallChange > 2 ? 'BULLISH UP' : assetData.overallChange < -2 ? 'BEARISH DOWN' : 'CHOPPY'}
+                    </span>
+                  </div>
+                  {/* Mini Sparkline Chart */}
+                  <div className="relative h-8 mb-2">
+                    <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path
+                        d={sparklinePath}
+                        fill="none"
+                        stroke={assetData.overallChange > 0 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)'}
+                        strokeWidth="1"
+                      />
+                    </svg>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-purple-300">
+                    <div className="flex justify-between">
+                      <span>Direction:</span>
+                      <span className="font-mono">{assetData.overallChange > 0 ? 'North' : 'South'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Strength:</span>
+                      <span className="font-mono">{Math.abs(assetData.overallChange).toFixed(0)}°</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pulse Panel */}
+                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <h3 className="text-lg font-semibold text-purple-100 mb-3">Pulse</h3>
+                  <div className="mb-2">
+                    <div className="flex justify-between text-xs text-purple-400 mb-1.5">
+                      <span>Quiet</span>
+                      <span>Tradable</span>
+                      <span>Wild</span>
+                    </div>
+                    <div className="relative h-2 bg-purple-900/50 rounded-full overflow-hidden">
+                      <div 
+                        className="absolute h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full transition-all duration-500"
+                        style={{ width: `${assetData.confidence}%` }}
+                      />
+                      <div 
+                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-purple-400 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)] transition-all duration-500"
+                        style={{ left: `${assetData.confidence}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-purple-300">
+                    <div className="flex justify-between">
+                      <span>Market Pulse:</span>
+                      <span className={`font-mono ${
+                        assetData.technicalIndicators.rsi > 70 ? 'text-emerald-400' :
+                        assetData.technicalIndicators.rsi > 30 ? 'text-amber-400' :
+                        'text-rose-400'
+                      }`}>
+                        {assetData.technicalIndicators.rsi > 70 ? 'Strong' : assetData.technicalIndicators.rsi > 30 ? 'Moderate' : 'Weak'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Signal Strength:</span>
+                      <span className="font-mono">{assetData.confidence}%</span>
+                    </div>
                   </div>
                 </div>
               </div>
