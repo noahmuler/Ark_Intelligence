@@ -11,10 +11,10 @@ import {
   Brain,
   Activity,
   Clock,
-  DollarSign,
   BarChart3,
   RefreshCw
 } from "lucide-react";
+
 
 interface AssetDetail {
   symbol: string;
@@ -406,62 +406,65 @@ export default function AssetDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [timeframe, setTimeframe] = useState<'1D' | '5D' | '1M'>('1D');
 
+  // Keep a stable ref at the top-level (Rules of Hooks)
+  const assetRef = useRef<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
+
     const asset = params.asset as string;
-    
-    // Use ref to track current asset and prevent stale closures
-    const assetRef = useRef(asset);
     assetRef.current = asset;
-    
-    // Flag to prevent state updates on unmounted component
-    let isMounted = true;
-    
-    const fetchAssetData = async () => {
-      const currentAsset = assetRef.current;
-      
-      if (currentAsset && mockAssetData[currentAsset]) {
-        // Start with mock data as fallback
-        setAssetData(mockAssetData[currentAsset]);
-        
-        try {
-          // Fetch real-time price data from API
-          const quote = await fetchStockQuote(currentAsset);
-          
-          // Only update state if component is still mounted
-          if (isMounted) {
-            setAssetData(prev => prev ? {
-              ...prev,
-              price: quote.price,
-              dayChange: quote.change,
-              overallChange: quote.changePercent,
-              marketData: {
-                ...prev.marketData,
-                volume: quote.volume.toLocaleString()
-              }
-            } : null);
-          }
-        } catch (error) {
-          console.error('Failed to fetch real-time data:', error);
-          // Keep mock data if API fails
-        }
-      } else if (isMounted && currentAsset) {
-        // Handle missing asset data - redirect or show error
-        console.warn(`Asset ${currentAsset} not found in mock data`);
+
+    let cancelled = false;
+
+    const fetchAssetData = async (symbol: string) => {
+      const fallback = mockAssetData[symbol];
+      if (!fallback) {
         router.push('/dashboard');
+        return;
+      }
+
+      // Always show fallback immediately
+      if (!cancelled) setAssetData(fallback);
+
+      try {
+        const quote = await fetchStockQuote(symbol);
+        if (cancelled) return;
+
+        setAssetData(prev =>
+          prev
+            ? {
+                ...prev,
+                price: quote.price,
+                dayChange: quote.change,
+                overallChange: quote.changePercent,
+                marketData: {
+                  ...prev.marketData,
+                  volume: quote.volume.toLocaleString(),
+                },
+              }
+            : null
+        );
+      } catch (error) {
+        console.error('Failed to fetch real-time data:', error);
+        // Keep fallback if API fails
       }
     };
-    
-    fetchAssetData();
-    
-    // Set up interval for real-time updates
-    const interval = setInterval(fetchAssetData, 30000); // Update every 30 seconds
-    
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+
+    const symbol = assetRef.current;
+    if (symbol) {
+      fetchAssetData(symbol);
+      const interval = setInterval(() => fetchAssetData(assetRef.current || symbol), 30000);
+
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
+    }
+
+    return undefined;
   }, [params.asset, router]);
+
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -471,13 +474,20 @@ export default function AssetDetailPage() {
   };
 
   const sparklinePath = useMemo(() => {
-    const points = [];
+    // Deterministic sparkline so render is pure (no Math.random)
+    const seed = assetData?.symbol?.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) ?? 0;
+    const points: string[] = [];
+
     for (let i = 0; i <= 100; i += 20) {
-      const y = 15 + (Math.random() - 0.5) * 10;
-      points.push(`${i},${y}`);
+      // Simple pseudo-random based on seed + i (deterministic)
+      const v = Math.sin(seed + i) * 0.5 + 0.5; // 0..1
+      const y = 15 + (v - 0.5) * 10;
+      points.push(`${i},${y.toFixed(2)}`);
     }
+
     return `M${points.join(' L')}`;
   }, [assetData?.symbol]);
+
 
   const getChangeColor = (change: number) => {
     return change >= 0 ? 'text-emerald-400' : 'text-rose-400';
