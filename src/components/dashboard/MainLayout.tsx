@@ -94,12 +94,14 @@ export function MainLayout({ children }: MainLayoutProps) {
           <Sidebar />
 
           <div
-            className={`flex-1 flex flex-col relative transition-all duration-300 ${
+            className={`flex-1 flex flex-col relative transition-all duration-300 overflow-x-hidden ${
               isDesktop ? (isSidebarExpanded ? "lg:pl-64" : "lg:pl-20") : ""
             }`}
           >
 
-            <Header />
+            <div className="sticky top-0 left-0 w-full z-50">
+              <Header />
+            </div>
 
             <main
               className={`flex-1 overflow-auto relative w-full ${

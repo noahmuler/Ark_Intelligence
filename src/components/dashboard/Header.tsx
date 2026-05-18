@@ -447,26 +447,16 @@ export function Header() {
   };
 
   /**
-   * Hydration Mismatch Prevention
+   * Header Component
    * 
-   * Returns null during server-side rendering to prevent hydration mismatches.
-   * This ensures consistent rendering between server and client.
+   * Top-level component for dashboard header.
+   * Contains branding, navigation, and market data displays.
    * 
-   * Why this is needed:
-   * - Server renders with default state values
-   * - Client may have different initial state (e.g., sidebar open)
-   * - Returning null prevents flash of incorrect content
-/**
- * Header Component
- * 
- * Top-level component for dashboard header.
- * Contains branding, navigation, and market data displays.
- * 
- * Responsive Design:
- * - Adapts to desktop and mobile screen sizes
- * - Hamburger menu visibility toggles on mobile
- * - Layout adjusts for max-size screens (> 1920px)
- */
+   * Responsive Design:
+   * - Adapts to desktop and mobile screen sizes
+   * - Hamburger menu visibility toggles on mobile
+   * - Layout adjusts for max-size screens (> 1920px)
+   */
 return (
   <div className="relative h-16 bg-purple-900/60 backdrop-blur-xl border-b border-purple-800/50 flex items-center shadow-2xl w-full will-change-transform">
     {/* 
@@ -533,7 +523,7 @@ return (
     <div className="relative px-2 lg:px-4 xl:px-6 border-l border-purple-800/50 flex items-center flex-shrink-0 w-48 mr-12">
       <div className="flex items-center space-x-2 lg:space-x-4">
         <Clock className="h-4 w-4 text-purple-400" />
-        <div className="flex items-center space-x-2 lg:space-x-3 mr-4">
+        <div className="flex items-center space-x-2 lg:space-x-3">
           {worldTimes.map((time) => (
             <div key={time.city} className="flex flex-col items-center">
               <span className="text-purple-300 text-xs font-medium">{time.city}</span>
@@ -543,19 +533,7 @@ return (
           ))}
         </div>
       </div>
-        <div className="flex items-center space-x-2 lg:space-x-4">
-          <Clock className="h-4 w-4 text-purple-400" />
-          <div className="flex items-center space-x-2 lg:space-x-3">
-            {worldTimes.map((time) => (
-              <div key={time.city} className="flex flex-col items-center">
-                <span className="text-purple-300 text-xs font-medium">{time.city}</span>
-                <span className="text-purple-200 font-mono text-sm font-bold">{time.time}</span>
-                <span className="text-purple-400 text-xs">{time.offset}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
+  </div>
   );
 }

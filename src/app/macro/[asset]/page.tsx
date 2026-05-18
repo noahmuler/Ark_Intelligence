@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MainLayout } from "@/components/dashboard/MainLayout";
+import { fetchStockQuote } from "@/services/polygonStockData";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -408,10 +409,59 @@ export default function AssetDetailPage() {
   useEffect(() => {
     setMounted(true);
     const asset = params.asset as string;
-    if (asset && mockAssetData[asset]) {
-      setAssetData(mockAssetData[asset]);
-    }
-  }, [params.asset]);
+    
+    // Use ref to track current asset and prevent stale closures
+    const assetRef = useRef(asset);
+    assetRef.current = asset;
+    
+    // Flag to prevent state updates on unmounted component
+    let isMounted = true;
+    
+    const fetchAssetData = async () => {
+      const currentAsset = assetRef.current;
+      
+      if (currentAsset && mockAssetData[currentAsset]) {
+        // Start with mock data as fallback
+        setAssetData(mockAssetData[currentAsset]);
+        
+        try {
+          // Fetch real-time price data from API
+          const quote = await fetchStockQuote(currentAsset);
+          
+          // Only update state if component is still mounted
+          if (isMounted) {
+            setAssetData(prev => prev ? {
+              ...prev,
+              price: quote.price,
+              dayChange: quote.change,
+              overallChange: quote.changePercent,
+              marketData: {
+                ...prev.marketData,
+                volume: quote.volume.toLocaleString()
+              }
+            } : null);
+          }
+        } catch (error) {
+          console.error('Failed to fetch real-time data:', error);
+          // Keep mock data if API fails
+        }
+      } else if (isMounted && currentAsset) {
+        // Handle missing asset data - redirect or show error
+        console.warn(`Asset ${currentAsset} not found in mock data`);
+        router.push('/dashboard');
+      }
+    };
+    
+    fetchAssetData();
+    
+    // Set up interval for real-time updates
+    const interval = setInterval(fetchAssetData, 30000); // Update every 30 seconds
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [params.asset, router]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -643,10 +693,10 @@ export default function AssetDetailPage() {
                   <p className="text-xs text-purple-200 leading-tight">{assetData.aiAnalysis}</p>
                 </div>
 
-                {/* Market Mood & Market Policy Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {/* Market Mood - Semi-Circular Gauge */}
-                  <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                {/* Market Mood & Market Policy Grid - 6-column symmetrical layout */}
+                <div className="grid grid-cols-6 gap-2">
+                  {/* Market Mood - Semi-Circular Gauge - Spans 3 columns */}
+                  <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                     <div className="flex items-center space-x-2 mb-3">
                       <Activity className="h-5 w-5 text-purple-300" />
                       <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
@@ -694,8 +744,8 @@ export default function AssetDetailPage() {
                     </div>
                   </div>
 
-                  {/* Market Policy - Watermark Text */}
-                  <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl relative overflow-hidden">
+                  {/* Market Policy - Watermark Text - Spans 3 columns */}
+                  <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl relative overflow-hidden">
                     {/* Watermark */}
                     <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${
                       assetData.overallChange > 0 ? 'text-emerald-500/5' : 'text-rose-500/5'
@@ -724,10 +774,10 @@ export default function AssetDetailPage() {
                 </div>
               </div>
 
-              {/* Bottom Metric Trio: Flow, Bearing, Pulse */}
-              <div className="col-span-12 lg:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-2">
-                {/* Flow Panel */}
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+              {/* Bottom Metric Trio: Flow, Bearing, Pulse - 6-column symmetrical layout */}
+              <div className="col-span-12 lg:col-span-12 grid grid-cols-6 gap-2">
+                {/* Flow Panel - Spans 2 columns */}
+                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Flow</h3>
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-purple-400 mb-1.5">
@@ -758,8 +808,8 @@ export default function AssetDetailPage() {
                   </div>
                 </div>
 
-                {/* Bearing Panel */}
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                {/* Bearing Panel - Spans 2 columns */}
+                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Bearing</h3>
                   <div className="mb-2">
                     <span className={`text-sm font-semibold ${
@@ -791,8 +841,8 @@ export default function AssetDetailPage() {
                   </div>
                 </div>
 
-                {/* Pulse Panel */}
-                <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                {/* Pulse Panel - Spans 2 columns */}
+                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Pulse</h3>
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-purple-400 mb-1.5">
