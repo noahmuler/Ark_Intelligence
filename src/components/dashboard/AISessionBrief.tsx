@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Brain, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { generateMarketOverview } from "@/services/geminiMarketAnalysis";
 import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
 
@@ -156,20 +156,14 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
   }, [sessionBrief.timestamp]);
 
   return (
-    <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 min-h-[280px] ${className}`}>
+    <div className={`bg-purple-900/30 rounded-lg border border-purple-900/40 p-2.5 backdrop-blur-md ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-semibold text-white flex items-center">
-          <Brain className="h-4 w-4 mr-2 text-purple-400" />
-          AI Session Brief
-        </h2>
-        <div className="flex items-center space-x-2">
+        <h2 className="text-xs font-semibold text-white tracking-tight">AI Brief</h2>
+        <div className="flex items-center gap-1.5">
           {isGenerating && (
-            <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-              <span className="text-xs text-purple-400">Generating...</span>
-            </div>
+            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
           )}
-          <span className="text-xs text-purple-400" suppressHydrationWarning>
+          <span className="text-xs text-purple-300/60 tracking-tight" suppressHydrationWarning>
             {displayTime}
           </span>
         </div>
@@ -177,67 +171,62 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
 
       <div className="space-y-2">
         {/* Main Driver */}
-        <div>
-          <div className="text-xs text-purple-400 mb-1">Main Driver</div>
-          <div className="text-xs font-medium text-purple-200">
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-purple-400/80 tracking-tight">Driver:</span>
+          <span className="text-xs font-medium text-white tracking-tight">
             {sessionBrief.mainDriver}
-          </div>
+          </span>
         </div>
 
         {/* Bias */}
-        <div>
-          <div className="text-xs text-purple-400 mb-1">Market Bias</div>
-          <div className={`flex items-center space-x-2 ${getBiasColor(sessionBrief.bias)}`}>
-            {getBiasIcon(sessionBrief.bias)}
-            <span className="text-xs font-medium">
-              {sessionBrief.bias} on Metals
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-purple-400/80 tracking-tight">Bias:</span>
+          <div className={`flex items-center gap-1 ${getBiasColor(sessionBrief.bias)}`}>
+            <div className={`w-1 h-1 rounded-full ${sessionBrief.bias === 'Bullish' ? 'bg-emerald-400' : sessionBrief.bias === 'Bearish' ? 'bg-rose-400' : 'bg-purple-400'}`} />
+            <span className="text-xs font-medium tracking-tight">
+              {sessionBrief.bias}
             </span>
           </div>
         </div>
 
         {/* Analysis */}
-        <div>
-          <div className="text-xs text-purple-400 mb-1">AI Analysis</div>
-          <div className="text-xs text-purple-200 leading-relaxed">
+        <div className="flex items-baseline gap-2">
+          <span className="text-xs text-purple-400/80 tracking-tight">Analysis:</span>
+          <span className="text-xs text-white/90 tracking-tight leading-snug">
             {sessionBrief.analysis}
-          </div>
+          </span>
         </div>
 
         {/* Key Levels */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-800">
-          <div>
-            <div className="text-xs text-purple-400 mb-1">Support</div>
-            <div className="space-y-1">
-              {sessionBrief.keyLevels.support.map((level, index) => (
-                <div key={index} className="text-xs text-emerald-400 font-mono">
-                  {level}
-                </div>
-              ))}
+        <div className="flex items-baseline gap-2 pt-1 border-t border-white/5">
+          <span className="text-xs text-purple-400/80 tracking-tight">Levels:</span>
+          <div className="flex gap-3">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-emerald-400/80 tracking-tight">S:</span>
+              <span className="text-xs text-emerald-300 font-mono tracking-tight">
+                {Array.isArray(sessionBrief.keyLevels.support) && sessionBrief.keyLevels.support.length > 0 ? sessionBrief.keyLevels.support[0] : "—"}
+              </span>
             </div>
-          </div>
-          <div>
-            <div className="text-xs text-purple-400 mb-1">Resistance</div>
-            <div className="space-y-1">
-              {sessionBrief.keyLevels.resistance.map((level, index) => (
-                <div key={index} className="text-xs text-rose-400 font-mono">
-                  {level}
-                </div>
-              ))}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-rose-400/80 tracking-tight">R:</span>
+              <span className="text-xs text-rose-300 font-mono tracking-tight">
+                {Array.isArray(sessionBrief.keyLevels.resistance) && sessionBrief.keyLevels.resistance.length > 0 ? sessionBrief.keyLevels.resistance[0] : "—"}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex space-x-2 pt-2">
+        <div className="flex gap-1.5 pt-1">
           <button
-            className="flex-1 px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1 bg-purple-500/15 text-purple-300/80 text-xs rounded hover:bg-purple-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed tracking-tight"
             onClick={handleRefresh}
             disabled={isGenerating}
           >
-            Refresh Brief
+            Refresh
           </button>
-          <button className="flex-1 px-2 py-1 bg-purple-800 text-purple-300 text-xs rounded hover:bg-purple-700 transition-colors">
-            Export PDF
+          <button className="flex-1 px-2 py-1 bg-purple-800/50 text-purple-300/80 text-xs rounded hover:bg-purple-700/60 transition-colors tracking-tight">
+            Export
           </button>
         </div>
       </div>

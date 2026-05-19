@@ -46,100 +46,97 @@ const TradingAssistantCard = React.memo(function TradingAssistantCard({ classNam
     setPrompt("");
   }, []);
 
+  const handleQuickFill = useCallback(() => {
+    setPrompt(quickPrompts[0]);
+  }, [quickPrompts]);
+
+  const handleSend = useCallback(() => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    runAssistant(trimmed);
+  }, [prompt, runAssistant]);
+
   return (
-    <div className={className}>
-      <Card className="overflow-hidden min-h-[380px]">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-4 relative">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Brain className="h-4 w-4 text-purple-300" />
-                <div className="text-base font-bold text-white">Trading Assistant</div>
-              </div>
-              <div className="text-xs text-purple-200/70">Ask about markets, trades, or analysis</div>
+    <Card className={`overflow-hidden min-h-[380px] border-purple-900/60 bg-purple-950/40 backdrop-blur-xl hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out ${className}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
+      <CardContent className="p-4 relative">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-purple-300" />
+              <div className="text-base font-bold text-white tracking-wide">Trading Assistant</div>
             </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">Local helper</Badge>
+            <div className="text-xs text-purple-200/70 tracking-wide">Ask about markets, trades, or analysis</div>
+          </div>
+          <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">Local helper</Badge>
+        </div>
+
+        <div className="rounded-xl border border-purple-900/60 bg-purple-950/40 p-3">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="text-sm text-purple-200/90 font-medium tracking-wide">Prompt</div>
+            <div className="flex items-center gap-2 text-xs text-purple-200/70 tracking-wide">
+              <Sparkles className="h-3 w-3" />
+              Quick-fill below
+            </div>
           </div>
 
-          <div className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="text-sm text-purple-200/90 font-medium">Prompt</div>
-              <div className="flex items-center gap-2 text-xs text-purple-200/70">
-                <Sparkles className="h-3 w-3" />
-                Quick-fill below
-              </div>
-            </div>
+          <div className="mt-2">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={3}
+              placeholder="Type your question…"
+              className="w-full resize-none rounded-xl border border-purple-800/60 bg-purple-950/40 px-3 py-2 text-sm text-white placeholder:text-purple-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 tracking-wide"
+            />
+          </div>
 
-            <div className="mt-2">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={3}
-                placeholder="Type your question…"
-                className="w-full resize-none rounded-xl border border-purple-800/60 bg-purple-950/40 px-3 py-2 text-sm text-white placeholder:text-purple-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-              />
-            </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              className="flex-1 px-3 py-2 bg-purple-500/20 text-purple-300 text-sm rounded-lg hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
+              onClick={handleQuickFill}
+            >
+              Quick Fill
+            </button>
+            <button
+              className="flex-1 px-3 py-2 bg-purple-500/20 text-purple-300 text-sm rounded-lg hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
+              onClick={handleSend}
+              disabled={isSending || !prompt.trim()}
+            >
+              {isSending ? "Sending…" : "Send"}
+            </button>
+          </div>
+        </div>
 
-            <div className="mt-3 flex items-center gap-3">
-              <Button
-                disabled={isSending || prompt.trim().length === 0}
-                onClick={() => runAssistant(prompt.trim())}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+        {messages.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`rounded-xl p-3 ${
+                  msg.role === "user"
+                    ? "bg-purple-900/50 border border-purple-800/50"
+                    : "bg-purple-950/50 border border-purple-800/50"
+                }`}
               >
-                {isSending ? "Thinking…" : (
-                  <span className="inline-flex items-center gap-2">
-                    Send <Send className="h-4 w-4" />
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={isSending}
-                onClick={handleClear}
-                className="border-purple-400/30 text-purple-200 hover:bg-purple-900/40"
-              >
-                Clear
-              </Button>
-            </div>
-
-            {messages.length > 0 && (
-              <div className="mt-4 space-y-3">
-                {messages.map((m, idx) => (
-                  <div key={idx} className={m.role === "user" ? "text-right" : "text-left"}>
-                    <div
-                      className={
-                        m.role === "user"
-                          ? "inline-block max-w-[95%] rounded-2xl bg-purple-600/20 border border-purple-500/30 px-3 py-2 text-sm text-white"
-                          : "inline-block max-w-[95%] rounded-2xl bg-purple-950/40 border border-purple-800/60 px-3 py-2 text-sm text-purple-100"
-                      }
-                    >
-                      <div className="text-xs text-purple-200/70 mb-1">{m.role === "user" ? "You" : "Assistant"}</div>
-                      <pre className="whitespace-pre-wrap font-sans">{m.content}</pre>
-                    </div>
-                  </div>
-                ))}
+                <div className="text-xs font-semibold text-purple-300 mb-1 tracking-wide">{msg.role === "user" ? "You" : "AI"}</div>
+                <div className="text-sm text-white/90 tracking-wide whitespace-pre-wrap">{msg.content}</div>
               </div>
-            )}
+            ))}
           </div>
+        )}
 
-          <div className="mt-4">
-            <div className="text-xs font-semibold text-purple-200/80 mb-2">Common prompts</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {quickPrompts.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPrompt(p)}
-                  className="text-left rounded-2xl border border-purple-900/60 bg-purple-950/40 px-3 py-2 text-sm text-purple-200/90 hover:bg-purple-900/60 transition"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+        {messages.length > 0 && (
+          <div className="mt-3">
+            <button
+              className="w-full px-3 py-2 bg-purple-800 text-purple-300 text-sm rounded-lg hover:bg-purple-700 transition-colors tracking-wide"
+              onClick={handleClear}
+            >
+              Clear Chat
+            </button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 });
 

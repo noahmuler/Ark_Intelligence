@@ -156,35 +156,34 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
   }, [history, labels, strength, tick]);
 
   return (
-    <div className={className}>
-      <Card className="overflow-hidden min-h-[340px]">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-4 relative">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <div className="text-base font-bold text-white">Currency Strength</div>
-              <div className="text-xs text-purple-200/70">Relative performance around 0 (center line)</div>
-            </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">
-              0-center
-            </Badge>
-          </div>
-
+    <Card className={`overflow-hidden min-h-[340px] border-purple-900/60 bg-purple-950/40 backdrop-blur-xl hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out ${className}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
+      <CardContent className="p-4 relative">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[220px]">
-              {/* center line */}
-              <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
-              {/* grid */}
-              {[0.25, 0.5, 0.75].map((t) => {
-                const y = chart.pad + chart.innerH * t;
-                return (
-                  <line key={t} x1={chart.pad} x2={chart.w - chart.pad} y1={y} y2={y} stroke="rgba(167,139,250,0.12)" />
-                );
-              })}
+            <div className="text-base font-bold text-white tracking-wide">Currency Strength</div>
+            <div className="text-xs text-purple-200/70 tracking-wide">Relative performance around 0 (center line)</div>
+          </div>
+          <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">
+            0-center
+          </Badge>
+        </div>
 
-              {chart.paths.map((p) => (
-                <path
-                  key={p.label}
+        <div>
+          <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[220px]">
+            {/* center line */}
+            <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
+            {/* grid */}
+            {[0.25, 0.5, 0.75].map((t) => {
+              const y = chart.pad + chart.innerH * t;
+              return (
+                <line key={t} x1={chart.pad} x2={chart.w - chart.pad} y1={y} y2={y} stroke="rgba(167,139,250,0.12)" />
+              );
+            })}
+
+            {chart.paths.map((p) => (
+              <path
+                key={p.label}
                   d={p.d}
                   fill="none"
                   stroke={p.color}
@@ -241,7 +240,6 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
           </div>
         </CardContent>
       </Card>
-    </div>
   );
 });
 

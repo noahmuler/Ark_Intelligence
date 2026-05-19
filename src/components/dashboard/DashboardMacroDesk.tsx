@@ -77,15 +77,15 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   const pairs = useMemo(() => ASSETS, []);
 
   return (
-    <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-4 shadow-xl min-h-[340px]">
+    <div className="bg-purple-950/40 backdrop-blur-xl rounded-xl border border-purple-900/60 p-4 shadow-xl min-h-[340px] hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-lg bg-purple-900/80 border border-purple-800/70 flex items-center justify-center">
             <span className="text-purple-200 font-bold text-sm">M</span>
           </div>
           <div>
-            <h3 className="text-base font-semibold text-purple-100">Macro Desk</h3>
-            <p className="text-xs text-purple-300">4-key pairs snapshot</p>
+            <h3 className="text-base font-semibold text-purple-100 tracking-wide">Macro Desk</h3>
+            <p className="text-xs text-purple-300 tracking-wide">4-key pairs snapshot</p>
           </div>
         </div>
       </div>
@@ -96,7 +96,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
           return (
             <div
               key={p.symbol}
-              className="bg-purple-900/50 border border-purple-800/50 rounded-lg p-3"
+              className="bg-purple-900/50 border border-purple-800/50 rounded-lg p-3 hover:bg-purple-900/60 hover:border-purple-500/60 transition-all duration-300 ease-in-out"
             >
               {/* Row 1: Asset name + price left, icon + delta + Bullish/Bearish right */}
               <div className="flex items-start justify-between gap-3">

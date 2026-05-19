@@ -334,49 +334,48 @@ const SessionIndicatorCard = React.memo(function SessionIndicatorCard({ classNam
   const timeZoneOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false } as const;
 
   return (
-    <div className={className}>
-      <Card className="relative overflow-hidden min-h-[240px]">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-4 relative">
-          <div className="flex flex-col items-center text-center gap-3">
-            <div className="w-full">
-              <div className="flex items-center justify-center gap-3">
-                <div className="relative">
-                  <div
-                    className={`h-14 w-14 rounded-full border-2 ${
-                      active.open ? "border-emerald-400/70" : "border-purple-400/50"
-                    } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
-                  >
-                    {active.open ? (
-                      <div className="h-9 w-9 rounded-full bg-emerald-400/20 flex items-center justify-center">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-200" />
-                      </div>
-                    ) : (
-                      <XCircle className="h-5 w-5 text-purple-200/90" />
-                    )}
-                  </div>
+    <Card className={`relative overflow-hidden min-h-[240px] border-purple-900/60 bg-purple-950/40 backdrop-blur-xl hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out ${className}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
+      <CardContent className="p-4 relative">
+        <div className="flex flex-col items-center text-center gap-3">
+          <div className="w-full">
+            <div className="flex items-center justify-center gap-3">
+              <div className="relative">
+                <div
+                  className={`h-14 w-14 rounded-full border-2 ${
+                    active.open ? "border-emerald-400/70" : "border-purple-400/50"
+                  } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
+                >
+                  {active.open ? (
+                    <div className="h-9 w-9 rounded-full bg-emerald-400/20 flex items-center justify-center">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-200" />
+                    </div>
+                  ) : (
+                    <XCircle className="h-5 w-5 text-purple-200/90" />
+                  )}
                 </div>
+              </div>
 
-                <div className="text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold text-white">
-                      {active.session.key}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-lg border ${activeBanner.cls}`}>
-                      {activeBanner.label}
-                    </span>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold text-white tracking-wide">
+                    {active.session.key}
+                  </span>
+                  <span className={`text-xs px-2 py-1 rounded-lg border ${activeBanner.cls}`}>
+                    {activeBanner.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <div className="text-xs text-purple-200/80 tracking-wide">
+                    Real-time in <span className="font-mono">America/New_York</span>.
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <div className="text-xs text-purple-200/80">
-                      Real-time in <span className="font-mono">America/New_York</span>.
-                    </div>
-                    <div className="text-xs font-mono text-purple-200" suppressHydrationWarning>
-                      {now.toLocaleTimeString("en-US", timeZoneOptions)}
-                    </div>
+                  <div className="text-xs font-mono text-purple-200" suppressHydrationWarning>
+                    {now.toLocaleTimeString("en-US", timeZoneOptions)}
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
             <div className="w-full pt-2">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -394,7 +393,6 @@ const SessionIndicatorCard = React.memo(function SessionIndicatorCard({ classNam
           </div>
         </CardContent>
       </Card>
-    </div>
   );
 });
 

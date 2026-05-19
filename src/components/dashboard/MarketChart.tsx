@@ -274,7 +274,7 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
       {/* Price info */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-xl sm:text-2xl font-bold text-white">
+          <div className="text-xl sm:text-2xl font-bold text-white tracking-wide">
             ${currentPrice.toFixed(2)}
           </div>
           <div className={`flex items-center space-x-2 ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -283,18 +283,18 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
             ) : (
               <TrendingDown className="h-3 w-3" />
             )}
-            <span className="font-semibold text-sm">
+            <span className="font-semibold text-sm tracking-wide">
               {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
             </span>
           </div>
         </div>
-        <div className="text-right text-xs text-purple-300">
+        <div className="text-right text-xs text-purple-300 tracking-wide">
           <div suppressHydrationWarning>Last updated: {new Date().toLocaleTimeString()}</div>
         </div>
       </div>
 
       {/* Chart */}
-      <div className="relative bg-purple-950/50 rounded-lg border border-purple-800/30 p-3 min-h-[180px]">
+      <div className="relative bg-purple-950/50 rounded-lg border border-purple-800/30 p-3 min-h-[180px] hover:border-purple-500/60 transition-all duration-300 ease-in-out">
         <canvas
           ref={canvasRef}
           className="w-full h-full"
