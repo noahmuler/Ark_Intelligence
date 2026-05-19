@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity } from "lucide-react";
 
 type Post = {
   id: string;
@@ -22,16 +22,13 @@ const FALLBACK: Post[] = [
 
 const LatestFromTwitterCard = React.memo(function LatestFromTwitterCard({ className = "" }: { className?: string }) {
   const [posts, setPosts] = useState<Post[]>(FALLBACK);
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      const initial = posts.length === 0;
-      if (initial) setLoading(true);
-      else setRefreshing(true);
+      setRefreshing(true);
 
       try {
         // If you have a real twitter/news proxy endpoint, swap it in here.
@@ -42,8 +39,7 @@ const LatestFromTwitterCard = React.memo(function LatestFromTwitterCard({ classN
         // Keep existing posts on failure; no clobber
       } finally {
         if (!cancelled) {
-          if (initial) setLoading(false);
-          else setRefreshing(false);
+          setRefreshing(false);
         }
       }
     };
@@ -83,12 +79,7 @@ const LatestFromTwitterCard = React.memo(function LatestFromTwitterCard({ classN
           </div>
 
           <div className="mt-4 space-y-3">
-            {loading ? (
-              <div className="flex items-center justify-center py-8 text-purple-200/70">
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Loading…
-              </div>
-            ) : posts.length === 0 ? (
+            {posts.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-purple-200/70">No posts available.</div>
             ) : (
               posts.map((p) => (

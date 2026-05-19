@@ -57,15 +57,9 @@ const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { 
     { symbol: "WTIUSD", name: "OIL", price: 82.35, percentChange: -0.35 },
     { symbol: "DXY", name: "DXY", price: 105.82, percentChange: 0.42 },
   ]);
-  const [mounted, setMounted] = useState(false);
 
   // Repeat quotes within a single segment so the loop width is long enough for smooth scrolling.
   const TAPE_REPEAT = 3;
-
-  useEffect(() => {
-    setMounted(true);
-    // Removed unnecessary interval since data fetching has its own interval
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

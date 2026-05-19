@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 
 // TradingView is loaded from https://s3.tradingview.com/tv.js
 declare global {
@@ -45,6 +45,7 @@ export function TradingViewWidget({
   className = ''
 }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const uniqueId = useId();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -54,7 +55,7 @@ export function TradingViewWidget({
     let mounted = true;
 
     // Create unique container ID for this widget
-    const containerId = `tradingview_widget_${symbol}_static`;
+    const containerId = `tradingview_widget_${symbol}_${uniqueId}`;
     container.id = containerId;
 
     // Create TradingView widget script (must be an actual script node so it executes)

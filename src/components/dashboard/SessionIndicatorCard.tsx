@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -310,10 +309,8 @@ const SessionRow = React.memo(function SessionRow({
 
 const SessionIndicatorCard = React.memo(function SessionIndicatorCard({ className = "" }: { className?: string }) {
   const [now, setNow] = useState(() => new Date("2024-01-01T00:00:00Z"));
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);

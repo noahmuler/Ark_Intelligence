@@ -47,7 +47,7 @@ function transformAIToSessionBrief(aiAnalysis: any, marketData: any): SessionBri
       support: support.slice(0, 3),
       resistance: resistance.slice(0, 3)
     },
-    timestamp: new Date().toISOString()
+    timestamp: "2024-01-01T00:00:00.000Z"
   };
 }
 
