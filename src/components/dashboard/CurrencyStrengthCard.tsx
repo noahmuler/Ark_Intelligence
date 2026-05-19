@@ -18,12 +18,59 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
-export default function CurrencyStrengthCard({ className = "" }: { className?: string }) {
+// Memoized SVG path calculation to prevent recalculation on every render
+function calculateChartPaths(
+  history: Record<string, number[]>,
+  labels: string[],
+  strength: StrengthSeries[],
+  tick: number
+) {
+  const w = 900;
+  const h = 260;
+  const pad = 28;
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+
+  const xs = Array.from({ length: 30 }, (_, i) => i);
+  const getArr = (label: string) => {
+    const arr = history[label] ?? [];
+    // Normalize to length 30
+    const padded = arr.length >= 30 ? arr.slice(-30) : [...Array(30 - arr.length).fill(0), ...arr];
+    return padded;
+  };
+
+  const yScale = (v: number) => {
+    // center at 0. Use fixed range [-100,100]
+    const range = 100;
+    const t = clamp((v + range) / (2 * range), 0, 1);
+    return pad + (1 - t) * innerH;
+  };
+
+  const paths = labels.map((label) => {
+    const s = strength.find((x) => x.label === label)!;
+    const vals = getArr(label);
+    const points = xs.map((i) => {
+      const x = pad + (innerW * i) / (xs.length - 1);
+      const y = yScale(vals[i]);
+      return { x, y };
+    });
+
+    const d = points
+      .map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+      .join(" ");
+
+    return { label, color: s.color, d, latest: vals[vals.length - 1] };
+  });
+
+  return { w, h, pad, innerW, innerH, paths };
+}
+
+const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ className = "" }: { className?: string }) {
   const [strength, setStrength] = useState<StrengthSeries[]>([
-    { label: "EUR", color: "#34d399", value: 0 },
-    { label: "GBP", color: "#60a5fa", value: 0 },
-    { label: "JPY", color: "#fbbf24", value: 0 },
-    { label: "USD", color: "#a78bfa", value: 0 },
+    { label: "EUR", color: "#34d399", value: 12.5 },
+    { label: "GBP", color: "#60a5fa", value: 8.3 },
+    { label: "JPY", color: "#fbbf24", value: -5.2 },
+    { label: "USD", color: "#a78bfa", value: -10.4 },
   ]);
 
   const [history, setHistory] = useState<Record<string, number[]>>({ EUR: [], GBP: [], JPY: [], USD: [] });
@@ -96,7 +143,6 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
     }, 30000);
 
     return () => clearInterval(i);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const labels = useMemo(() => {
@@ -104,77 +150,17 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
     return base;
   }, []);
 
-  // Build SVG paths
+  // Memoize chart calculations
   const chart = useMemo(() => {
-    const w = 900;
-    const h = 260;
-    const pad = 28;
-    const innerW = w - pad * 2;
-    const innerH = h - pad * 2;
-
-    const xs = Array.from({ length: 30 }, (_, i) => i);
-    const getArr = (label: string) => {
-      const arr = history[label] ?? [];
-      // Normalize to length 30
-      const padded = arr.length >= 30 ? arr.slice(-30) : [...Array(30 - arr.length).fill(0), ...arr];
-      return padded;
-    };
-
-    const yScale = (v: number) => {
-      // center at 0. Use fixed range [-100,100]
-      const range = 100;
-      const t = clamp((v + range) / (2 * range), 0, 1);
-      return pad + (1 - t) * innerH;
-    };
-
-    const paths = labels.map((label) => {
-      const s = strength.find((x) => x.label === label)!;
-      const vals = getArr(label);
-      const points = xs.map((i) => {
-        const x = pad + (innerW * i) / (xs.length - 1);
-        const y = yScale(vals[i]);
-        return { x, y };
-      });
-
-      const d = points
-        .map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-        .join(" ");
-
-      return { label, color: s.color, d, latest: vals[vals.length - 1] };
-    });
-
-    return { w, h, pad, innerW, innerH, paths };
+    return calculateChartPaths(history, labels, strength, tick);
   }, [history, labels, strength, tick]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Card className={"overflow-hidden " + className}>
-        <motion.div
-          className="absolute inset-0"
-          animate={{
-            "--angle": ["0deg", "360deg"],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          style={{
-            backgroundImage: "linear-gradient(var(--angle), rgba(147, 51, 234, 0.05), transparent, rgba(37, 99, 235, 0.05))",
-            backgroundSize: "200% 200%",
-          }}
-        />
+    <div className={className}>
+      <Card className="overflow-hidden min-h-[400px]">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
         <CardContent className="p-6 relative">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-start justify-between gap-4"
-          >
+          <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-lg font-bold text-white">Currency Strength</div>
               <div className="text-xs text-purple-200/80">Relative performance around 0 (center line)</div>
@@ -182,14 +168,9 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
             <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
               0-center
             </Badge>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="mt-4"
-          >
+          <div className="mt-4">
             <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[260px]">
               {/* center line */}
               <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
@@ -201,22 +182,19 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
                 );
               })}
 
-              {chart.paths.map((p, index) => (
-                <motion.path
+              {chart.paths.map((p) => (
+                <path
                   key={p.label}
                   d={p.d}
                   fill="none"
                   stroke={p.color}
                   strokeWidth="2.5"
                   opacity={0.95}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 0.95 }}
-                  transition={{ duration: 1, delay: 0.2 + index * 0.1 }}
                 />
               ))}
 
               {/* latest dots */}
-              {chart.paths.map((p, index) => {
+              {chart.paths.map((p) => {
                 // latest at i=29
                 const vals = history[p.label] ?? [];
                 const arr = vals.length >= 30 ? vals.slice(-30) : [...Array(30 - vals.length).fill(0), ...vals];
@@ -226,7 +204,7 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
                 const y = chart.pad + (1 - t) * chart.innerH;
                 const x = chart.pad + (chart.innerW * 29) / 29;
                 return (
-                  <motion.circle
+                  <circle
                     key={p.label}
                     cx={x}
                     cy={y}
@@ -234,57 +212,37 @@ export default function CurrencyStrengthCard({ className = "" }: { className?: s
                     fill={p.color}
                     stroke="rgba(255,255,255,0.35)"
                     strokeWidth="1"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.3, delay: 0.8 + index * 0.1 }}
                   />
                 );
               })}
             </svg>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4"
-          >
-            {strength.map((s, index) => {
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+            {strength.map((s) => {
               const up = s.value >= 0;
               return (
-                <motion.div
+                <div
                   key={s.label}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.05, backgroundColor: "rgba(139, 92, 246, 0.2)" }}
-                  transition={{ duration: 0.2, delay: 0.4 + index * 0.05 }}
-                  className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3 cursor-pointer"
+                  className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3 cursor-pointer hover:bg-purple-900/40 transition-colors duration-200"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-xs text-purple-200/80">{s.label}</div>
-                    <motion.div
-                      className={up ? "text-emerald-300" : "text-rose-300"}
-                      animate={up ? { y: [0, -3, 0] } : { y: [0, 3, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    </motion.div>
+                    <div className="text-xs font-semibold text-purple-200">{s.label}</div>
+                    <div className={up ? "text-emerald-300" : "text-rose-300"}>
+                      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    </div>
                   </div>
-                  <motion.div
-                    className="mt-2 text-lg font-mono font-bold"
-                    style={{ color: s.color }}
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
+                  <div className={`mt-1 text-sm font-mono ${up ? "text-emerald-300" : "text-rose-300"}`}>
                     {s.value >= 0 ? "+" : ""}{s.value.toFixed(1)}
-                  </motion.div>
-                </motion.div>
+                  </div>
+                </div>
               );
             })}
-          </motion.div>
+          </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
-}
+});
 
+export default CurrencyStrengthCard;

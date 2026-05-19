@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Brain, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { generateMarketOverview } from "@/services/geminiMarketAnalysis";
 import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
@@ -19,14 +19,14 @@ interface SessionBrief {
 /**
  * Transform AI analysis to SessionBrief format
  */
-const transformAIToSessionBrief = (aiAnalysis: any, marketData: any): SessionBrief => {
+function transformAIToSessionBrief(aiAnalysis: any, marketData: any): SessionBrief {
   // Validate aiAnalysis and marketData shapes
   const isValidAI = aiAnalysis && aiAnalysis.analysis;
   const isValidMarket = marketData && Array.isArray(marketData.stocks);
-  
-  const bias = isValidAI && aiAnalysis.analysis.marketOutlook === "Positive" ? "Bullish" : 
+
+  const bias = isValidAI && aiAnalysis.analysis.marketOutlook === "Positive" ? "Bullish" :
                isValidAI && aiAnalysis.analysis.marketOutlook === "Negative" ? "Bearish" : "Neutral";
-  
+
   // Extract key levels from market data (simplified)
   const getTopStocks = () => {
     if (!isValidMarket || !Array.isArray(marketData.stocks)) {
@@ -34,11 +34,11 @@ const transformAIToSessionBrief = (aiAnalysis: any, marketData: any): SessionBri
     }
     return marketData.stocks.slice(0, 3);
   };
-  
+
   const topStocks = getTopStocks();
   const support = topStocks.map((stock: any) => `$${(stock.price * 0.98).toFixed(2)}`);
   const resistance = topStocks.map((stock: any) => `$${(stock.price * 1.02).toFixed(2)}`);
-  
+
   return {
     mainDriver: (isValidAI && Array.isArray(aiAnalysis.analysis.keyInsights) && aiAnalysis.analysis.keyInsights[0]?.title) || "Market Analysis",
     bias,
@@ -49,12 +49,12 @@ const transformAIToSessionBrief = (aiAnalysis: any, marketData: any): SessionBri
     },
     timestamp: new Date().toISOString()
   };
-};
+}
 
 /**
  * Fetch real AI session brief
  */
-const fetchRealSessionBrief = async (): Promise<SessionBrief> => {
+async function fetchRealSessionBrief(): Promise<SessionBrief> {
   try {
     const [aiAnalysis, marketData] = await Promise.all([
       generateMarketOverview(),
@@ -66,33 +66,29 @@ const fetchRealSessionBrief = async (): Promise<SessionBrief> => {
     console.error('Error fetching session brief:', error);
     return getFallbackSessionBrief();
   }
-};
+}
 
 /**
  * Fallback session brief for when API fails
  */
-const getFallbackSessionBrief = (): SessionBrief => ({
-  mainDriver: "Market Analysis Unavailable",
-  bias: "Neutral",
-  analysis: "Unable to generate real-time analysis. Using fallback data.",
-  keyLevels: {
-    support: ["Support 1", "Support 2", "Support 3"],
-    resistance: ["Resistance 1", "Resistance 2", "Resistance 3"]
-  },
-  timestamp: new Date().toISOString()
-});
+function getFallbackSessionBrief(): SessionBrief {
+  return {
+    mainDriver: "Market Analysis Unavailable",
+    bias: "Neutral",
+    analysis: "Unable to generate real-time analysis. Using fallback data.",
+    keyLevels: {
+      support: ["Support 1", "Support 2", "Support 3"],
+      resistance: ["Resistance 1", "Resistance 2", "Resistance 3"]
+    },
+    timestamp: "2024-01-01T00:00:00.000Z"
+  };
+}
 
-export function AISessionBrief({ className = "" }: { className?: string }) {
+export const AISessionBrief = React.memo(function AISessionBrief({ className = "" }: { className?: string }) {
   const [sessionBrief, setSessionBrief] = useState<SessionBrief>(getFallbackSessionBrief());
   const [isGenerating, setIsGenerating] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
     
     // Initial AI brief fetch
     const fetchInitialBrief = async () => {
@@ -125,26 +121,42 @@ export function AISessionBrief({ className = "" }: { className?: string }) {
     }, 300000); // Update every 5 minutes for AI analysis
 
     return () => clearInterval(interval);
-  }, [mounted]);
+  }, []);
 
-  const getBiasColor = (bias: string) => {
+  const getBiasColor = useCallback((bias: string) => {
     switch (bias) {
       case "Bullish": return "text-emerald-400";
       case "Bearish": return "text-rose-400";
       default: return "text-amber-400";
     }
-  };
+  }, []);
 
-  const getBiasIcon = (bias: string) => {
+  const getBiasIcon = useCallback((bias: string) => {
     switch (bias) {
       case "Bullish": return <TrendingUp className="h-4 w-4" />;
       case "Bearish": return <TrendingDown className="h-4 w-4" />;
       default: return <Minus className="h-4 w-4" />;
     }
-  };
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    setIsGenerating(true);
+    fetchRealSessionBrief().then(realBrief => {
+      setSessionBrief(realBrief);
+      setIsGenerating(false);
+    }).catch(error => {
+      console.error('Manual refresh failed:', error);
+      setIsGenerating(false);
+    });
+  }, []);
+
+  // Memoize the timestamp display to prevent unnecessary recalculations
+  const displayTime = useMemo(() => {
+    return new Date(sessionBrief.timestamp).toLocaleTimeString();
+  }, [sessionBrief.timestamp]);
 
   return (
-    <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 sm:p-4 ${className}`}>
+    <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 sm:p-4 min-h-[320px] ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base sm:text-lg font-semibold text-white flex items-center">
           <Brain className="h-5 w-5 mr-2 text-purple-400" />
@@ -157,8 +169,8 @@ export function AISessionBrief({ className = "" }: { className?: string }) {
               <span className="text-xs text-purple-400">Generating...</span>
             </div>
           )}
-          <span className="text-xs text-purple-400">
-            {mounted ? new Date(sessionBrief.timestamp).toLocaleTimeString() : ""}
+          <span className="text-xs text-purple-400" suppressHydrationWarning>
+            {displayTime}
           </span>
         </div>
       </div>
@@ -218,8 +230,9 @@ export function AISessionBrief({ className = "" }: { className?: string }) {
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
           <button 
-            className="flex-1 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded hover:bg-purple-500/30 transition-colors"
-            onClick={() => setIsGenerating(true)}
+            className="flex-1 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleRefresh}
+            disabled={isGenerating}
           >
             Refresh Brief
           </button>
@@ -230,4 +243,4 @@ export function AISessionBrief({ className = "" }: { className?: string }) {
       </div>
     </div>
   );
-}
+});

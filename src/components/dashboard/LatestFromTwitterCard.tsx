@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Loader2 } from "lucide-react";
@@ -20,9 +20,9 @@ const FALLBACK: Post[] = [
   { id: "4", author: "@BTCflow", text: "Liquidity headlines matter. If BTC holds bid into session overlap, trend continuation is likely.", time: "28m ago", topic: "Crypto" },
 ];
 
-export default function LatestFromTwitterCard({ className = "" }: { className?: string }) {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+const LatestFromTwitterCard = React.memo(function LatestFromTwitterCard({ className = "" }: { className?: string }) {
+  const [posts, setPosts] = useState<Post[]>(FALLBACK);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -54,9 +54,9 @@ export default function LatestFromTwitterCard({ className = "" }: { className?: 
       cancelled = true;
       clearInterval(i);
     };
-  }, []);
+  }, [posts.length]);
 
-  const badgeFor = (topic: Post["topic"]) => {
+  const badgeFor = useCallback((topic: Post["topic"]) => {
     const map: Record<Post["topic"], string> = {
       Macro: "bg-purple-500/20 text-purple-200 border-purple-400/30",
       Crypto: "bg-emerald-500/15 text-emerald-200 border-emerald-400/25",
@@ -64,51 +64,55 @@ export default function LatestFromTwitterCard({ className = "" }: { className?: 
       Commodities: "bg-amber-500/15 text-amber-200 border-amber-400/25",
     };
     return map[topic];
-  };
+  }, []);
 
   return (
-    <Card className={"overflow-hidden " + className}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-300" />
-              <div className="text-lg font-bold text-white">Latest from X / Twitter</div>
+    <div className={className}>
+      <Card className="overflow-hidden min-h-[400px]">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
+        <CardContent className="p-6 relative">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-purple-300" />
+                <div className="text-lg font-bold text-white">Latest from X / Twitter</div>
+              </div>
+              <div className="text-xs text-purple-200/80">Market-relevant posts (fallback mock until integrated)</div>
             </div>
-            <div className="text-xs text-purple-200/80">Market-relevant posts (fallback mock until integrated)</div>
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Auto</Badge>
           </div>
-          <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Auto</Badge>
-        </div>
 
-        <div className="mt-4 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-purple-200/70">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Loading…
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-purple-200/70">No posts available.</div>
-          ) : (
-            posts.map((p) => (
-              <div key={p.id} className="rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs text-purple-200/70 font-mono">{p.author}</div>
-                    <div className="mt-2 text-sm text-white/95 leading-relaxed">{p.text}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="inline-flex">
-                      <Badge className={badgeFor(p.topic)}>{p.topic}</Badge>
+          <div className="mt-4 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-8 text-purple-200/70">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Loading…
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-purple-200/70">No posts available.</div>
+            ) : (
+              posts.map((p) => (
+                <div key={p.id} className="rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4 hover:bg-purple-900/40 transition-colors duration-200">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-purple-200/70 font-mono">{p.author}</div>
+                      <div className="mt-2 text-sm text-white/95 leading-relaxed">{p.text}</div>
                     </div>
-                    <div className="mt-2 text-xs text-purple-200/60">{p.time}</div>
+                    <div className="text-right">
+                      <div className="inline-flex">
+                        <Badge className={badgeFor(p.topic)}>{p.topic}</Badge>
+                      </div>
+                      <div className="mt-2 text-xs text-purple-200/60">{p.time}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
-}
+});
 
+export default LatestFromTwitterCard;

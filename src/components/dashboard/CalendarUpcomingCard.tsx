@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -20,9 +20,9 @@ function impactBadge(impact: CalendarEvent["impact"]) {
   }
 }
 
-export default function CalendarUpcomingCard({ className = "" }: { className?: string }) {
+const CalendarUpcomingCard = React.memo(function CalendarUpcomingCard({ className = "" }: { className?: string }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,55 +62,63 @@ export default function CalendarUpcomingCard({ className = "" }: { className?: s
       cancelled = true;
       clearInterval(i);
     };
-  }, []);
+  }, [events.length]);
 
-  const upcoming = events
-    .slice()
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .filter((e) => e.date.getTime() >= Date.now())
-    .slice(0, 6);
+  // Memoize the upcoming events calculation
+  const upcoming = useMemo(() => {
+    const now = new Date("2024-01-01T00:00:00.000Z").getTime();
+    return events
+      .slice()
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .filter((e) => e.date.getTime() >= now)
+      .slice(0, 6);
+  }, [events]);
 
   return (
-    <Card className={"overflow-hidden " + className}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5 text-purple-300" />
-              <div className="text-lg font-bold text-white">Calendar</div>
+    <div className={className}>
+      <Card className="overflow-hidden min-h-[400px]">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
+        <CardContent className="p-6 relative">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-purple-300" />
+                <div className="text-lg font-bold text-white">Calendar</div>
+              </div>
+              <div className="text-xs text-purple-200/80">Recently upcoming events</div>
             </div>
-            <div className="text-xs text-purple-200/80">Recently upcoming events</div>
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Live</Badge>
           </div>
-          <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Live</Badge>
-        </div>
 
-        <div className="mt-4 space-y-3">
-          {loading ? (
-            <div className="text-purple-200/70 text-sm">Loading…</div>
-          ) : upcoming.length === 0 ? (
-            <div className="text-purple-200/70 text-sm">No upcoming events found.</div>
-          ) : (
-            upcoming.map((e) => (
-              <div key={e.id} className="rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white/95 truncate">{e.title}</div>
-                    <div className="text-xs text-purple-200/70 mt-1">
-                      {e.date.toLocaleDateString("en-US", { month: "short", day: "2-digit" })} • {e.time}
+          <div className="mt-4 space-y-3">
+            {loading ? (
+              <div className="text-purple-200/70 text-sm">Loading…</div>
+            ) : upcoming.length === 0 ? (
+              <div className="text-purple-200/70 text-sm">No upcoming events found.</div>
+            ) : (
+              upcoming.map((e) => (
+                <div key={e.id} className="rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4 hover:bg-purple-900/40 transition-colors duration-200">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-white/95 truncate">{e.title}</div>
+                      <div className="text-xs text-purple-200/70 mt-1" suppressHydrationWarning>
+                        {e.date.toLocaleDateString("en-US", { month: "short", day: "2-digit" })} • {e.time}
+                      </div>
+                      <div className="text-xs text-purple-200/60 mt-2 line-clamp-2">{e.description}</div>
                     </div>
-                    <div className="text-xs text-purple-200/60 mt-2 line-clamp-2">{e.description}</div>
-                  </div>
-                  <div className="text-right">
-                    <Badge className={impactBadge(e.impact)}>{e.impact}</Badge>
-                    <div className="text-xs text-purple-200/60 mt-2">{e.category}</div>
+                    <div className="text-right">
+                      <Badge className={impactBadge(e.impact)}>{e.impact}</Badge>
+                      <div className="text-xs text-purple-200/60 mt-2">{e.category}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
-}
+});
 
+export default CalendarUpcomingCard;

@@ -54,7 +54,7 @@ export function TradingViewWidget({
     let mounted = true;
 
     // Create unique container ID for this widget
-    const containerId = `tradingview_widget_${symbol}_${Date.now()}`;
+    const containerId = `tradingview_widget_${symbol}_static`;
     container.id = containerId;
 
     // Create TradingView widget script (must be an actual script node so it executes)

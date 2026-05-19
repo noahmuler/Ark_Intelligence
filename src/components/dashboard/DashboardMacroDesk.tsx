@@ -69,15 +69,15 @@ function SentimentIcon({ sentiment }: { sentiment: "Bullish" | "Bearish" }) {
   return <TrendingDown className="h-4 w-4 text-rose-300" />;
 }
 
-function clamp(n: number, min: number, max: number) {
+const clamp = (n: number, min: number, max: number) => {
   return Math.max(min, Math.min(max, n));
-}
+};
 
-export function DashboardMacroDesk() {
+export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   const pairs = useMemo(() => ASSETS, []);
 
   return (
-    <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl">
+    <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl min-h-[400px]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <div className="h-10 w-10 rounded-xl bg-purple-900/80 border border-purple-800/70 flex items-center justify-center">
@@ -146,6 +146,4 @@ export function DashboardMacroDesk() {
       </div>
     </div>
   );
-}
-
-
+});

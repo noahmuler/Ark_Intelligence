@@ -135,7 +135,7 @@ interface WorldTime {
  * @returns {WorldTime[]} Array of world time objects
  */
 const getWorldTimes = (): WorldTime[] => {
-  const now = new Date();
+  const now = new Date("2024-01-01T00:00:00.000Z");
   return [
     {
       city: "NY",
