@@ -48,30 +48,30 @@ const TradingAssistantCard = React.memo(function TradingAssistantCard({ classNam
 
   return (
     <div className={className}>
-      <Card className="overflow-hidden min-h-[450px]">
+      <Card className="overflow-hidden min-h-[380px]">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-6 relative">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="p-4 relative">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-purple-300" />
-                <div className="text-lg font-bold text-white">Trading Assistant</div>
+                <Brain className="h-4 w-4 text-purple-300" />
+                <div className="text-base font-bold text-white">Trading Assistant</div>
               </div>
-              <div className="text-xs text-purple-200/80">Ask about markets, trades, or analysis</div>
+              <div className="text-xs text-purple-200/70">Ask about markets, trades, or analysis</div>
             </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Local helper</Badge>
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">Local helper</Badge>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4">
-            <div className="flex items-center justify-between gap-3">
+          <div className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
               <div className="text-sm text-purple-200/90 font-medium">Prompt</div>
               <div className="flex items-center gap-2 text-xs text-purple-200/70">
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="h-3 w-3" />
                 Quick-fill below
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-2">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}

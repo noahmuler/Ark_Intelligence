@@ -272,18 +272,18 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
       </div>
 
       {/* Price info */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-2xl sm:text-3xl font-bold text-white">
+          <div className="text-xl sm:text-2xl font-bold text-white">
             ${currentPrice.toFixed(2)}
           </div>
           <div className={`flex items-center space-x-2 ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {priceChange >= 0 ? (
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="h-3 w-3" />
             ) : (
-              <TrendingDown className="h-4 w-4" />
+              <TrendingDown className="h-3 w-3" />
             )}
-            <span className="font-semibold">
+            <span className="font-semibold text-sm">
               {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
             </span>
           </div>
@@ -294,7 +294,7 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
       </div>
 
       {/* Chart */}
-      <div className="relative bg-purple-950/50 rounded-xl border border-purple-800/30 p-4 min-h-[200px]">
+      <div className="relative bg-purple-950/50 rounded-lg border border-purple-800/30 p-3 min-h-[180px]">
         <canvas
           ref={canvasRef}
           className="w-full h-full"

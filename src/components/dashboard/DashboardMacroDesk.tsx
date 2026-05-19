@@ -77,26 +77,26 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   const pairs = useMemo(() => ASSETS, []);
 
   return (
-    <div className="bg-purple-950/90 backdrop-blur-xl rounded-2xl border border-purple-900/50 p-5 shadow-xl min-h-[400px]">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-4 shadow-xl min-h-[340px]">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
-          <div className="h-10 w-10 rounded-xl bg-purple-900/80 border border-purple-800/70 flex items-center justify-center">
-            <span className="text-purple-200 font-bold">M</span>
+          <div className="h-8 w-8 rounded-lg bg-purple-900/80 border border-purple-800/70 flex items-center justify-center">
+            <span className="text-purple-200 font-bold text-sm">M</span>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-purple-100">Macro Desk</h3>
-            <p className="text-sm text-purple-300">4-key pairs snapshot</p>
+            <h3 className="text-base font-semibold text-purple-100">Macro Desk</h3>
+            <p className="text-xs text-purple-300">4-key pairs snapshot</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {pairs.map((p) => {
           const c = sentimentColor(p.sentiment);
           return (
             <div
               key={p.symbol}
-              className="bg-purple-900/50 border border-purple-800/50 rounded-xl p-4"
+              className="bg-purple-900/50 border border-purple-800/50 rounded-lg p-3"
             >
               {/* Row 1: Asset name + price left, icon + delta + Bullish/Bearish right */}
               <div className="flex items-start justify-between gap-3">

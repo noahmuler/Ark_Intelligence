@@ -156,10 +156,10 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
   }, [sessionBrief.timestamp]);
 
   return (
-    <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 sm:p-4 min-h-[320px] ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base sm:text-lg font-semibold text-white flex items-center">
-          <Brain className="h-5 w-5 mr-2 text-purple-400" />
+    <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 min-h-[280px] ${className}`}>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-white flex items-center">
+          <Brain className="h-4 w-4 mr-2 text-purple-400" />
           AI Session Brief
         </h2>
         <div className="flex items-center space-x-2">
@@ -175,11 +175,11 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Main Driver */}
         <div>
           <div className="text-xs text-purple-400 mb-1">Main Driver</div>
-          <div className="text-sm font-medium text-purple-200">
+          <div className="text-xs font-medium text-purple-200">
             {sessionBrief.mainDriver}
           </div>
         </div>
@@ -189,7 +189,7 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
           <div className="text-xs text-purple-400 mb-1">Market Bias</div>
           <div className={`flex items-center space-x-2 ${getBiasColor(sessionBrief.bias)}`}>
             {getBiasIcon(sessionBrief.bias)}
-            <span className="text-sm font-medium">
+            <span className="text-xs font-medium">
               {sessionBrief.bias} on Metals
             </span>
           </div>
@@ -204,9 +204,9 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
         </div>
 
         {/* Key Levels */}
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-purple-800">
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-800">
           <div>
-            <div className="text-xs text-purple-400 mb-2">Support</div>
+            <div className="text-xs text-purple-400 mb-1">Support</div>
             <div className="space-y-1">
               {sessionBrief.keyLevels.support.map((level, index) => (
                 <div key={index} className="text-xs text-emerald-400 font-mono">
@@ -216,7 +216,7 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
             </div>
           </div>
           <div>
-            <div className="text-xs text-purple-400 mb-2">Resistance</div>
+            <div className="text-xs text-purple-400 mb-1">Resistance</div>
             <div className="space-y-1">
               {sessionBrief.keyLevels.resistance.map((level, index) => (
                 <div key={index} className="text-xs text-rose-400 font-mono">
@@ -229,14 +229,14 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
 
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
-          <button 
-            className="flex-1 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <button
+            className="flex-1 px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleRefresh}
             disabled={isGenerating}
           >
             Refresh Brief
           </button>
-          <button className="flex-1 px-3 py-1 bg-purple-800 text-purple-300 text-xs rounded hover:bg-purple-700 transition-colors">
+          <button className="flex-1 px-2 py-1 bg-purple-800 text-purple-300 text-xs rounded hover:bg-purple-700 transition-colors">
             Export PDF
           </button>
         </div>

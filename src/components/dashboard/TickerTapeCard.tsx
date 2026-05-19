@@ -184,18 +184,18 @@ const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { 
     <div className={className}>
       <Card className="overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-6 relative">
-          <div className="flex items-start justify-between gap-4 mb-4">
+        <CardContent className="p-4 relative">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <div className="text-lg font-bold text-white">Major Asset Tape</div>
-              <div className="text-xs text-purple-200/80">Real-time market snapshot</div>
+              <div className="text-base font-bold text-white">Major Asset Tape</div>
+              <div className="text-xs text-purple-200/70">Real-time market snapshot</div>
             </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">
               Live
             </Badge>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-purple-900/60 bg-purple-950/40 min-h-[140px]">
+          <div className="relative overflow-hidden rounded-xl border border-purple-900/60 bg-purple-950/40 min-h-[120px]">
             <div
               ref={containerRef}
               className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide will-change-transform"
@@ -204,19 +204,19 @@ const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { 
                 msOverflowStyle: "none",
               }}
             >
-              <div ref={contentRef} className="flex gap-3">
+              <div ref={contentRef} className="flex gap-2">
                 {segmentItems.length === 0 ? (
                   <div className="text-purple-200/80 text-sm px-4">Loading…</div>
                 ) : (
                   <>
-                    <div data-tape-segment="1" className="flex gap-3">
+                    <div data-tape-segment="1" className="flex gap-2">
                       {segmentItems.map((q: any, idx: number) => (
                         <TickerItem key={q._k ?? `${q.symbol}-${idx}`} quote={q} />
                       ))}
                     </div>
 
                     {/* Duplicate segment for seamless looping */}
-                    <div data-tape-segment="2" className="flex gap-3">
+                    <div data-tape-segment="2" className="flex gap-2">
                       {segmentItems.map((q: any, idx: number) => (
                         <TickerItem key={`${q._k ?? `${q.symbol}-${idx}`}-2`} quote={q} />
                       ))}

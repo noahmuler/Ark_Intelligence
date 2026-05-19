@@ -64,36 +64,36 @@ const LatestFromTwitterCard = React.memo(function LatestFromTwitterCard({ classN
 
   return (
     <div className={className}>
-      <Card className="overflow-hidden min-h-[400px]">
+      <Card className="overflow-hidden min-h-[340px]">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-6 relative">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="p-4 relative">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-purple-300" />
-                <div className="text-lg font-bold text-white">Latest from X / Twitter</div>
+                <Activity className="h-4 w-4 text-purple-300" />
+                <div className="text-base font-bold text-white">Latest from X / Twitter</div>
               </div>
-              <div className="text-xs text-purple-200/80">Market-relevant posts (fallback mock until integrated)</div>
+              <div className="text-xs text-purple-200/70">Market-relevant posts</div>
             </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">Auto</Badge>
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">Auto</Badge>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className="space-y-2">
             {posts.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-purple-200/70">No posts available.</div>
+              <div className="flex items-center justify-center py-6 text-purple-200/70">No posts available.</div>
             ) : (
               posts.map((p) => (
-                <div key={p.id} className="rounded-2xl border border-purple-900/60 bg-purple-950/60 p-4 hover:bg-purple-900/40 transition-colors duration-200">
+                <div key={p.id} className="rounded-xl border border-purple-900/60 bg-purple-950/60 p-3 hover:bg-purple-900/40 transition-colors duration-200">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-xs text-purple-200/70 font-mono">{p.author}</div>
-                      <div className="mt-2 text-sm text-white/95 leading-relaxed">{p.text}</div>
+                      <div className="mt-1 text-sm text-white/95 leading-relaxed">{p.text}</div>
                     </div>
                     <div className="text-right">
                       <div className="inline-flex">
                         <Badge className={badgeFor(p.topic)}>{p.topic}</Badge>
                       </div>
-                      <div className="mt-2 text-xs text-purple-200/60">{p.time}</div>
+                      <div className="mt-1 text-xs text-purple-200/60">{p.time}</div>
                     </div>
                   </div>
                 </div>

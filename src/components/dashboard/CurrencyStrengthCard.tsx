@@ -157,21 +157,21 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
 
   return (
     <div className={className}>
-      <Card className="overflow-hidden min-h-[400px]">
+      <Card className="overflow-hidden min-h-[340px]">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-6 relative">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="p-4 relative">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <div className="text-lg font-bold text-white">Currency Strength</div>
-              <div className="text-xs text-purple-200/80">Relative performance around 0 (center line)</div>
+              <div className="text-base font-bold text-white">Currency Strength</div>
+              <div className="text-xs text-purple-200/70">Relative performance around 0 (center line)</div>
             </div>
-            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30">
+            <Badge variant="outline" className="text-purple-200/80 border-purple-400/30 text-xs">
               0-center
             </Badge>
           </div>
 
-          <div className="mt-4">
-            <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[260px]">
+          <div>
+            <svg viewBox={`0 0 ${chart.w} ${chart.h}`} className="w-full h-[220px]">
               {/* center line */}
               <line x1={chart.pad} x2={chart.w - chart.pad} y1={chart.pad + chart.innerH / 2} y2={chart.pad + chart.innerH / 2} stroke="rgba(167,139,250,0.35)" strokeDasharray="6 6" />
               {/* grid */}

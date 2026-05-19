@@ -335,42 +335,42 @@ const SessionIndicatorCard = React.memo(function SessionIndicatorCard({ classNam
 
   return (
     <div className={className}>
-      <Card className="relative overflow-hidden min-h-[280px]">
+      <Card className="relative overflow-hidden min-h-[240px]">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 -z-10" />
-        <CardContent className="p-6 relative">
-          <div className="flex flex-col items-center text-center gap-4">
+        <CardContent className="p-4 relative">
+          <div className="flex flex-col items-center text-center gap-3">
             <div className="w-full">
               <div className="flex items-center justify-center gap-3">
                 <div className="relative">
                   <div
-                    className={`h-16 w-16 rounded-full border-2 ${
+                    className={`h-14 w-14 rounded-full border-2 ${
                       active.open ? "border-emerald-400/70" : "border-purple-400/50"
                     } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
                   >
                     {active.open ? (
-                      <div className="h-10 w-10 rounded-full bg-emerald-400/20 flex items-center justify-center">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-200" />
+                      <div className="h-9 w-9 rounded-full bg-emerald-400/20 flex items-center justify-center">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-200" />
                       </div>
                     ) : (
-                      <XCircle className="h-6 w-6 text-purple-200/90" />
+                      <XCircle className="h-5 w-5 text-purple-200/90" />
                     )}
                   </div>
                 </div>
 
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-white">
+                    <span className="text-xl font-bold text-white">
                       {active.session.key}
                     </span>
                     <span className={`text-xs px-2 py-1 rounded-lg border ${activeBanner.cls}`}>
                       {activeBanner.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mt-1">
+                  <div className="flex items-center gap-3 mt-1">
                     <div className="text-xs text-purple-200/80">
-                      Real-time opens/closes in <span className="font-mono">America/New_York</span>.
+                      Real-time in <span className="font-mono">America/New_York</span>.
                     </div>
-                    <div className="text-sm font-mono text-purple-200" suppressHydrationWarning>
+                    <div className="text-xs font-mono text-purple-200" suppressHydrationWarning>
                       {now.toLocaleTimeString("en-US", timeZoneOptions)}
                     </div>
                   </div>
