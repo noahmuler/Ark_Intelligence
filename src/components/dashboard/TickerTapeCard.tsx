@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
-
-import { Badge } from "@/components/ui/badge";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingDown, TrendingUp } from "lucide-react";
 
@@ -16,211 +13,152 @@ type Quote = {
 
 function pctStr(p: number) {
   const sign = p >= 0 ? "+" : "";
-  return `${sign}${Math.abs(p).toFixed(2)}%`;
+  return `${sign}${p.toFixed(2)}%`;
 }
 
-// Isolated ticker item component to prevent unnecessary re-renders
-const TickerItem = React.memo(function TickerItem({ quote }: { quote: Quote & { _k?: string } }) {
+const TickerItem = React.memo(function TickerItem({ quote }: { quote: Quote }) {
   const up = quote.percentChange >= 0;
 
   return (
-    <div className="min-w-[180px] snap-start rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer hover:bg-purple-900/60 transition-colors duration-200">
+    <div className="min-w-[190px] rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer hover:bg-purple-900/60 hover:border-purple-500/40 transition-all duration-200 shadow-md shadow-purple-500/5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs text-purple-300/90 font-mono">{quote.symbol}</div>
-          <div className="text-xl font-bold text-white mt-1">
-            {quote.symbol.includes("BTC")
+          <div className="text-xs text-purple-300/90 font-mono font-bold">{quote.symbol}</div>
+          <div className="text-lg font-black text-white mt-1 font-mono tracking-tight">
+            {quote.symbol.includes("BTC") || quote.symbol.includes("ETH") || quote.symbol === "NQ"
               ? quote.price.toLocaleString("en-US", { maximumFractionDigits: 0 })
-              : quote.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+              : quote.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
           </div>
         </div>
-        <div className={up ? "text-emerald-300" : "text-rose-300"}>
-          {up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+        <div className={up ? "text-emerald-400" : "text-rose-400"}>
+          {up ? <TrendingUp className="h-4.5 w-4.5" /> : <TrendingDown className="h-4.5 w-4.5" />}
         </div>
       </div>
 
-      <div className="mt-2">
-        <div className="text-xs font-semibold text-purple-200">{quote.name ?? quote.symbol}</div>
-        <div className={up ? "text-emerald-300" : "text-rose-300"}>
-          <span className="font-mono text-sm font-bold">{pctStr(quote.percentChange)}</span>
-        </div>
-        <div className="text-xs text-purple-200/60">% up/down vs last reference</div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[10px] font-bold text-purple-300/60 uppercase">{quote.name ?? quote.symbol}</span>
+        <span className={`font-mono text-xs font-black ${up ? "text-emerald-400" : "text-rose-400"}`}>
+          {pctStr(quote.percentChange)}
+        </span>
       </div>
     </div>
   );
 });
 
-const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { className?: string }) {
-  const [quotes, setQuotes] = useState<Quote[]>([
-    { symbol: "XAUUSD", name: "XAU", price: 2748.32, percentChange: 0.85 },
-    { symbol: "BTCUSD", name: "BTC", price: 67845.32, percentChange: 1.25 },
-    { symbol: "WTIUSD", name: "OIL", price: 82.35, percentChange: -0.35 },
-    { symbol: "DXY", name: "DXY", price: 105.82, percentChange: 0.42 },
-  ]);
+const DEFAULT_QUOTES: Quote[] = [
+  { symbol: "XAUUSD", name: "Gold / USD", price: 2748.32, percentChange: 0.85 },
+  { symbol: "BTCUSD", name: "Bitcoin / USD", price: 67845.0, percentChange: 1.25 },
+  { symbol: "ETHUSD", name: "Ethereum / USD", price: 3450.45, percentChange: 1.62 },
+  { symbol: "EURUSD", name: "Euro / USD", price: 1.0876, percentChange: 0.21 },
+  { symbol: "GBPUSD", name: "Sterling / USD", price: 1.2654, percentChange: -0.14 },
+  { symbol: "USDJPY", name: "Dollar / Yen", price: 154.32, percentChange: 0.29 },
+  { symbol: "AUDUSD", name: "Aussie / USD", price: 0.6654, percentChange: 0.45 },
+  { symbol: "USDCAD", name: "Loonie / USD", price: 1.3654, percentChange: -0.12 },
+  { symbol: "WTIUSD", name: "Crude Oil", price: 82.35, percentChange: -0.35 },
+  { symbol: "DXY", name: "US Dollar Index", price: 105.82, percentChange: 0.42 },
+  { symbol: "NQ", name: "Nasdaq 100 Fut", price: 18450.5, percentChange: 1.12 },
+  { symbol: "ES", name: "S&P 500 Fut", price: 5240.75, percentChange: 0.85 },
+];
 
-  // Repeat quotes within a single segment so the loop width is long enough for smooth scrolling.
-  const TAPE_REPEAT = 3;
+const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { className?: string }) {
+  const [quotes, setQuotes] = useState<Quote[]>(DEFAULT_QUOTES);
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchQuotes = async () => {
       try {
-        const symbols = ["XAUUSD", "BTCUSD", "WTIUSD", "DXY", "EURUSD", "GBPUSD", "USDJPY"].join(",");
+        const symbols = DEFAULT_QUOTES.map((q) => q.symbol).join(",");
         const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbols)}`);
         if (!res.ok) throw new Error(`Ticker request failed: ${res.status}`);
         const json = await res.json();
         const data = json?.data ?? {};
 
-        const mapped: Quote[] = [
-          {
-            symbol: "XAUUSD",
-            name: "XAU",
-            price: Number(data["XAUUSD"]?.price ?? 0),
-            percentChange: Number(data["XAUUSD"]?.percentChange ?? 0),
-          },
-          {
-            symbol: "BTCUSD",
-            name: "BTC",
-            price: Number(data["BTCUSD"]?.price ?? 0),
-            percentChange: Number(data["BTCUSD"]?.percentChange ?? 0),
-          },
-          {
-            symbol: "WTIUSD",
-            name: "OIL",
-            price: Number(data["WTIUSD"]?.price ?? 0),
-            percentChange: Number(data["WTIUSD"]?.percentChange ?? 0),
-          },
-          {
-            symbol: "DXY",
-            name: "DXY",
-            price: Number(data["DXY"]?.price ?? 0),
-            percentChange: Number(data["DXY"]?.percentChange ?? 0),
-          },
-        ].filter((q) => Number.isFinite(q.price) && q.price !== 0);
+        const mapped: Quote[] = DEFAULT_QUOTES.map((fallback) => {
+          const apiData = data[fallback.symbol];
+          if (apiData && typeof apiData.price === "number" && apiData.price !== 0) {
+            return {
+              symbol: fallback.symbol,
+              name: fallback.name,
+              price: apiData.price,
+              percentChange: typeof apiData.changePercent === "number" ? apiData.changePercent : fallback.percentChange,
+            };
+          }
+          return fallback;
+        });
 
         if (!cancelled) setQuotes(mapped);
       } catch {
-        if (!cancelled) {
-          setQuotes([
-            { symbol: "XAUUSD", name: "XAU", price: 2748.32, percentChange: 0.85 },
-            { symbol: "BTCUSD", name: "BTC", price: 67845.32, percentChange: 1.25 },
-            { symbol: "WTIUSD", name: "OIL", price: 82.35, percentChange: -0.35 },
-            { symbol: "DXY", name: "DXY", price: 105.82, percentChange: 0.42 },
-          ]);
-        }
+        if (!cancelled) setQuotes(DEFAULT_QUOTES);
       }
     };
 
     fetchQuotes();
-    const i = setInterval(fetchQuotes, 30000);
+    const interval = setInterval(fetchQuotes, 30000);
     return () => {
       cancelled = true;
-      clearInterval(i);
+      clearInterval(interval);
     };
   }, []);
 
-  // One segment (we will render it twice: [segment][segment])
-  const segmentItems = useMemo(() => {
-    return Array.from({ length: TAPE_REPEAT }).flatMap((_, i) =>
-      quotes.map((q) => ({ ...q, _k: `${q.symbol}-${i}` }))
-    );
-  }, [quotes]);
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-
-  const [segmentWidth, setSegmentWidth] = useState(0);
-
-  // Measure width of a single segment so we can wrap perfectly.
-  useEffect(() => {
-    const measure = () => {
-      if (!contentRef.current) return;
-      const segmentEl = contentRef.current.querySelector('[data-tape-segment="1"]') as HTMLElement | null;
-      if (!segmentEl) return;
-      setSegmentWidth(Math.max(1, segmentEl.getBoundingClientRect().width));
-    };
-
-    measure();
-    const ro = new ResizeObserver(() => measure());
-    if (contentRef.current) ro.observe(contentRef.current);
-    window.addEventListener("resize", measure);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [segmentItems.length]);
-
-  // Optimized animation loop using requestAnimationFrame with CSS transforms
-  useEffect(() => {
-    let rafId = 0;
-    let lastTs = 0;
-    let offsetPx = 0;
-
-    const tick = (ts: number) => {
-      rafId = requestAnimationFrame(tick);
-      if (!containerRef.current) return;
-
-      const dt = lastTs ? ts - lastTs : 16;
-      lastTs = ts;
-
-      // Speed in px/s - optimized for smoother performance
-      const pxPerMs = 18 / 1000;
-      offsetPx += dt * pxPerMs;
-
-      const w = Math.max(1, segmentWidth);
-      const wrapped = offsetPx % w;
-
-      // Use transform instead of changing layout properties
-      containerRef.current.style.transform = `translateX(${-wrapped}px)`;
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [segmentWidth]);
-
   return (
     <Card className={`overflow-hidden rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>
-      <CardContent className="p-3 relative">
-        <div className="flex items-start justify-between gap-2 mb-3">
+      {/* Global CSS for seamless infinite horizontal marquee */}
+      <style>{`
+        @keyframes marquee-scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .marquee-container {
+          display: flex;
+          overflow: hidden;
+          width: 100%;
+          user-select: none;
+          mask-image: linear-gradient(to right, transparent, white 5%, white 95%, transparent);
+        }
+        .marquee-track {
+          display: flex;
+          gap: 12px;
+          width: max-content;
+          animation: marquee-scroll 45s linear infinite;
+        }
+        .marquee-track:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-xs font-semibold text-white/90 tracking-wider uppercase">Asset Tape</div>
+            <div className="text-xs font-bold text-purple-300/70 tracking-widest uppercase">Global Market Stream</div>
+            <div className="text-lg font-extrabold text-white tracking-wide mt-0.5">Asset Tape</div>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-1 h-1 rounded-full bg-purple-400/60" />
-            <span className="text-xs text-purple-300/60 tracking-tight">Live</span>
+          <div className="flex items-center gap-1.5 bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-500/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-[10px] font-bold text-emerald-300 tracking-wider uppercase">Live Feeds</span>
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-lg border border-white/5 bg-purple-950/20 min-h-[100px]">
-          <div
-            ref={containerRef}
-            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide will-change-transform"
-            style={{
-              scrollbarWidth: "none",
-              msOverflowStyle: "none",
-            }}
-          >
-            <div ref={contentRef} className="flex gap-2">
-              {segmentItems.length === 0 ? (
-                <div className="text-purple-200/60 text-sm px-4">Loading…</div>
-              ) : (
-                <>
-                  <div data-tape-segment="1" className="flex gap-2">
-                    {segmentItems.map((q: any, idx: number) => (
-                      <TickerItem key={q._k ?? `${q.symbol}-${idx}`} quote={q} />
-                    ))}
-                  </div>
+        <div className="relative overflow-hidden rounded-xl border border-white/5 bg-purple-950/20 p-2">
+          <div className="marquee-container">
+            <div className="marquee-track">
+              {/* Copy 1 */}
+              <div className="flex gap-3 shrink-0">
+                {quotes.map((q, idx) => (
+                  <TickerItem key={`${q.symbol}-c1-${idx}`} quote={q} />
+                ))}
+              </div>
 
-                  {/* Duplicate segment for seamless looping */}
-                  <div data-tape-segment="2" className="flex gap-2">
-                    {segmentItems.map((q: any, idx: number) => (
-                      <TickerItem key={`${q._k ?? `${q.symbol}-${idx}`}-2`} quote={q} />
-                    ))}
-                  </div>
-                </>
-              )}
+              {/* Copy 2 (Perfect Duplicate for seamless infinite loop) */}
+              <div className="flex gap-3 shrink-0">
+                {quotes.map((q, idx) => (
+                  <TickerItem key={`${q.symbol}-c2-${idx}`} quote={q} />
+                ))}
+              </div>
             </div>
           </div>
         </div>

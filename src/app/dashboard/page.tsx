@@ -9,19 +9,13 @@ import LatestFromTwitterCard from "@/components/dashboard/LatestFromTwitterCard"
 import CurrencyStrengthCard from "@/components/dashboard/CurrencyStrengthCard";
 import CalendarUpcomingCard from "@/components/dashboard/CalendarUpcomingCard";
 import TradingAssistantCard from "@/components/dashboard/TradingAssistantCard";
+import GreetingCard from "@/components/dashboard/GreetingCard";
 
 export default function Dashboard() {
   return (
     <div className="container mx-auto px-4 py-6 min-h-screen space-y-4">
       {/* Greeting */}
-      <div className="rounded-2xl border border-purple-900/60 bg-purple-950/40 p-4 backdrop-blur-xl hover:border-purple-500/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out min-h-[80px]">
-        <div className="text-2xl font-extrabold text-white tracking-wide">
-          Greetings, Trader.
-        </div>
-        <div className="mt-2 text-purple-200/80 text-sm tracking-wide">
-          Today's edge is patience—wait for liquidity, then commit.
-        </div>
-      </div>
+      <GreetingCard />
 
       {/* Card 1: Session indicator full width */}
       <SessionIndicatorCard />

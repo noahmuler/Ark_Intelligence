@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import React, { useEffect, useMemo, useState } from "react";
+import { utcToZonedTime } from "date-fns-tz";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
-type DotColor = "emerald" | "amber" | "rose";
+type DotColor = "emerald" | "amber" | "rose" | "indigo";
 
 type SessionKey =
   | "Sydney"
@@ -17,382 +16,408 @@ type SessionKey =
   | "NY PM"
   | "Market Close";
 
-type SessionDef = {
+type SessionConfig = {
   key: SessionKey;
-  isExplicit: boolean;
-  // Times are anchored to America/New_York local time exactly as in Sessions.txt.
+  label: string;
   openHour: number;
   openMinute: number;
   closeHour: number;
   closeMinute: number;
   dotColor: DotColor;
-
-  // If true, the session is only visible when market is open (i.e. NOT during maintenance).
-  // (Used for temporary implicit row visibility rules.)
-  hideDuringMarketClose?: boolean;
+  isExplicit: boolean; // True for standard top-row sessions, False for conditional ones
 };
 
-const SESSIONS: SessionDef[] = [
-  // Explicit (must be in 2nd row)
+const SESSION_CONFIGS: SessionConfig[] = [
   {
     key: "Sydney",
-    isExplicit: true,
+    label: "Sydney Session",
     openHour: 17,
     openMinute: 0,
     closeHour: 2,
     closeMinute: 0,
     dotColor: "amber",
+    isExplicit: true,
   },
   {
     key: "Asia",
-    isExplicit: true,
+    label: "Asia Session",
     openHour: 20,
     openMinute: 0,
     closeHour: 0,
     closeMinute: 0,
-    dotColor: "amber",
+    dotColor: "indigo",
+    isExplicit: true,
   },
   {
     key: "London",
-    isExplicit: true,
+    label: "London Session",
     openHour: 3,
     openMinute: 0,
     closeHour: 12,
     closeMinute: 0,
     dotColor: "emerald",
+    isExplicit: true,
   },
   {
     key: "NY AM",
-    isExplicit: true,
+    label: "NY AM Session",
     openHour: 8,
     openMinute: 0,
     closeHour: 12,
     closeMinute: 0,
     dotColor: "rose",
+    isExplicit: true,
+  },
+  {
+    key: "NY Lunch",
+    label: "NY Lunch Pauses",
+    openHour: 12,
+    openMinute: 0,
+    closeHour: 13,
+    closeMinute: 30,
+    dotColor: "amber",
+    isExplicit: false,
   },
   {
     key: "NY PM",
-    isExplicit: true,
+    label: "NY PM Session",
     openHour: 13,
     openMinute: 30,
     closeHour: 16,
     closeMinute: 0,
     dotColor: "rose",
-  },
-
-  // Implicit (temporarily visible in 1st row)
-  {
-    key: "NY Lunch",
-    isExplicit: false,
-    openHour: 12,
-    openMinute: 0,
-    closeHour: 13,
-    closeMinute: 30,
-    dotColor: "rose",
-  },
-  {
-    key: "Market Close",
-    isExplicit: false,
-    openHour: 17,
-    openMinute: 0,
-    closeHour: 18,
-    closeMinute: 0,
-    dotColor: "emerald",
+    isExplicit: true,
   },
 ];
 
+// Helper to format countdown
+function formatDuration(ms: number): string {
+  const safeMs = Math.max(0, ms);
+  const totalSecs = Math.floor(safeMs / 1000);
+  const hours = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
 
-
-function pad2(n: number) {
-  return n.toString().padStart(2, "0");
-}
-
-function formatTime(h: number, m: number) {
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function getNowInEasternParts(now: Date) {
-  // We use Intl to derive Eastern time parts without extra deps.
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = dtf.formatToParts(now);
-  const partMap: Record<string, string> = {};
-  for (const p of parts) {
-    if (p.type !== "literal") partMap[p.type] = p.value;
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
   }
-  return {
-    year: Number(partMap.year),
-    month: Number(partMap.month),
-    day: Number(partMap.day),
-    hour: Number(partMap.hour),
-    minute: Number(partMap.minute),
-  };
+  if (mins > 0) {
+    return `${mins}m ${secs}s`;
+  }
+  return `${secs}s`;
 }
 
-function buildSessionTimesForDate(now: Date, session: SessionDef) {
-  // Convert current time to America/New_York zoned time
-  const nowEastern = utcToZonedTime(now, 'America/New_York');
+// Get session open/close boundaries in NY time
+function getSessionTimes(nowNY: Date, openH: number, openM: number, closeH: number, closeM: number) {
+  const openTime = new Date(nowNY);
+  openTime.setHours(openH, openM, 0, 0);
 
-  // Start of Eastern day for 'now'
-  const startOfDayEastern = new Date(nowEastern);
-  startOfDayEastern.setHours(0, 0, 0, 0);
+  const closeTime = new Date(nowNY);
+  closeTime.setHours(closeH, closeM, 0, 0);
 
-  // Build open/close in Eastern local time
-  const openEastern = new Date(startOfDayEastern);
-  openEastern.setHours(session.openHour, session.openMinute, 0, 0);
-
-  const closeEastern = new Date(startOfDayEastern);
-  closeEastern.setHours(session.closeHour, session.closeMinute, 0, 0);
-
-  // If close is logically next-day relative to open, add one day
-  if (closeEastern <= openEastern) {
-    closeEastern.setDate(closeEastern.getDate() + 1);
+  if (closeTime <= openTime) {
+    if (nowNY.getHours() >= openH) {
+      closeTime.setDate(closeTime.getDate() + 1);
+    } else {
+      openTime.setDate(openTime.getDate() - 1);
+    }
   }
 
-  // Convert Eastern times back to UTC for comparisons
-  const openUtc = zonedTimeToUtc(openEastern, 'America/New_York');
-  const closeUtc = zonedTimeToUtc(closeEastern, 'America/New_York');
-
-  const parts = getNowInEasternParts(now);
-  return { open: openUtc, close: closeUtc, nowParts: parts };
+  return { openTime, closeTime };
 }
 
-function isMarketMaintenanceOpen(now: Date) {
-  // Sessions.txt: Weekday Daily Closures (Mon–Thu) 5:00 PM – 6:00 PM NY time
-  // These are functionally "closed for active trading" windows.
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  const parts = dtf.formatToParts(now);
-  const partMap: Record<string, string> = {};
-  for (const p of parts) {
-    if (p.type !== "literal") partMap[p.type] = p.value;
-  }
-  const weekday = partMap.weekday; // e.g. Mon, Tue, Wed, Thu
-
-  const hour = Number(partMap.hour);
-  const minute = Number(partMap.minute);
+// Check market close state based on weekend & weekday rules
+function getMarketCloseTimes(nowNY: Date) {
+  const weekday = nowNY.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const hour = nowNY.getHours();
+  const minute = nowNY.getMinutes();
   const totalMinutes = hour * 60 + minute;
 
-  const isMonThu = weekday === "Mon" || weekday === "Tue" || weekday === "Wed" || weekday === "Thu";
-  if (!isMonThu) return false;
+  // Weekend: Friday 17:00 NY Time to Sunday 17:00 NY Time
+  const isWeekendClose =
+    (weekday === 5 && totalMinutes >= 17 * 60) ||
+    weekday === 6 ||
+    (weekday === 0 && totalMinutes < 17 * 60);
 
-  // 17:00 - 18:00
-  return totalMinutes >= 17 * 60 && totalMinutes < 18 * 60;
-}
+  // Weekday Daily Closure: Mon-Thu 17:00 to 18:00 NY Time
+  const isWeekdayClose =
+    weekday >= 1 &&
+    weekday <= 4 &&
+    totalMinutes >= 17 * 60 &&
+    totalMinutes < 18 * 60;
 
-function isOpen(now: Date, session: SessionDef) {
-  const { open, close } = buildSessionTimesForDate(now, session);
-  const baseOpen = now >= open && now < close;
+  const isActive = isWeekendClose || isWeekdayClose;
 
-  // If marked to hide during market close, force OFF during maintenance window.
-  if (session.hideDuringMarketClose) {
-    if (isMarketMaintenanceOpen(now)) return false;
-  }
+  const targetDate = new Date(nowNY);
 
-  return baseOpen;
-}
-
-
-function msUntilNextBoundary(now: Date, session: SessionDef) {
-  const { open, close } = buildSessionTimesForDate(now, session);
-  const target = isOpen(now, session) ? close : open;
-  return target.getTime() - now.getTime();
-}
-
-function getDotClasses(color: SessionDef["dotColor"], isSessionOpen: boolean) {
-  if (!isSessionOpen) {
-    return "bg-gray-500/40 border border-gray-400/30";
-  }
-  switch (color) {
-    case "emerald":
-      return "bg-emerald-400/20 border-emerald-400/60";
-    case "amber":
-      return "bg-amber-300/20 border-amber-300/60";
-    case "rose":
-      return "bg-rose-400/20 border-rose-400/60";
-  }
-}
-
-// Isolated countdown component to prevent parent re-renders
-const CountdownDisplay = React.memo(function CountdownDisplay({ session, now }: { session: SessionDef; now: Date }) {
-  const countdown = useMemo(() => {
-    let cd = "";
-    try {
-      const ms = msUntilNextBoundary(now, session);
-      const safe = Math.max(0, ms);
-      const totalSeconds = Math.floor(safe / 1000);
-      const hh = Math.floor(totalSeconds / 3600);
-      const mm = Math.floor((totalSeconds % 3600) / 60);
-      const ss = totalSeconds % 60;
-      if (hh > 0) cd = `${hh}h ${mm}m`;
-      else if (mm > 0) cd = `${mm}m ${ss}s`;
-      else cd = `${ss}s`;
-    } catch {
-      cd = "--";
+  if (isActive) {
+    if (isWeekdayClose) {
+      // Daily maintenance ends at 18:00
+      targetDate.setHours(18, 0, 0, 0);
+    } else {
+      // Weekend close ends on Sunday at 17:00
+      const daysToSunday = (7 - weekday) % 7;
+      targetDate.setDate(targetDate.getDate() + daysToSunday);
+      targetDate.setHours(17, 0, 0, 0);
     }
-    return cd;
-  }, [now, session]);
+  } else {
+    // When does the next closure start?
+    if (weekday === 5) {
+      // Friday before 17:00 -> starts today 17:00
+      targetDate.setHours(17, 0, 0, 0);
+    } else if (weekday === 0) {
+      // Sunday after 17:00 -> starts Monday 17:00
+      targetDate.setDate(targetDate.getDate() + 1);
+      targetDate.setHours(17, 0, 0, 0);
+    } else {
+      // Monday - Thursday
+      if (totalMinutes < 17 * 60) {
+        targetDate.setHours(17, 0, 0, 0);
+      } else {
+        targetDate.setDate(targetDate.getDate() + 1);
+        targetDate.setHours(17, 0, 0, 0);
+      }
+    }
+  }
 
-  return (
-    <div className="text-[10px] text-purple-300/90 font-mono min-w-[3ch]">
-      {countdown}
-    </div>
-  );
-});
+  return { isActive, targetDate };
+}
 
-// Isolated session row component for better memoization
-const SessionRow = React.memo(function SessionRow({ 
-  session, 
-  now, 
-  compact = false 
-}: { 
-  session: SessionDef; 
-  now: Date; 
-  compact?: boolean;
-}) {
-  const openStr = useMemo(() => formatTime(session.openHour, session.openMinute), [session.openHour, session.openMinute]);
-  const closeStr = useMemo(() => formatTime(session.closeHour, session.closeMinute), [session.closeHour, session.closeMinute]);
-  const sessionOpen = useMemo(() => isOpen(now, session), [now, session]);
-  
-  const iconSize = compact ? "h-4 w-4" : "h-5 w-5";
-  const dotSize = compact ? "h-8 w-8" : "h-10 w-10";
-  const fontSize = compact ? "text-sm" : "font-semibold";
-  const subFontSize = compact ? "text-[10px]" : "text-xs";
-
-  return (
-    <div
-      className="flex items-center justify-between gap-2 rounded-lg p-2 cursor-pointer hover:bg-purple-900/20 transition-colors duration-200"
-    >
-      <div className="flex items-center gap-2">
-        <div
-          className={`${dotSize} rounded-full flex items-center justify-center ${getDotClasses(
-            session.dotColor,
-            sessionOpen
-          )} transition-colors flex-shrink-0`}
-        >
-          {sessionOpen ? (
-            <CheckCircle2 className={`${iconSize} text-emerald-300`} />
-          ) : (
-            <Clock className={`${iconSize} text-gray-300`} />
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className={`${fontSize} text-white truncate`}>{session.key}</div>
-          <div className={`${subFontSize} text-purple-200/80`}>{openStr}-{closeStr}</div>
-        </div>
-      </div>
-
-      <div className="text-right flex-shrink-0">
-        <Badge
-          variant={sessionOpen ? "default" : "secondary"}
-          className={`${sessionOpen ? "bg-purple-600 text-white" : "bg-purple-900/40 text-purple-200"} text-[10px] px-1.5 py-0.5`}
-        >
-          {sessionOpen ? "OPEN" : "OFF"}
-        </Badge>
-        <CountdownDisplay session={session} now={now} />
-      </div>
-    </div>
-  );
-});
-
-const SessionIndicatorCard = React.memo(function SessionIndicatorCard({ className = "" }: { className?: string }) {
-  const [now, setNow] = useState(() => new Date("2024-01-01T00:00:00Z"));
+export default function SessionIndicatorCard({ className = "" }: { className?: string }) {
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setTimeout(() => {
+      setNow(new Date());
+    }, 0);
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
-
-  const openState = useMemo(() => {
-    return SESSIONS.map((s) => ({
-      key: s.key,
-      open: isOpen(now, s),
-      session: s,
-    }));
+  const nowNY = useMemo(() => {
+    if (!now) return null;
+    return utcToZonedTime(now, "America/New_York");
   }, [now]);
 
-  const active = openState.find((x) => x.open) ?? openState[0];
+  const marketStatus = useMemo(() => {
+    if (!nowNY) return { isClosed: false, isWeekend: false, countdown: "" };
+    const { isActive, targetDate } = getMarketCloseTimes(nowNY);
+    const msLeft = targetDate.getTime() - nowNY.getTime();
+    return {
+      isClosed: isActive,
+      countdown: formatDuration(msLeft),
+    };
+  }, [nowNY]);
 
-  const activeBanner = active.open
-    ? { label: "Live", cls: "bg-emerald-500/20 text-emerald-200 border-emerald-400/20" }
-    : { label: "Next", cls: "bg-purple-500/20 text-purple-200 border-purple-400/20" };
+  const sessionsData = useMemo(() => {
+    if (!nowNY) return [];
 
-  const timeZoneOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false } as const;
+    const weekday = nowNY.getDay();
+    const hour = nowNY.getHours();
+    const minute = nowNY.getMinutes();
+    const totalMinutes = hour * 60 + minute;
+
+    // Standard weekend close (Fri 17:00 to Sun 17:00)
+    const isWeekend =
+      (weekday === 5 && totalMinutes >= 17 * 60) ||
+      weekday === 6 ||
+      (weekday === 0 && totalMinutes < 17 * 60);
+
+    return SESSION_CONFIGS.map((cfg) => {
+      const { openTime, closeTime } = getSessionTimes(
+        nowNY,
+        cfg.openHour,
+        cfg.openMinute,
+        cfg.closeHour,
+        cfg.closeMinute
+      );
+
+      // Check if session is active
+      let active = false;
+      if (!isWeekend) {
+        if (cfg.openHour > cfg.closeHour) {
+          // Cross-midnight session (e.g., Sydney 17:00 - 02:00)
+          active = totalMinutes >= cfg.openHour * 60 || totalMinutes < cfg.closeHour * 60;
+        } else {
+          active = totalMinutes >= cfg.openHour * 60 && totalMinutes < cfg.closeHour * 60;
+        }
+      }
+
+      // Calculate countdown ms
+      let countdownMs = 0;
+      if (active) {
+        countdownMs = closeTime.getTime() - nowNY.getTime();
+      } else {
+        if (nowNY < openTime) {
+          countdownMs = openTime.getTime() - nowNY.getTime();
+        } else {
+          countdownMs = openTime.getTime() + 24 * 3600 * 1000 - nowNY.getTime();
+        }
+      }
+
+      return {
+        ...cfg,
+        isActive: active,
+        countdownText: active
+          ? `Ends in ${formatDuration(countdownMs)}`
+          : `Opens in ${formatDuration(countdownMs)}`,
+      };
+    });
+  }, [nowNY]);
+
+  // Combine standard sessions and active implicit sessions
+  const visibleSessions = useMemo(() => {
+    if (!nowNY) return [];
+
+    const list = sessionsData.filter((s) => s.isExplicit || s.isActive);
+
+    // If Market Close is active, add it to the list
+    const { isActive, targetDate } = getMarketCloseTimes(nowNY);
+    if (isActive) {
+      const msLeft = targetDate.getTime() - nowNY.getTime();
+      list.push({
+        key: "Market Close",
+        label: "Market Closed",
+        openHour: 17,
+        openMinute: 0,
+        closeHour: 18,
+        closeMinute: 0,
+        dotColor: "emerald",
+        isExplicit: false,
+        isActive: true,
+        countdownText: `Opens in ${formatDuration(msLeft)}`,
+      });
+    }
+
+    return list;
+  }, [sessionsData, nowNY]);
+
+  if (!now || !nowNY) {
+    return (
+      <Card className="rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] p-5 text-center min-h-[160px] flex items-center justify-center">
+        <span className="text-purple-300/60 text-sm">Syncing with New York clock...</span>
+      </Card>
+    );
+  }
+
+  // Get dot styling classes based on active state and color theme
+  const getDotClass = (color: DotColor, active: boolean) => {
+    const baseClass = "w-2.5 h-2.5 rounded-full transition-all duration-300";
+    if (!active) {
+      return `${baseClass} bg-purple-900/40 opacity-40 border border-purple-500/20`;
+    }
+
+    // Active glows using a pulse helper
+    switch (color) {
+      case "emerald":
+        return `${baseClass} bg-emerald-400 border border-emerald-300 pulse-dot text-emerald-400`;
+      case "amber":
+        return `${baseClass} bg-amber-400 border border-amber-300 pulse-dot text-amber-400`;
+      case "rose":
+        return `${baseClass} bg-rose-400 border border-rose-300 pulse-dot text-rose-400`;
+      case "indigo":
+        return `${baseClass} bg-indigo-400 border border-indigo-300 pulse-dot text-indigo-400`;
+    }
+  };
+
+  const nyTimeStr = nowNY.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 
   return (
-    <Card className={`relative overflow-hidden min-h-[150px] rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>
-      <CardContent className="p-3 relative">
-        <div className="flex flex-col items-center text-center gap-3">
-          <div className="w-full">
-            <div className="flex items-center justify-center gap-3">
-              <div className="relative">
-                <div
-                  className={`h-12 w-12 rounded-full border-2 ${
-                    active.open ? "border-emerald-400/60" : "border-purple-400/40"
-                  } ${active.open ? "bg-emerald-400/10" : "bg-purple-400/10"} flex items-center justify-center`}
+    <Card className={`relative overflow-hidden rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>
+      {/* Global CSS for pulsing dots */}
+      <style>{`
+        @keyframes dot-pulse {
+          0%, 100% {
+            transform: scale(1);
+            filter: drop-shadow(0 0 2px currentColor);
+            opacity: 0.85;
+          }
+          50% {
+            transform: scale(1.2);
+            filter: drop-shadow(0 0 8px currentColor);
+            opacity: 1;
+          }
+        }
+        .pulse-dot {
+          animation: dot-pulse 2s infinite ease-in-out;
+        }
+      `}</style>
+
+      <CardContent className="p-4">
+        {/* Header Block */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-purple-900/30 pb-3 mb-4">
+          <div>
+            <div className="text-xs font-bold text-purple-300/70 tracking-widest uppercase">
+              Ark Market Desk
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-lg font-extrabold text-white tracking-wide">
+                Trading Sessions
+              </span>
+              <Badge
+                variant="outline"
+                className={`text-[10px] uppercase font-bold tracking-wider ${
+                  marketStatus.isClosed
+                    ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
+                    : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                }`}
+              >
+                {marketStatus.isClosed ? "Market Closed" : "Market Active"}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="text-left sm:text-right flex flex-col sm:items-end">
+            <span className="text-xs text-purple-300/60 font-medium">New York Time (EST/EDT)</span>
+            <span className="text-2xl font-black text-white font-mono tracking-wider mt-0.5">
+              {nyTimeStr}
+            </span>
+          </div>
+        </div>
+
+        {/* Sessions Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          {visibleSessions.map((s) => (
+            <div
+              key={s.key}
+              className={`rounded-xl border p-3 flex flex-col justify-between transition-all duration-300 min-h-[90px] ${
+                s.isActive
+                  ? "bg-purple-900/20 border-purple-500/40 shadow-md shadow-purple-500/5"
+                  : "bg-purple-950/10 border-white/5 opacity-60 hover:opacity-85"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-white truncate tracking-wide">
+                  {s.key}
+                </span>
+                <div className={getDotClass(s.dotColor, s.isActive)} />
+              </div>
+
+              <div className="mt-3">
+                <span className="block text-[10px] text-purple-300/50 font-medium leading-none">
+                  {s.label}
+                </span>
+                <span
+                  className={`block text-xs font-mono font-bold mt-1.5 ${
+                    s.isActive ? "text-purple-200" : "text-purple-300/60"
+                  }`}
                 >
-                  {active.open ? (
-                    <div className="h-8 w-8 rounded-full bg-emerald-400/20 flex items-center justify-center">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200/90" />
-                    </div>
-                  ) : (
-                    <XCircle className="h-4 w-4 text-purple-200/80" />
-                  )}
-                </div>
-              </div>
-
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-white/90 tracking-wide">
-                    {active.session.key}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-lg border ${activeBanner.cls}`}>
-                    {activeBanner.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                  <div className="text-xs text-purple-300/70 tracking-wide">
-                    Real-time in <span className="font-mono">America/New_York</span>.
-                  </div>
-                  <div className="text-xs font-mono text-purple-300/70" suppressHydrationWarning>
-                    {now.toLocaleTimeString("en-US", timeZoneOptions)}
-                  </div>
-                </div>
+                  {s.countdownText}
+                </span>
               </div>
             </div>
-          </div>
-
-            <div className="w-full pt-2">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                {/* Explicit sessions only */}
-                {SESSIONS
-                  .filter((s) => s.isExplicit)
-                  .map((s) => (
-                    <div key={s.key}>
-                      <SessionRow session={s} now={now} compact={true} />
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
-});
-
-export default SessionIndicatorCard;
+}
