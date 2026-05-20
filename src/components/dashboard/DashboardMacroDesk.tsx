@@ -110,7 +110,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-3">
         {pairs.map((p) => {
           const c = sentimentColor(p.sentiment);
           const up = p.deltaPercentText.startsWith("+");
