@@ -156,14 +156,14 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
   }, [sessionBrief.timestamp]);
 
   return (
-    <div className={`bg-purple-900/30 rounded-lg border border-purple-900/40 p-2.5 backdrop-blur-md ${className}`}>
+    <div className={`bg-purple-950/20 rounded-lg border border-white/10 p-2.5 backdrop-blur-[12px] ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-semibold text-white tracking-tight">AI Brief</h2>
+        <h2 className="text-xs font-semibold text-white/90 tracking-wider uppercase">AI Brief</h2>
         <div className="flex items-center gap-1.5">
           {isGenerating && (
-            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            <div className="w-1 h-1 rounded-full bg-purple-400/60 animate-pulse" />
           )}
-          <span className="text-xs text-purple-300/60 tracking-tight" suppressHydrationWarning>
+          <span className="text-xs text-purple-300/50 tracking-tight" suppressHydrationWarning>
             {displayTime}
           </span>
         </div>
@@ -172,44 +172,44 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
       <div className="space-y-2">
         {/* Main Driver */}
         <div className="flex items-baseline gap-2">
-          <span className="text-xs text-purple-400/80 tracking-tight">Driver:</span>
-          <span className="text-xs font-medium text-white tracking-tight">
+          <span className="text-xs text-purple-300/70 tracking-tight">Driver:</span>
+          <span className="text-xs font-medium text-white/90 tracking-tight">
             {sessionBrief.mainDriver}
           </span>
         </div>
 
         {/* Bias */}
         <div className="flex items-baseline gap-2">
-          <span className="text-xs text-purple-400/80 tracking-tight">Bias:</span>
+          <span className="text-xs text-purple-300/70 tracking-tight">Bias:</span>
           <div className={`flex items-center gap-1 ${getBiasColor(sessionBrief.bias)}`}>
-            <div className={`w-1 h-1 rounded-full ${sessionBrief.bias === 'Bullish' ? 'bg-emerald-400' : sessionBrief.bias === 'Bearish' ? 'bg-rose-400' : 'bg-purple-400'}`} />
+            <div className={`w-1 h-1 rounded-full ${sessionBrief.bias === 'Bullish' ? 'bg-emerald-400/60' : sessionBrief.bias === 'Bearish' ? 'bg-rose-400/60' : 'bg-purple-400/60'}`} />
             <span className="text-xs font-medium tracking-tight">
               {sessionBrief.bias}
             </span>
           </div>
         </div>
 
-        {/* Analysis */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs text-purple-400/80 tracking-tight">Analysis:</span>
-          <span className="text-xs text-white/90 tracking-tight leading-snug">
+        {/* Analysis - 3-sentence constraint with line-clamp */}
+        <div>
+          <span className="text-xs text-purple-300/70 tracking-tight">Analysis:</span>
+          <p className="text-xs text-white/80 tracking-tight leading-snug mt-1 line-clamp-3">
             {sessionBrief.analysis}
-          </span>
+          </p>
         </div>
 
         {/* Key Levels */}
         <div className="flex items-baseline gap-2 pt-1 border-t border-white/5">
-          <span className="text-xs text-purple-400/80 tracking-tight">Levels:</span>
+          <span className="text-xs text-purple-300/70 tracking-tight">Levels:</span>
           <div className="flex gap-3">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-emerald-400/80 tracking-tight">S:</span>
-              <span className="text-xs text-emerald-300 font-mono tracking-tight">
+              <span className="text-xs text-emerald-400/70 tracking-tight">S:</span>
+              <span className="text-xs text-emerald-300/80 font-mono tracking-tight">
                 {Array.isArray(sessionBrief.keyLevels.support) && sessionBrief.keyLevels.support.length > 0 ? sessionBrief.keyLevels.support[0] : "—"}
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-rose-400/80 tracking-tight">R:</span>
-              <span className="text-xs text-rose-300 font-mono tracking-tight">
+              <span className="text-xs text-rose-400/70 tracking-tight">R:</span>
+              <span className="text-xs text-rose-300/80 font-mono tracking-tight">
                 {Array.isArray(sessionBrief.keyLevels.resistance) && sessionBrief.keyLevels.resistance.length > 0 ? sessionBrief.keyLevels.resistance[0] : "—"}
               </span>
             </div>
@@ -219,13 +219,13 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
         {/* Action Buttons */}
         <div className="flex gap-1.5 pt-1">
           <button
-            className="flex-1 px-2 py-1 bg-purple-500/15 text-purple-300/80 text-xs rounded hover:bg-purple-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed tracking-tight"
+            className="flex-1 px-2 py-1 bg-purple-500/10 text-purple-300/70 text-xs rounded hover:bg-purple-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed tracking-tight"
             onClick={handleRefresh}
             disabled={isGenerating}
           >
             Refresh
           </button>
-          <button className="flex-1 px-2 py-1 bg-purple-800/50 text-purple-300/80 text-xs rounded hover:bg-purple-700/60 transition-colors tracking-tight">
+          <button className="flex-1 px-2 py-1 bg-purple-800/30 text-purple-300/70 text-xs rounded hover:bg-purple-700/40 transition-colors tracking-tight">
             Export
           </button>
         </div>
