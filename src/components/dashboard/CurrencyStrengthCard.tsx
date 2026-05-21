@@ -1,18 +1,12 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
+
+
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 type StrengthSeries = {
   label: string;
@@ -43,6 +37,8 @@ const DEFAULT_STRENGTH: StrengthSeries[] = [
   { label: "JPY", color: "#f59e0b", value: -5.2 },
   { label: "USD", color: "#a855f7", value: -10.4 },
 ];
+
+// Convex query and data preparation moved inside component
 
 interface TooltipPayloadItem {
   name: string;
@@ -85,82 +81,27 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
 const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ className = "" }: { className?: string }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [strength, setStrength] = useState<StrengthSeries[]>(DEFAULT_STRENGTH);
-  const [history, setHistory] = useState<Record<string, number[]>>({
-    EUR: generateSeedHistory(12.5),
-    GBP: generateSeedHistory(8.3),
-    JPY: generateSeedHistory(-5.2),
-    USD: generateSeedHistory(-10.4),
-  });
-
-  const strengthRef = useRef<StrengthSeries[]>(strength);
-
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsMounted(true);
-    }, 0);
-    return () => clearTimeout(timer);
+    setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const symbols = ["EURUSD", "GBPUSD", "USDJPY"].join(",");
-        const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbols)}`);
-        if (!res.ok) throw new Error(`Ticker request failed: ${res.status}`);
-        const json = await res.json();
-        const data = json?.data ?? {};
 
-        const eur = Number(data["EURUSD"]?.changePercent ?? 0);
-        const gbp = Number(data["GBPUSD"]?.changePercent ?? 0);
-        const jpy = Number(data["USDJPY"]?.changePercent ?? 0);
+  // Convex query and data preparation
+  const rawHistory = useQuery(api.currencyStrength.getHistory) ?? null;
+  const history = rawHistory ?? {
+    EUR: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "EUR")?.value ?? 0),
+    GBP: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "GBP")?.value ?? 0),
+    JPY: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "JPY")?.value ?? 0),
+    USD: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "USD")?.value ?? 0),
+  };
 
-        // Normalize strength indexes
-        const usdProxy = -(eur + gbp) / 2;
-
-        const next = [
-          { label: "EUR", color: "#10b981", value: clamp(eur * 15, -100, 100) },
-          { label: "GBP", color: "#3b82f6", value: clamp(gbp * 15, -100, 100) },
-          { label: "JPY", color: "#f59e0b", value: clamp(-jpy * 15, -100, 100) },
-          { label: "USD", color: "#a855f7", value: clamp(usdProxy * 15, -100, 100) },
-        ] satisfies StrengthSeries[];
-
-        setStrength(next);
-        strengthRef.current = next;
-        setHistory((h) => {
-          const copy: Record<string, number[]> = {};
-          for (const s of next) {
-            const arr = h[s.label] ? [...h[s.label]] : [];
-            arr.push(s.value);
-            copy[s.label] = arr.slice(-30);
-          }
-          return copy;
-        });
-      } catch {
-        // Fallback: Random walk
-        const next = strengthRef.current.map((s) => ({
-          ...s,
-          value: clamp(s.value + (Math.random() - 0.5) * 5, -100, 100),
-        }));
-
-        setStrength(next);
-        strengthRef.current = next;
-        setHistory((h) => {
-          const copy: Record<string, number[]> = {};
-          for (const s of next) {
-            const arr = h[s.label] ? [...h[s.label]] : [];
-            arr.push(s.value);
-            copy[s.label] = arr.slice(-30);
-          }
-          return copy;
-        });
-      }
-    };
-
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Derive current strength values from the latest history point
+  const strength: StrengthSeries[] = [
+    { label: "EUR", color: "#10b981", value: history.EUR?.[history.EUR.length - 1] ?? 0 },
+    { label: "GBP", color: "#3b82f6", value: history.GBP?.[history.GBP.length - 1] ?? 0 },
+    { label: "JPY", color: "#f59e0b", value: history.JPY?.[history.JPY.length - 1] ?? 0 },
+    { label: "USD", color: "#a855f7", value: history.USD?.[history.USD.length - 1] ?? 0 },
+  ];
 
   // Format Recharts friendly data points
   const chartData = useMemo(() => {
@@ -202,7 +143,7 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
         {/* Chart Area */}
         <div className="relative flex-1 min-h-[190px] w-full rounded-xl bg-purple-950/20 border border-white/5 p-2 flex items-center justify-center">
           {!isMounted ? (
-            <span className="text-purple-300/60 text-xs font-medium">Initializing Recharts Engine...</span>
+            <div className="w-full h-[200px] bg-purple-900/30 animate-pulse rounded-xl"></div>
           ) : (
             <div className="w-full h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
