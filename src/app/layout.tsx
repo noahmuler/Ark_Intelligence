@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
+"use client";
+
+import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -8,10 +10,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-export const metadata: Metadata = {
-  title: "Ark Intelligence",
-  description: "Professional AI-driven trading intelligence dashboard for macro and technical analysis",
-};
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export default function RootLayout({
   children,
@@ -24,9 +23,9 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <ConvexProvider client={convex}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </ConvexProvider>
       </body>
     </html>
   );
