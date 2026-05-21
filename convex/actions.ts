@@ -1,17 +1,21 @@
 // Convex actions for Ark Intelligence
 
-import { query, mutation } from "convex/server";
-import { v } from "convex/values";
+import { query, mutation } from "./_generated/server";
+
 
 // Query all price entries sorted by symbol
 export const getAll = query(({ db }) => {
-  return db.query("prices").order("by_symbol");
+  // Convex ordering only supports "asc"/"desc" on indexes.
+  return db.query("prices").withIndex("by_symbol", (q) => q).order("asc");
 });
 
 // Query all asset briefs sorted by symbol
 export const getAllAssetBriefs = query(({ db }) => {
   return db.query("asset_briefs").order("by_symbol");
 });
+
+// Public API expected by the frontend: api.asset_briefs.getAll
+export const __compat_getAll_asset_briefs = getAllAssetBriefs;
 
 // Query all price entries (alias for getAll)
 export const getAllPrices = query(({ db }) => {
