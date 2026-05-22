@@ -85,6 +85,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Central banks continue gold accumulation strategy",
         impact: "Medium"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Gold ETF holdings reach monthly high as investors seek safety",
+        impact: "Low"
       }
     ]
   },
@@ -126,6 +132,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 6 * 60 * 1000),
         title: "Euro weakness contributes to dollar strength",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 9 * 60 * 1000),
+        title: "US Treasury yields rise as inflation expectations persist",
+        impact: "Medium"
       }
     ]
   },
@@ -167,6 +179,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 7 * 60 * 1000),
         title: "Eurozone inflation shows signs of moderation",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 10 * 60 * 1000),
+        title: "European bond markets stabilize after volatile week",
+        impact: "Low"
       }
     ]
   },
@@ -202,6 +220,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 5 * 60 * 1000),
         title: "UK inflation falls to 3.2% in latest reading",
         impact: "High"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Bank of England maintains current policy rate",
+        impact: "Medium"
       }
     ]
   },
@@ -243,6 +267,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 6 * 60 * 1000),
         title: "Japanese export data shows surprising strength",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 9 * 60 * 1000),
+        title: "Japan trade deficit narrows as exports outpace imports",
+        impact: "Medium"
       }
     ]
   },
@@ -284,6 +314,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 7 * 60 * 1000),
         title: "Bitcoin mining difficulty reaches all-time high",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 10 * 60 * 1000),
+        title: "Bitcoin network hash rate surges to new record levels",
+        impact: "Low"
       }
     ]
   },
@@ -319,6 +355,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 5 * 60 * 1000),
         title: "Layer 2 solutions reduce gas fees by 90%",
         impact: "High"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Ethereum staking ratio reaches new milestone",
+        impact: "Medium"
       }
     ]
   },
@@ -354,6 +396,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 4 * 60 * 1000),
         title: "Big Tech earnings beat expectations across the board",
         impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 7 * 60 * 1000),
+        title: "S&P 500 sector rotation continues amid economic uncertainty",
+        impact: "Low"
       }
     ]
   },
@@ -394,6 +442,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         id: "3",
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "China demand concerns weigh on oil prices",
+        impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "US strategic petroleum reserve remains unchanged",
         impact: "Low"
       }
     ]
@@ -436,6 +490,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Mining output declines in major silver-producing regions",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Silver price correlation with gold strengthens",
+        impact: "Low"
       }
     ]
   },
@@ -477,6 +537,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Global bond markets show signs of stabilization",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Yield curve inversion persists despite economic data",
+        impact: "Medium"
       }
     ]
   },
@@ -517,6 +583,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         id: "3",
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Platinum ETF holdings increase for third consecutive week",
+        impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Platinum supply constraints support price levels",
         impact: "Low"
       }
     ]
@@ -559,6 +631,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Palladium industrial demand shows signs of weakening",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Palladium inventories rise as substitution accelerates",
+        impact: "Low"
       }
     ]
   },
@@ -599,6 +677,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         id: "3",
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Apple Services revenue reaches new quarterly record",
+        impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Apple supply chain diversification efforts progress",
         impact: "Low"
       }
     ]
@@ -641,6 +725,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Microsoft gaming division shows strong quarterly growth",
         impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Microsoft cloud infrastructure expansion continues globally",
+        impact: "Medium"
       }
     ]
   },
@@ -681,6 +771,12 @@ const mockAssetData: Record<string, AssetDetail> = {
         id: "3",
         timestamp: new Date(Date.now() - 8 * 60 * 1000),
         title: "Gemini AI model shows improved performance in benchmarks",
+        impact: "Low"
+      },
+      {
+        id: "4",
+        timestamp: new Date(Date.now() - 11 * 60 * 1000),
+        title: "Google search market share remains dominant globally",
         impact: "Low"
       }
     ]
@@ -809,7 +905,6 @@ export default function AssetDetailPage() {
       <div className="p-3 sm:p-4 lg:p-5">
         {assetData && (
           <>
-            {/* Header with Edge Factor Card Docked */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-4">
                 <button
@@ -833,10 +928,8 @@ export default function AssetDetailPage() {
               </div>
             </div>
 
-            {/* Edge Factor Card - Docked in Header */}
             <div className="mb-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
               <div className="flex items-center gap-4">
-                {/* Dashboard Indicator Badge - Interactive Gauge */}
                 <div className="flex-shrink-0">
                   <Gauge
                     value={assetData.confidence}
@@ -848,7 +941,6 @@ export default function AssetDetailPage() {
                     sentiment={assetData.sentiment}
                   />
                 </div>
-                {/* Qualitative State Text */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
@@ -866,12 +958,8 @@ export default function AssetDetailPage() {
               </div>
             </div>
 
-            {/* Multi-Column Dashboard Grid Layout */}
             <div className="grid grid-cols-12 gap-3">
-              
-              {/* Left Column: Price Chart & News Stories */}
               <div className="col-span-12 lg:col-span-4 space-y-3">
-                {/* Price Chart Module */}
                 <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
@@ -951,7 +1039,7 @@ export default function AssetDetailPage() {
                     <Clock className="h-5 w-5 text-purple-300" />
                     <h3 className="text-lg font-semibold text-purple-100">News Stories</h3>
                   </div>
-                  <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-[28rem] overflow-y-auto">
                     {assetData.recentNews.map((news) => (
                       <div key={news.id} className="p-1.5 bg-purple-900/30 rounded-lg hover:bg-purple-900/50 transition-colors">
                         <div className="flex items-start justify-between gap-2">
@@ -1007,17 +1095,14 @@ export default function AssetDetailPage() {
                       <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
                     </div>
                     <div className="flex gap-4">
-                      {/* Left Column: Gauge Workspace (~40%) */}
                       <div className="w-2/5 flex-shrink-0 flex flex-col items-center">
-                        <div className="relative h-28 w-full">
+                        <div className="relative h-28 w-full aspect-[2/1]">
                           <MarketMoodGauge value={assetData.technicalIndicators.rsi} />
                         </div>
-                        {/* Central Indicator Number */}
                         <div className="mt-2 text-2xl font-bold text-purple-100">
                           {Math.round(assetData.technicalIndicators.rsi)}
                         </div>
                       </div>
-                      {/* Right Column: Dense Text Data Stack (~60%) */}
                       <div className="w-3/5 flex flex-col justify-center space-y-2">
                         <div className="text-xs font-semibold text-purple-300 mb-1">Market State</div>
                         <div className={`text-sm font-bold ${
@@ -1049,9 +1134,7 @@ export default function AssetDetailPage() {
                     </div>
                   </div>
 
-                  {/* Market Policy - Watermark Text - Spans 3 columns */}
                   <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl relative overflow-hidden">
-                    {/* Watermark */}
                     <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${
                       assetData.overallChange > 0 ? 'text-emerald-500/5' : 'text-rose-500/5'
                     }`}>
@@ -1068,7 +1151,6 @@ export default function AssetDetailPage() {
                         ? 'Central bank policies remain supportive of growth with accommodative stance expected to continue.'
                         : 'Monetary tightening cycle continues with hawkish signals from major central banks.'}
                     </p>
-                    {/* Toggle Menu Drawer */}
                     <div className="p-1.5 bg-purple-900/30 rounded-lg relative z-10">
                       <div className="flex justify-between text-xs text-purple-300">
                         <span>Trend Policy:</span>
@@ -1077,10 +1159,8 @@ export default function AssetDetailPage() {
                     </div>
                   </div>
                 </div>
-                {/* Bottom Metric Trio: Flow, Bearing, Pulse - 6-column symmetrical layout */}
-              <div className="col-span-8 grid grid-cols-6 gap-2">
-                {/* Flow Panel - Spans 2 columns */}
-                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                <div className="col-span-8 grid grid-cols-6 gap-2">
+                  <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Flow</h3>
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-purple-400 mb-1.5">
@@ -1111,8 +1191,7 @@ export default function AssetDetailPage() {
                   </div>
                 </div>
 
-                {/* Bearing Panel - Spans 2 columns */}
-                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Bearing</h3>
                   <div className="mb-2">
                     <span className={`text-sm font-semibold ${
@@ -1121,7 +1200,6 @@ export default function AssetDetailPage() {
                       {assetData.overallChange > 2 ? 'BULLISH UP' : assetData.overallChange < -2 ? 'BEARISH DOWN' : 'CHOPPY'}
                     </span>
                   </div>
-                  {/* Mini Sparkline Chart */}
                   <div className="relative h-8 mb-2">
                     <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
                       <path
@@ -1144,8 +1222,7 @@ export default function AssetDetailPage() {
                   </div>
                 </div>
 
-                {/* Pulse Panel - Spans 2 columns */}
-                <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
+                  <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Pulse</h3>
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-purple-400 mb-1.5">
