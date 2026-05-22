@@ -9,7 +9,7 @@ interface MarketMoodGaugeProps {
 }
 
 export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps) {
-  // Animate the needle position
+  // Animate the needle position using exact formula: (score × 1.8) - 90 deg
   const rotation = useSpring(0, {
     damping: 50,
     stiffness: 120,
@@ -17,7 +17,7 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
 
   React.useEffect(() => {
     // Map value (0-100) to rotation (-90 to 90 degrees)
-    const targetRotation = (value / 100) * 180 - 90
+    const targetRotation = (value * 1.8) - 90
     rotation.set(targetRotation)
   }, [value, rotation])
 
@@ -25,9 +25,9 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
     <div className={`relative w-full ${className}`}>
       <svg className="w-full h-full" viewBox="0 0 200 100">
         <defs>
-          {/* Glow filter for neon purple effect */}
-          <filter id="purpleGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+          {/* Glow filter for high-contrast needle */}
+          <filter id="needleGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
               <feMergeNode in="SourceGraphic" />
@@ -65,13 +65,12 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
           stroke="url(#purpleActiveGradient)"
           strokeWidth="8"
           strokeLinecap="round"
-          filter="url(#purpleGlow)"
           initial={{ pathLength: 0, opacity: 0 }}
           animate={{ pathLength: 1, opacity: 1 }}
           transition={{ duration: 1.2, ease: [0.25, 0.1, 0.25, 1] }}
         />
 
-        {/* Needle with glow - pivots from bottom-center */}
+        {/* Needle - pivots from exact bottom-center (50% 100%) */}
         <motion.g
           style={{ 
             rotate: rotation,
@@ -79,18 +78,20 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
           }}
           transition={{ type: "spring", damping: 50, stiffness: 120 }}
         >
+          {/* High-contrast white needle with neon purple glow */}
           <line
             x1="100"
             y1="100"
             x2="100"
             y2="35"
-            stroke="rgba(168, 85, 247, 1)"
+            stroke="rgba(255, 255, 255, 0.95)"
             strokeWidth="3"
             strokeLinecap="round"
-            filter="url(#purpleGlow)"
+            filter="url(#needleGlow)"
           />
-          <circle cx="100" cy="100" r="7" fill="rgba(168, 85, 247, 1)" filter="url(#purpleGlow)" />
-          <circle cx="100" cy="100" r="3.5" fill="rgba(168, 85, 247, 0.4)" />
+          {/* Center pivot dot */}
+          <circle cx="100" cy="100" r="6" fill="rgba(255, 255, 255, 0.95)" filter="url(#needleGlow)" />
+          <circle cx="100" cy="100" r="3" fill="rgba(168, 85, 247, 0.8)" />
         </motion.g>
       </svg>
     </div>

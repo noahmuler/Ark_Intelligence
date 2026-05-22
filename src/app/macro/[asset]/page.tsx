@@ -1018,7 +1018,7 @@ export default function AssetDetailPage() {
                         <div className="text-xs font-semibold text-purple-300 mb-1">Market State</div>
                         <div className={`text-sm font-bold ${
                           assetData.technicalIndicators.rsi >= 60 ? 'text-emerald-400' :
-                          assetData.technicalIndicators.rsi <= 40 ? 'text-rose-400' :
+                          assetData.technicalIndicators.rsi <= 40 ? 'text-rose-500' :
                           'text-amber-400'
                         }`}>
                           {assetData.technicalIndicators.rsi >= 60 ? 'Risk On' :
