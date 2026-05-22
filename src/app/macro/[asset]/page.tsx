@@ -867,10 +867,10 @@ export default function AssetDetailPage() {
             </div>
 
             {/* Multi-Column Dashboard Grid Layout */}
-            <div className="grid grid-cols-12 gap-2">
+            <div className="grid grid-cols-12 gap-3">
               
               {/* Left Column: Price Chart & News Stories */}
-              <div className="col-span-12 lg:col-span-4 space-y-2">
+              <div className="col-span-12 lg:col-span-4 space-y-3">
                 {/* Price Chart Module */}
                 <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <div className="flex items-center justify-between mb-3">
@@ -951,7 +951,7 @@ export default function AssetDetailPage() {
                     <Clock className="h-5 w-5 text-purple-300" />
                     <h3 className="text-lg font-semibold text-purple-100">News Stories</h3>
                   </div>
-                  <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-96 overflow-y-auto">
                     {assetData.recentNews.map((news) => (
                       <div key={news.id} className="p-1.5 bg-purple-900/30 rounded-lg hover:bg-purple-900/50 transition-colors">
                         <div className="flex items-start justify-between gap-2">
@@ -976,7 +976,7 @@ export default function AssetDetailPage() {
               </div>
 
               {/* Main Body: AI Overview, Market Mood, Market Policy */}
-              <div className="col-span-12 lg:col-span-8 space-y-2">
+              <div className="col-span-12 lg:col-span-8 space-y-3">
                 {/* AI Overview Card */}
                 <div className="bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <div className="flex items-center justify-between mb-3">
@@ -1001,19 +1001,23 @@ export default function AssetDetailPage() {
                 {/* Market Mood & Market Policy Grid - 6-column symmetrical layout */}
                 <div className="grid grid-cols-6 gap-2">
                   {/* Market Mood - Split two-column layout */}
-                  <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
-                    <div className="flex items-center space-x-2 mb-3">
+                  <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-4 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-4">
                       <Activity className="h-5 w-5 text-purple-300" />
                       <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
                     </div>
                     <div className="flex gap-4">
-                      {/* Left Column: Gauge Workspace */}
-                      <div className="w-2/5 flex-shrink-0">
-                        <div className="relative h-24">
+                      {/* Left Column: Gauge Workspace (~40%) */}
+                      <div className="w-2/5 flex-shrink-0 flex flex-col items-center">
+                        <div className="relative h-28 w-full">
                           <MarketMoodGauge value={assetData.technicalIndicators.rsi} />
                         </div>
+                        {/* Central Indicator Number */}
+                        <div className="mt-2 text-2xl font-bold text-purple-100">
+                          {Math.round(assetData.technicalIndicators.rsi)}
+                        </div>
                       </div>
-                      {/* Right Column: Context Grid */}
+                      {/* Right Column: Dense Text Data Stack (~60%) */}
                       <div className="w-3/5 flex flex-col justify-center space-y-2">
                         <div className="text-xs font-semibold text-purple-300 mb-1">Market State</div>
                         <div className={`text-sm font-bold ${
@@ -1025,6 +1029,9 @@ export default function AssetDetailPage() {
                            assetData.technicalIndicators.rsi <= 40 ? 'Risk Off' :
                            'Balanced'}
                         </div>
+                        <div className="text-[10px] text-purple-300 leading-tight mt-2">
+                          Investor positioning indicates {assetData.technicalIndicators.rsi > 50 ? 'bullish' : 'bearish'} sentiment with {assetData.confidence}% confidence.
+                        </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div className="bg-purple-900/30 rounded p-1.5">
                             <div className="text-[10px] text-purple-400">Momentum</div>
@@ -1034,6 +1041,9 @@ export default function AssetDetailPage() {
                             <div className="text-[10px] text-purple-400">Volatility</div>
                             <div className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.macd > 0 ? 'High' : 'Low'}</div>
                           </div>
+                        </div>
+                        <div className="text-[10px] text-purple-400 mt-1">
+                          Directional Bias: {assetData.overallChange > 0 ? 'North' : 'South'}
                         </div>
                       </div>
                     </div>
