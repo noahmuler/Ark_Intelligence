@@ -951,7 +951,7 @@ export default function AssetDetailPage() {
                     <Clock className="h-5 w-5 text-purple-300" />
                     <h3 className="text-lg font-semibold text-purple-100">News Stories</h3>
                   </div>
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-80 overflow-y-auto">
                     {assetData.recentNews.map((news) => (
                       <div key={news.id} className="p-1.5 bg-purple-900/30 rounded-lg hover:bg-purple-900/50 transition-colors">
                         <div className="flex items-start justify-between gap-2">
@@ -1067,10 +1067,8 @@ export default function AssetDetailPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Bottom Metric Trio: Flow, Bearing, Pulse - 6-column symmetrical layout */}
-              <div className="col-span-12 lg:col-span-12 grid grid-cols-6 gap-2">
+                {/* Bottom Metric Trio: Flow, Bearing, Pulse - 6-column symmetrical layout */}
+              <div className="col-span-8 grid grid-cols-6 gap-2">
                 {/* Flow Panel - Spans 2 columns */}
                 <div className="col-span-6 md:col-span-2 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                   <h3 className="text-lg font-semibold text-purple-100 mb-3">Flow</h3>
@@ -1174,6 +1172,7 @@ export default function AssetDetailPage() {
                   </div>
                 </div>
               </div>
+             </div>
             </div>
           </>
         )}
