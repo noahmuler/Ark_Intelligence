@@ -21,28 +21,9 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
     rotation.set(targetRotation)
   }, [value, rotation])
 
-  // Animate the displayed value
-  const displayValue = useSpring(0, {
-    damping: 50,
-    stiffness: 120,
-  })
-
-  React.useEffect(() => {
-    displayValue.set(value)
-  }, [value, displayValue])
-
-  const [currentValue, setCurrentValue] = React.useState(0)
-
-  React.useEffect(() => {
-    const unsubscribe = displayValue.on("change", (latest) => {
-      setCurrentValue(Math.round(latest))
-    })
-    return unsubscribe
-  }, [displayValue])
-
   return (
     <div className={`relative w-full ${className}`}>
-      <svg className="w-full h-full" viewBox="0 0 200 120">
+      <svg className="w-full h-full" viewBox="0 0 200 100">
         <defs>
           {/* Glow filter for neon purple effect */}
           <filter id="purpleGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -90,14 +71,7 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
           transition={{ duration: 1.2, ease: [0.25, 0.1, 0.25, 1] }}
         />
 
-        {/* Tick marks */}
-        <g opacity="0.3">
-          <line x1="30" y1="100" x2="30" y2="90" stroke="rgba(168, 85, 247, 0.6)" strokeWidth="2" />
-          <line x1="100" y1="30" x2="100" y2="40" stroke="rgba(168, 85, 247, 0.6)" strokeWidth="2" />
-          <line x1="170" y1="100" x2="170" y2="90" stroke="rgba(168, 85, 247, 0.6)" strokeWidth="2" />
-        </g>
-
-        {/* Needle with glow */}
+        {/* Needle with glow - pivots from bottom-center */}
         <motion.g
           style={{ 
             rotate: rotation,
@@ -118,11 +92,6 @@ export function MarketMoodGauge({ value, className = "" }: MarketMoodGaugeProps)
           <circle cx="100" cy="100" r="7" fill="rgba(168, 85, 247, 1)" filter="url(#purpleGlow)" />
           <circle cx="100" cy="100" r="3.5" fill="rgba(168, 85, 247, 0.4)" />
         </motion.g>
-
-        {/* Central reading text - large, crisp, centered beneath needle pivot */}
-        <text x="100" y="118" fontSize="24" fill="rgba(168, 85, 247, 1)" className="text-2xl font-bold font-mono" textAnchor="middle" fontWeight="bold">
-          {currentValue}
-        </text>
       </svg>
     </div>
   )

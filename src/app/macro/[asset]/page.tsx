@@ -1000,24 +1000,41 @@ export default function AssetDetailPage() {
 
                 {/* Market Mood & Market Policy Grid - 6-column symmetrical layout */}
                 <div className="grid grid-cols-6 gap-2">
-                  {/* Market Mood - Semi-Circular Gauge - Spans 3 columns */}
+                  {/* Market Mood - Split two-column layout */}
                   <div className="col-span-6 md:col-span-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
                     <div className="flex items-center space-x-2 mb-3">
                       <Activity className="h-5 w-5 text-purple-300" />
                       <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
                     </div>
-                    <div className="relative h-32 mb-2">
-                      <MarketMoodGauge value={assetData.technicalIndicators.rsi} />
-                    </div>
-                    {/* Expandable Detail Drawer */}
-                    <div className="p-1.5 bg-purple-900/30 rounded-lg text-xs text-purple-300">
-                      <div className="flex justify-between mb-1">
-                        <span>Momentum:</span>
-                        <span className="font-mono">{assetData.technicalIndicators.rsi > 50 ? 'Strong' : 'Weak'}</span>
+                    <div className="flex gap-4">
+                      {/* Left Column: Gauge Workspace */}
+                      <div className="w-2/5 flex-shrink-0">
+                        <div className="relative h-24">
+                          <MarketMoodGauge value={assetData.technicalIndicators.rsi} />
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Volatility:</span>
-                        <span className="font-mono">{assetData.technicalIndicators.macd > 0 ? 'High' : 'Low'}</span>
+                      {/* Right Column: Context Grid */}
+                      <div className="w-3/5 flex flex-col justify-center space-y-2">
+                        <div className="text-xs font-semibold text-purple-300 mb-1">Market State</div>
+                        <div className={`text-sm font-bold ${
+                          assetData.technicalIndicators.rsi >= 60 ? 'text-emerald-400' :
+                          assetData.technicalIndicators.rsi <= 40 ? 'text-rose-400' :
+                          'text-amber-400'
+                        }`}>
+                          {assetData.technicalIndicators.rsi >= 60 ? 'Risk On' :
+                           assetData.technicalIndicators.rsi <= 40 ? 'Risk Off' :
+                           'Balanced'}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="bg-purple-900/30 rounded p-1.5">
+                            <div className="text-[10px] text-purple-400">Momentum</div>
+                            <div className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.rsi > 50 ? 'Strong' : 'Weak'}</div>
+                          </div>
+                          <div className="bg-purple-900/30 rounded p-1.5">
+                            <div className="text-[10px] text-purple-400">Volatility</div>
+                            <div className="text-xs font-mono text-purple-200">{assetData.technicalIndicators.macd > 0 ? 'High' : 'Low'}</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
