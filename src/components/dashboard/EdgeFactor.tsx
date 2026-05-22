@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Gauge } from "@/components/ui/gauge";
 
 interface EdgeFactorProps {
   overallScore: number;
@@ -29,53 +30,20 @@ export function EdgeFactor({
     return "bg-rose-500";
   };
 
-  const getGaugeRotation = (score: number) => {
-    // Map score (0-100) to rotation (-90 to 90 degrees)
-    return (score / 100) * 180 - 90;
-  };
-
   return (
     <div className={`bg-purple-900 rounded-lg border border-purple-800 p-3 sm:p-4 ${className}`}>
       <h2 className="text-base sm:text-lg font-semibold text-white mb-4">Edge Factor</h2>
       
       {/* Radial Gauge */}
-      <div className="relative w-28 h-28 sm:w-32 sm:h-32 mx-auto mb-4">
-        {/* Background circle */}
-        <div className="absolute inset-0 rounded-full border-8 border-purple-800"></div>
-        
-        {/* Progress arc */}
-        <div className="absolute inset-0 rounded-full">
-          <svg className="w-full h-full transform -rotate-90">
-            <circle
-              cx="56"
-              cy="56"
-              r="48"
-              stroke="currentColor"
-              strokeWidth="8"
-              fill="none"
-              className="text-purple-800"
-            />
-            <circle
-              cx="56"
-              cy="56"
-              r="48"
-              stroke="currentColor"
-              strokeWidth="8"
-              fill="none"
-              strokeDasharray={`${(overallScore / 100) * 301.59} 301.59`}
-              className={getScoreColor(overallScore).replace('text-', 'text-')}
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
-        
-        {/* Center text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className={`text-xl sm:text-2xl font-bold font-mono ${getScoreColor(overallScore)}`}>
-            {overallScore}%
-          </div>
-          <div className="text-xs text-purple-400">Confidence</div>
-        </div>
+      <div className="flex justify-center mb-4">
+        <Gauge
+          value={overallScore}
+          size={128}
+          strokeWidth={8}
+          showValue={true}
+          showPercentage={true}
+          label="Confidence"
+        />
       </div>
 
       {/* Breakdown */}

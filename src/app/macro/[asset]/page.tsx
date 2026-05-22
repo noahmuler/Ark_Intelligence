@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { fetchStockQuote } from "@/services/polygonStockData";
+import { Gauge } from "@/components/ui/gauge";
+import { MarketMoodGauge } from "@/components/ui/market-mood-gauge";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -395,6 +397,293 @@ const mockAssetData: Record<string, AssetDetail> = {
         impact: "Low"
       }
     ]
+  },
+  "XAGUSD": {
+    symbol: "XAGUSD",
+    name: "Silver / US Dollar",
+    price: 31.52,
+    dayChange: 0.85,
+    overallChange: 2.34,
+    sentiment: "Bullish",
+    confidence: 65,
+    aiAnalysis: "Silver shows strength amid industrial demand recovery and investment interest. Technical indicators suggest upside potential with $32.50 as key resistance level. Support at $31.00.",
+    technicalIndicators: {
+      rsi: 61.2,
+      macd: 1.2,
+      bollinger: 31.5
+    },
+    marketData: {
+      volume: "89.7K",
+      marketCap: "1.8T",
+      supply: "1.74M tonnes",
+      circulating: "1.74M tonnes"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Silver industrial demand surges in solar panel production",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "ETF inflows for silver reach monthly high",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Mining output declines in major silver-producing regions",
+        impact: "Low"
+      }
+    ]
+  },
+  "US10Y": {
+    symbol: "US10Y",
+    name: "US 10Y Treasury",
+    price: 4.32,
+    dayChange: -0.05,
+    overallChange: -1.14,
+    sentiment: "Bearish",
+    confidence: 72,
+    aiAnalysis: "Treasury yields face pressure from mixed economic signals. While inflation concerns persist, growth worries may cap upside. Range trading likely between 4.20-4.45%.",
+    technicalIndicators: {
+      rsi: 45.2,
+      macd: -0.3,
+      bollinger: 4.38
+    },
+    marketData: {
+      volume: "N/A",
+      marketCap: "N/A",
+      supply: "N/A",
+      circulating: "N/A"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Fed officials signal patience on rate cuts despite cooling inflation",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "Treasury auction sees strong demand despite yield volatility",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Global bond markets show signs of stabilization",
+        impact: "Low"
+      }
+    ]
+  },
+  "XPTUSD": {
+    symbol: "XPTUSD",
+    name: "Platinum / US Dollar",
+    price: 945.80,
+    dayChange: 5.20,
+    overallChange: 0.55,
+    sentiment: "Bullish",
+    confidence: 62,
+    aiAnalysis: "Platinum shows strength amid industrial demand recovery from automotive sector. Key resistance at $980, support at $920.",
+    technicalIndicators: {
+      rsi: 56.3,
+      macd: 2.1,
+      bollinger: 938.5
+    },
+    marketData: {
+      volume: "45.2K",
+      marketCap: "285.6B",
+      supply: "69M tonnes",
+      circulating: "69M tonnes"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Automotive catalyst demand drives platinum prices higher",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "South African mining production shows unexpected decline",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Platinum ETF holdings increase for third consecutive week",
+        impact: "Low"
+      }
+    ]
+  },
+  "XPDUSD": {
+    symbol: "XPDUSD",
+    name: "Palladium / US Dollar",
+    price: 1234.50,
+    dayChange: -8.75,
+    overallChange: -0.70,
+    sentiment: "Bearish",
+    confidence: 58,
+    aiAnalysis: "Palladium faces pressure from substitution to platinum in automotive catalysts. Key resistance at $1,280, support at $1,200.",
+    technicalIndicators: {
+      rsi: 41.2,
+      macd: -3.4,
+      bollinger: 1238.5
+    },
+    marketData: {
+      volume: "32.8K",
+      marketCap: "67.2B",
+      supply: "2.1M tonnes",
+      circulating: "2.1M tonnes"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Auto manufacturers shift toward platinum in catalytic converters",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "Russian palladium exports increase amid sanctions workaround",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Palladium industrial demand shows signs of weakening",
+        impact: "Low"
+      }
+    ]
+  },
+  "AAPL": {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    price: 178.45,
+    dayChange: 2.34,
+    overallChange: 1.33,
+    sentiment: "Bullish",
+    confidence: 72,
+    aiAnalysis: "Apple shows strength with iPhone sales and services growth. Key resistance at $185, support at $170.",
+    technicalIndicators: {
+      rsi: 62.1,
+      macd: 2.8,
+      bollinger: 175.5
+    },
+    marketData: {
+      volume: "45.2M",
+      marketCap: "2.8T",
+      supply: "15.6B",
+      circulating: "15.6B"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Apple announces new AI features for iOS ecosystem",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "iPhone 15 pre-orders exceed analyst expectations",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Apple Services revenue reaches new quarterly record",
+        impact: "Low"
+      }
+    ]
+  },
+  "MSFT": {
+    symbol: "MSFT",
+    name: "Microsoft Corporation",
+    price: 378.22,
+    dayChange: 3.12,
+    overallChange: 0.83,
+    sentiment: "Bullish",
+    confidence: 68,
+    aiAnalysis: "Microsoft benefits from AI and cloud growth. Azure expansion drives revenue. Key resistance at $385, support at $370.",
+    technicalIndicators: {
+      rsi: 58.7,
+      macd: 3.5,
+      bollinger: 376.2
+    },
+    marketData: {
+      volume: "32.1M",
+      marketCap: "2.8T",
+      supply: "7.5B",
+      circulating: "7.5B"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "Microsoft Azure AI adoption accelerates among enterprise clients",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "Copilot integration expands across Office 365 suite",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Microsoft gaming division shows strong quarterly growth",
+        impact: "Low"
+      }
+    ]
+  },
+  "GOOGL": {
+    symbol: "GOOGL",
+    name: "Alphabet Inc.",
+    price: 142.56,
+    dayChange: -1.45,
+    overallChange: -1.01,
+    sentiment: "Bearish",
+    confidence: 65,
+    aiAnalysis: "Google faces regulatory pressure but AI investments show promise. Key resistance at $148, support at $138.",
+    technicalIndicators: {
+      rsi: 42.3,
+      macd: -1.8,
+      bollinger: 143.5
+    },
+    marketData: {
+      volume: "28.9M",
+      marketCap: "1.8T",
+      supply: "12.5B",
+      circulating: "12.5B"
+    },
+    recentNews: [
+      {
+        id: "1",
+        timestamp: new Date(Date.now() - 2 * 60 * 1000),
+        title: "EU antitrust regulators prepare new investigation into Google's ad tech",
+        impact: "High"
+      },
+      {
+        id: "2",
+        timestamp: new Date(Date.now() - 5 * 60 * 1000),
+        title: "Google Cloud revenue growth slows amid increased competition",
+        impact: "Medium"
+      },
+      {
+        id: "3",
+        timestamp: new Date(Date.now() - 8 * 60 * 1000),
+        title: "Gemini AI model shows improved performance in benchmarks",
+        impact: "Low"
+      }
+    ]
   }
 };
 
@@ -547,11 +836,17 @@ export default function AssetDetailPage() {
             {/* Edge Factor Card - Docked in Header */}
             <div className="mb-3 bg-purple-950/90 backdrop-blur-xl rounded-xl border border-purple-900/50 p-3 shadow-xl">
               <div className="flex items-center gap-4">
-                {/* Dashboard Indicator Badge */}
+                {/* Dashboard Indicator Badge - Interactive Gauge */}
                 <div className="flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-purple-900/50 border-2 border-purple-500/50 flex items-center justify-center">
-                    <span className="text-xl font-bold text-purple-200">{assetData.confidence}</span>
-                  </div>
+                  <Gauge
+                    value={assetData.confidence}
+                    size={56}
+                    strokeWidth={6}
+                    showValue={true}
+                    showPercentage={false}
+                    label=""
+                    sentiment={assetData.sentiment}
+                  />
                 </div>
                 {/* Qualitative State Text */}
                 <div className="flex-1">
@@ -711,35 +1006,8 @@ export default function AssetDetailPage() {
                       <Activity className="h-5 w-5 text-purple-300" />
                       <h3 className="text-lg font-semibold text-purple-100">Market Mood</h3>
                     </div>
-                    <div className="relative h-24 mb-2">
-                      <svg className="w-full h-full" viewBox="0 0 100 50">
-                        <defs>
-                          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="rgba(239, 68, 68, 0.8)" />
-                            <stop offset="50%" stopColor="rgba(168, 85, 247, 0.8)" />
-                            <stop offset="100%" stopColor="rgba(34, 197, 94, 0.8)" />
-                          </linearGradient>
-                        </defs>
-                        <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="url(#gaugeGradient)" strokeWidth="8" strokeLinecap="round" />
-                        <line
-                          x1="50" y1="50"
-                          x2={50 + 35 * Math.cos(Math.PI * (1 - assetData.technicalIndicators.rsi / 100))}
-                          y2={50 + 35 * Math.sin(Math.PI * (1 - assetData.technicalIndicators.rsi / 100))}
-                          stroke="rgba(168, 85, 247, 1)"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                        <circle cx="50" cy="50" r="4" fill="rgba(168, 85, 247, 1)" />
-                      </svg>
-                    </div>
-                    <div className="text-center mb-1.5">
-                      <span className={`text-sm font-semibold ${
-                        assetData.sentiment === 'Bullish' ? 'text-emerald-400' :
-                        assetData.sentiment === 'Bearish' ? 'text-rose-400' :
-                        'text-amber-400'
-                      }`}>
-                        {assetData.technicalIndicators.rsi > 60 ? 'RISK-ON' : assetData.technicalIndicators.rsi < 40 ? 'RISK-OFF' : 'NEUTRAL'}
-                      </span>
+                    <div className="relative h-32 mb-2">
+                      <MarketMoodGauge value={assetData.technicalIndicators.rsi} />
                     </div>
                     {/* Expandable Detail Drawer */}
                     <div className="p-1.5 bg-purple-900/30 rounded-lg text-xs text-purple-300">
