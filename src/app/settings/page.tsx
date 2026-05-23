@@ -1,23 +1,111 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { 
-  Settings as SettingsIcon, 
-  Bell, 
-  Shield, 
-  Palette, 
-  Globe, 
+import { useMutation, useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import {
+  Settings as SettingsIcon,
+  Bell,
+  Shield,
+  Palette,
+  Globe,
   Database,
   Moon,
   Sun,
   Sparkles,
   Zap,
-  Monitor
+  Monitor,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Loader2,
 } from "lucide-react";
 
 export default function Settings() {
+  const [mt5Connected, setMt5Connected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [serverName, setServerName] = useState("");
+  const [accountLogin, setAccountLogin] = useState("");
+  const [investorPassword, setInvestorPassword] = useState("");
+
+  // Convex mutations and actions
+  const connectMT5 = useMutation(api.mt5.connectMT5);
+  const disconnectMT5 = useMutation(api.mt5.disconnectMT5);
+  const fetchTradeHistory = useAction(api.mt5Actions.fetchTradeHistory);
+
+  // Load connection state from localStorage on mount
+  useEffect(() => {
+    const savedConnection = localStorage.getItem("mt5Connected");
+    const savedServerName = localStorage.getItem("mt5ServerName");
+    const savedAccountLogin = localStorage.getItem("mt5AccountLogin");
+
+    if (savedConnection === "true") {
+      setMt5Connected(true);
+      setServerName(savedServerName || "");
+      setAccountLogin(savedAccountLogin || "");
+    }
+  }, []);
+
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    try {
+      const userId = "user-1"; // TODO: Get actual user ID from auth
+
+      // Store connection in Convex
+      await connectMT5({
+        userId,
+        serverName,
+        accountLogin,
+        investorPassword,
+      });
+
+      // Fetch trade history from MT5 API
+      await fetchTradeHistory({
+        userId,
+        serverName,
+        accountLogin,
+        investorPassword,
+      });
+
+      // Persist to localStorage
+      setMt5Connected(true);
+      localStorage.setItem("mt5Connected", "true");
+      localStorage.setItem("mt5ServerName", serverName);
+      localStorage.setItem("mt5AccountLogin", accountLogin);
+      setIsConnecting(false);
+    } catch (error) {
+      console.error("Failed to connect MT5 account:", error);
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      const userId = "user-1"; // TODO: Get actual user ID from auth
+
+      // Disconnect from Convex
+      await disconnectMT5({ userId });
+
+      // Clear localStorage
+      setMt5Connected(false);
+      localStorage.removeItem("mt5Connected");
+      localStorage.removeItem("mt5ServerName");
+      localStorage.removeItem("mt5AccountLogin");
+      setServerName("");
+      setAccountLogin("");
+      setInvestorPassword("");
+    } catch (error) {
+      console.error("Failed to disconnect MT5 account:", error);
+    }
+  };
+
+  const maskAccountNumber = (account: string) => {
+    if (account.length <= 4) return "****";
+    return "******" + account.slice(-4);
+  };
+
   return (
     <MainLayout>
       <div className="p-3 sm:p-4 lg:p-6 h-full">
@@ -128,28 +216,123 @@ export default function Settings() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-purple-300 text-sm">Finnhub API</span>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     placeholder="API Key"
                     className="bg-purple-800 text-white text-sm rounded-lg px-3 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 w-32"
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-purple-300 text-sm">Polygon API</span>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     placeholder="API Key"
                     className="bg-purple-800 text-white text-sm rounded-lg px-3 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 w-32"
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-purple-300 text-sm">OpenAI API</span>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     placeholder="API Key"
                     className="bg-purple-800 text-white text-sm rounded-lg px-3 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 w-32"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* MT5 Connection */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center mb-6">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 mr-3">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">MT5 Connection</h2>
+                </div>
+
+                {!mt5Connected ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-purple-300 text-sm font-medium mb-2">
+                        Broker Server Name
+                      </label>
+                      <input
+                        type="text"
+                        value={serverName}
+                        onChange={(e) => setServerName(e.target.value)}
+                        placeholder="e.g., MetaQuotes-Demo"
+                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-purple-300 text-sm font-medium mb-2">
+                        Account Login
+                      </label>
+                      <input
+                        type="number"
+                        value={accountLogin}
+                        onChange={(e) => setAccountLogin(e.target.value)}
+                        placeholder="Account number"
+                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-purple-300 text-sm font-medium mb-2">
+                        Investor Password
+                      </label>
+                      <input
+                        type="password"
+                        value={investorPassword}
+                        onChange={(e) => setInvestorPassword(e.target.value)}
+                        placeholder="Investor password"
+                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
+                      />
+                    </div>
+                    <button
+                      onClick={handleConnect}
+                      disabled={isConnecting || !serverName || !accountLogin || !investorPassword}
+                      className="w-full mt-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        "Connect Account"
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+                      <div className="flex items-center">
+                        <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+                        <div>
+                          <p className="text-white font-medium">MetaTrader 5 Connected</p>
+                          <p className="text-purple-300 text-sm">Account: {maskAccountNumber(accountLogin)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleDisconnect}
+                        className="flex-1 bg-purple-700 hover:bg-purple-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Disconnect
+                      </button>
+                      <button
+                        onClick={handleDisconnect}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center"
+                      >
+                        Switch Account
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

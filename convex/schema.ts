@@ -38,4 +38,30 @@ export default defineSchema({
     brief: v.string(), // strict three‑sentence summary
     updatedAt: v.number(),
   }).index("by_symbol", ["symbol"]),
+
+  // MT5 connection state
+  mt5_connections: defineTable({
+    userId: v.string(), // User identifier
+    serverName: v.string(), // Broker server name
+    accountLogin: v.string(), // Account number (masked)
+    isConnected: v.boolean(), // Connection status
+    lastSynced: v.number(), // Last sync timestamp
+  }).index("by_userId", ["userId"]),
+
+  // MT5 trade history
+  mt5_trades: defineTable({
+    userId: v.string(), // User identifier
+    ticket: v.number(), // Trade ticket ID
+    symbol: v.string(), // Trading symbol (e.g., "XAUUSD")
+    type: v.string(), // "BUY" or "SELL"
+    lots: v.number(), // Lot size
+    openPrice: v.number(), // Open price
+    closePrice: v.number(), // Close price
+    openTime: v.number(), // Open timestamp
+    closeTime: v.number(), // Close timestamp
+    profit: v.number(), // Profit/loss
+    commission: v.number(), // Commission
+    swap: v.number(), // Swap
+  }).index("by_userId", ["userId"])
+   .index("by_userId_ticket", ["userId", "ticket"]),
 });

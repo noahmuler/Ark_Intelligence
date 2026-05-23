@@ -15,6 +15,7 @@ import {
   Calendar,
   Settings,
   Activity,
+  BookOpen,
 } from "lucide-react";
 import { LogoIcon } from "@/components/ui/hamburger-icon";
 
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Macro Desk", href: "/macro", icon: TrendingUp },
   { name: "Economic Calendar", href: "/calendar", icon: Calendar },
   { name: "Reports", href: "/reports", icon: Activity },
+  { name: "Journal", href: "/journal", icon: BookOpen },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

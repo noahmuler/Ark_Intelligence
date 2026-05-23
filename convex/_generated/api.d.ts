@@ -12,6 +12,9 @@ import type * as actions from "../actions.js";
 import type * as asset_briefs from "../asset_briefs.js";
 import type * as crons from "../crons.js";
 import type * as currencyStrength from "../currencyStrength.js";
+import type * as mt5 from "../mt5.js";
+import type * as mt5Actions from "../mt5Actions.js";
+import type * as mt5Queries from "../mt5Queries.js";
 import type * as prices from "../prices.js";
 import type * as seed from "../seed.js";
 
@@ -26,6 +29,9 @@ declare const fullApi: ApiFromModules<{
   asset_briefs: typeof asset_briefs;
   crons: typeof crons;
   currencyStrength: typeof currencyStrength;
+  mt5: typeof mt5;
+  mt5Actions: typeof mt5Actions;
+  mt5Queries: typeof mt5Queries;
   prices: typeof prices;
   seed: typeof seed;
 }>;
