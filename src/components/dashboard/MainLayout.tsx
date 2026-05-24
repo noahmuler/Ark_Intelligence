@@ -17,7 +17,7 @@ import React, { useEffect, useState } from "react";
 
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "next-themes";
 
 interface MainLayoutProps {
   children: React.ReactNode;

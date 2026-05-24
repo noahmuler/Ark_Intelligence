@@ -92,6 +92,7 @@ export const storeTrade = mutation({
     profit: v.number(),
     commission: v.number(),
     swap: v.number(),
+    isDeposit: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Check if trade already exists using the compound index
@@ -107,6 +108,7 @@ export const storeTrade = mutation({
       await ctx.db.patch(existing._id, {
         symbol: args.symbol,
         type: args.type,
+        isDeposit: args.isDeposit,
         lots: args.lots,
         openPrice: args.openPrice,
         closePrice: args.closePrice,
@@ -133,6 +135,7 @@ export const storeTrade = mutation({
       profit: args.profit,
       commission: args.commission,
       swap: args.swap,
+      isDeposit: args.isDeposit,
     });
 
     return tradeId;

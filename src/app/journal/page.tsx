@@ -5,8 +5,46 @@ import { MainLayout } from "@/components/dashboard/MainLayout";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, ArrowRight, TrendingUp, TrendingDown, DollarSign, Target } from "lucide-react";
+import { BookOpen, ArrowRight, TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+
+// Animated Counter Component
+function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1500 }: { value: number; prefix?: string; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    const steps = 50;
+    const incrementTime = duration / steps;
+    const increment = end / steps;
+    let currentStep = 0;
+
+    const timer = setInterval(() => {
+      currentStep++;
+      start += increment;
+      if (currentStep >= steps) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(start);
+      }
+    }, incrementTime);
+    
+    return () => clearInterval(timer);
+  }, [value, duration]);
+
+  // Format: integer if whole number, otherwise 2 decimal places
+  const formattedCount = typeof count === 'number' 
+    ? (Number.isInteger(count) ? count.toString() : count.toFixed(2))
+    : count;
+
+  return (
+    <span>
+      {prefix}{formattedCount}{suffix}
+    </span>
+  );
+}
 
 interface TradingMetrics {
   winRate: number;
@@ -41,12 +79,13 @@ export default function Journal() {
   const [currentPage, setCurrentPage] = useState(1);
   const [symbolFilter, setSymbolFilter] = useState('');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [calendarDate, setCalendarDate] = useState(new Date());
   const itemsPerPage = 10;
 
   // Fetch data from Convex
   const connection = useQuery(api.mt5.getMT5Connection, { userId: "user-1" });
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
-  const allTrades = useQuery(api.mt5Queries.getRecentTrades, { userId: "user-1" });
+  const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
   const equityCurve = useQuery(api.mt5Queries.getEquityCurve, { userId: "user-1" });
 
   // Filter trades
@@ -136,12 +175,20 @@ export default function Journal() {
               <p className="text-purple-300 text-sm sm:text-base">
                 Real-time trading analytics and performance metrics
               </p>
+              {connection && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <span className="text-purple-400 text-xs">
+                    Connected: {connection.serverName} - {connection.accountLogin}
+                  </span>
+                </div>
+              )}
             </div>
             <button
               onClick={() => router.push("/journal/analytics")}
               className="group relative inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              <span>Go to Deep Analytics</span>
+              <span>Deep Analytics</span>
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
@@ -157,8 +204,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <DollarSign className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.currentBalance ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${(metrics?.currentBalance ?? 0).toFixed(2)}
+                  <span className={`text-3xl font-bold ${(metrics?.currentBalance ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <AnimatedCounter value={metrics?.currentBalance ?? 0} prefix="$" />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Current Balance</p>
@@ -174,8 +221,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.profitFactor ?? 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
-                    {(metrics?.profitFactor ?? 0).toFixed(2)}
+                  <span className={`text-3xl font-bold ${(metrics?.profitFactor ?? 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                    <AnimatedCounter value={metrics?.profitFactor ?? 0} />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Profit Factor</p>
@@ -191,8 +238,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                    {(metrics?.winRate ?? 0).toFixed(1)}%
+                  <span className={`text-3xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                    <AnimatedCounter value={metrics?.winRate ?? 0} suffix="%" />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Win Rate</p>
@@ -208,8 +255,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <DollarSign className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.totalPnL ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${(metrics?.totalPnL ?? 0).toFixed(2)}
+                  <span className={`text-3xl font-bold ${(metrics?.totalPnL ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <AnimatedCounter value={metrics?.totalPnL ?? 0} prefix="$" />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Total PnL</p>
@@ -226,8 +273,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-white">
-                    {metrics?.totalTrades ?? 0}
+                  <span className="text-3xl font-bold text-white">
+                    <AnimatedCounter value={metrics?.totalTrades ?? 0} />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Total Trades</p>
@@ -243,8 +290,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.expectancy ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${(metrics?.expectancy ?? 0).toFixed(2)}
+                  <span className={`text-3xl font-bold ${(metrics?.expectancy ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <AnimatedCounter value={metrics?.expectancy ?? 0} prefix="$" />
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Expectancy</p>
@@ -260,8 +307,8 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-white">
-                    {(metrics?.averageRR ?? 0).toFixed(2)}
+                  <span className="text-3xl font-bold text-white">
+                    {metrics?.averageRR != null ? <AnimatedCounter value={metrics?.averageRR ?? 0} /> : 'N/A'}
                   </span>
                 </div>
                 <p className="text-purple-300 text-sm font-medium">Average R:R</p>
@@ -269,20 +316,25 @@ export default function Journal() {
               </div>
             </div>
 
-            {/* Streaks */}
+            {/* Streaks - Redesigned with separate columns */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
-                    <TrendingUp className="h-5 w-5 text-white" />
+                <p className="text-purple-300 text-sm font-medium mb-4">Streaks</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <p className="text-purple-400 text-xs mb-1">Max Win Streak</p>
+                    <p className="text-2xl font-bold text-green-400">
+                      <AnimatedCounter value={metrics?.streaks?.wins ?? 0} />
+                    </p>
                   </div>
-                  <span className="text-2xl font-bold text-white">
-                    W: {metrics?.streaks?.wins ?? 0} / L: {metrics?.streaks?.losses ?? 0}
-                  </span>
+                  <div className="text-center">
+                    <p className="text-purple-400 text-xs mb-1">Max Loss Streak</p>
+                    <p className="text-2xl font-bold text-red-400">
+                      <AnimatedCounter value={metrics?.streaks?.losses ?? 0} />
+                    </p>
+                  </div>
                 </div>
-                <p className="text-purple-300 text-sm font-medium">Streaks</p>
-                <p className="text-purple-400 text-xs mt-1">Longest win/loss streaks</p>
               </div>
             </div>
           </div>
@@ -297,9 +349,13 @@ export default function Journal() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={equityCurve ?? []}>
                       <defs>
-                        <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                        <linearGradient id="colorEquityGreen" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorEquityRed" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
@@ -322,12 +378,12 @@ export default function Journal() {
                       <Area
                         type="monotone"
                         dataKey="equity"
-                        stroke="#8b5cf6"
+                        stroke={(equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? '#10b981' : '#ef4444'}
                         strokeWidth={2}
                         fillOpacity={1}
-                        fill="url(#colorEquity)"
+                        fill={(equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? 'url(#colorEquityGreen)' : 'url(#colorEquityRed)'}
                         animationDuration={1000}
-                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                        dot={{ fill: (equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? '#10b981' : '#ef4444', strokeWidth: 2, r: 4 }}
                         activeDot={{ r: 6 }}
                       />
                     </AreaChart>
@@ -343,7 +399,47 @@ export default function Journal() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-white">PnL Calendar</h3>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => {
+                        const newDate = new Date(calendarDate);
+                        if (calendarView === 'monthly') {
+                          newDate.setMonth(newDate.getMonth() - 1);
+                        } else {
+                          newDate.setDate(newDate.getDate() - 7);
+                        }
+                        setCalendarDate(newDate);
+                      }}
+                      className="p-2 rounded-lg bg-purple-800 text-purple-300 hover:bg-purple-700 transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <h3 className="text-xl font-semibold text-white">
+                      {calendarView === 'monthly' 
+                        ? calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                        : (() => {
+                            const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
+                            const shift = firstDayOfMonth.getDay();
+                            const weekNumber = Math.floor((calendarDate.getDate() + shift - 1) / 7) + 1;
+                            return `Week ${weekNumber}, ${calendarDate.getFullYear()}`;
+                          })()
+                      }
+                    </h3>
+                    <button
+                      onClick={() => {
+                        const newDate = new Date(calendarDate);
+                        if (calendarView === 'monthly') {
+                          newDate.setMonth(newDate.getMonth() + 1);
+                        } else {
+                          newDate.setDate(newDate.getDate() + 7);
+                        }
+                        setCalendarDate(newDate);
+                      }}
+                      className="p-2 rounded-lg bg-purple-800 text-purple-300 hover:bg-purple-700 transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setCalendarView('weekly')}
@@ -374,9 +470,8 @@ export default function Journal() {
                     </div>
                   ))}
                   {calendarView === 'monthly' ? (() => {
-                    const now = new Date();
-                    const currentYear = now.getFullYear();
-                    const currentMonth = now.getMonth();
+                    const currentYear = calendarDate.getFullYear();
+                    const currentMonth = calendarDate.getMonth();
                     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
                     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
                     const startDayOfWeek = firstDayOfMonth.getDay();
@@ -427,11 +522,10 @@ export default function Journal() {
                       );
                     });
                   })() : (() => {
-                    // Weekly view - show current week
-                    const now = new Date();
-                    const currentDayOfWeek = now.getDay();
-                    const startOfWeek = new Date(now);
-                    startOfWeek.setDate(now.getDate() - currentDayOfWeek);
+                    // Weekly view - show selected week
+                    const currentDayOfWeek = calendarDate.getDay();
+                    const startOfWeek = new Date(calendarDate);
+                    startOfWeek.setDate(calendarDate.getDate() - currentDayOfWeek);
                     startOfWeek.setHours(0, 0, 0, 0);
 
                     const weekDays = [];

@@ -16,6 +16,7 @@ interface Trade {
   profit: number;
   commission: number;
   swap: number;
+  isDeposit?: boolean;
 }
 
 // Fetch trade history from MT5 API
@@ -263,11 +264,19 @@ export const importTradesFromCSV = action({
           continue;
         }
 
-        // Normalize trade type
-        if (type.toLowerCase().includes('buy')) {
+        // Normalize trade type and identify deposits/withdrawals
+        let isDeposit = false;
+        const typeLower = type.toLowerCase();
+        if (typeLower.includes('buy')) {
           type = 'BUY';
-        } else if (type.toLowerCase().includes('sell')) {
+        } else if (typeLower.includes('sell')) {
           type = 'SELL';
+        } else if (typeLower.includes('deposit') || typeLower.includes('balance')) {
+          type = 'DEPOSIT';
+          isDeposit = true;
+        } else if (typeLower.includes('withdrawal') || typeLower.includes('withdraw')) {
+          type = 'WITHDRAWAL';
+          isDeposit = true;
         }
 
         trades.push({
@@ -282,6 +291,7 @@ export const importTradesFromCSV = action({
           profit,
           commission,
           swap,
+          isDeposit,
         });
       }
 

@@ -17,7 +17,7 @@ export const getUserTrades = query({
   },
 });
 
-// Get recent trades (last 20)
+// Get recent trades (last 20) - for UI table pagination only
 export const getRecentTrades = query({
   args: {
     userId: v.string(),
@@ -28,6 +28,21 @@ export const getRecentTrades = query({
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(20);
+
+    return trades;
+  },
+});
+
+// Get all trades for metrics calculation - full dataset
+export const getAllTrades = query({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trades = await ctx.db
+      .query("mt5_trades")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .collect();
 
     return trades;
   },
@@ -67,7 +82,7 @@ export const getTradingMetrics = query({
     const totalDeposits = deposits.reduce((sum, t) => sum + t.profit, 0);
     const totalWithdrawals = Math.abs(withdrawals.reduce((sum, t) => sum + t.profit, 0));
     const tradingPnL = actualTrades.reduce((sum, t) => sum + t.profit, 0);
-    const currentBalance = totalDeposits - totalWithdrawals + tradingPnL;
+    const currentBalance = Math.max(0, totalDeposits - totalWithdrawals + tradingPnL);
 
     // Calculate basic metrics (only on actual trades)
     const winningTrades = actualTrades.filter((t) => t.profit > 0);
@@ -165,8 +180,11 @@ export const getEquityCurve = query({
       return [];
     }
 
+    // Filter out deposits/withdrawals for equity curve
+    const actualTrades = trades.filter((t) => !t.isDeposit);
+
     // Sort trades by close time
-    const sortedTrades = [...trades].sort((a, b) => a.closeTime - b.closeTime);
+    const sortedTrades = [...actualTrades].sort((a, b) => a.closeTime - b.closeTime);
 
     // Build equity curve
     const equityCurve: { timestamp: number; equity: number }[] = [];
