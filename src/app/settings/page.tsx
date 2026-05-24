@@ -29,11 +29,15 @@ export default function Settings() {
   const [serverName, setServerName] = useState("");
   const [accountLogin, setAccountLogin] = useState("");
   const [investorPassword, setInvestorPassword] = useState("");
+  const [csvData, setCsvData] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
 
   // Convex mutations and actions
   const connectMT5 = useMutation(api.mt5.connectMT5);
   const disconnectMT5 = useMutation(api.mt5.disconnectMT5);
   const fetchTradeHistory = useAction(api.mt5Actions.fetchTradeHistory);
+  const importTradesFromCSV = useAction(api.mt5Actions.importTradesFromCSV);
 
   // Load connection state from localStorage on mount
   useEffect(() => {
@@ -62,12 +66,23 @@ export default function Settings() {
       });
 
       // Fetch trade history from MT5 API
-      await fetchTradeHistory({
+      const result = await fetchTradeHistory({
         userId,
         serverName,
         accountLogin,
         investorPassword,
       });
+
+      // Validate that fetch was successful
+      if (!result.success) {
+        throw new Error(result.message || "Failed to fetch trade history");
+      }
+
+      // Handle case where no trades were found (non-fatal)
+      if (result.tradesCount === 0) {
+        console.warn("No trades found in the specified time range");
+        alert("Warning: No trades found in the specified time range. Connection saved but no trades imported.");
+      }
 
       // Persist to localStorage
       setMt5Connected(true);
@@ -78,6 +93,7 @@ export default function Settings() {
     } catch (error) {
       console.error("Failed to connect MT5 account:", error);
       setIsConnecting(false);
+      alert(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -98,6 +114,59 @@ export default function Settings() {
       setInvestorPassword("");
     } catch (error) {
       console.error("Failed to disconnect MT5 account:", error);
+    }
+  };
+
+  const handleCSVImport = async () => {
+    let csvContent = csvData;
+
+    // If file is selected, read its content
+    if (csvFile) {
+      try {
+        csvContent = await csvFile.text();
+      } catch (error) {
+        alert("Failed to read CSV file");
+        return;
+      }
+    }
+
+    if (!csvContent.trim()) {
+      alert("Please upload a CSV file or paste CSV data");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const userId = "user-1"; // TODO: Get actual user ID from auth
+      const result = await importTradesFromCSV({
+        userId,
+        csvData: csvContent,
+      });
+
+      if (result.success && result.tradesCount > 0) {
+        alert(`Successfully imported ${result.tradesCount} trades`);
+        setCsvData("");
+        setCsvFile(null);
+        setMt5Connected(true);
+        localStorage.setItem("mt5Connected", "true");
+        localStorage.setItem("mt5ServerName", "CSV Import");
+        localStorage.setItem("mt5AccountLogin", "Imported");
+      } else {
+        alert(result.message || "No trades imported");
+      }
+    } catch (error) {
+      console.error("Failed to import CSV:", error);
+      alert(`Failed to import CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      setCsvData(""); // Clear text area when file is selected
     }
   };
 
@@ -333,6 +402,77 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Free CSV Import */}
+            <div className="bg-purple-900 rounded-lg border border-purple-800 p-6">
+              <div className="flex items-center mb-4">
+                <Database className="h-6 w-6 text-purple-400 mr-3" />
+                <h2 className="text-lg font-semibold text-white">Free CSV Import (Exness MT5)</h2>
+              </div>
+              <div className="space-y-4">
+                <div className="bg-purple-800/50 rounded-lg p-4 border border-purple-700">
+                  <h3 className="text-white font-medium mb-2">How to Export from Exness MT5:</h3>
+                  <ol className="text-purple-300 text-sm space-y-1 list-decimal list-inside">
+                    <li>Open MT5 terminal and login to your Exness account (e.g., Exness-MT5Trial9)</li>
+                    <li>Go to "Account History" tab at the bottom</li>
+                    <li>Right-click anywhere in the history list</li>
+                    <li>Select "Save as Detailed Report" or "Save as CSV"</li>
+                    <li>Save the file to your computer</li>
+                    <li>Upload the file directly below or paste the CSV content</li>
+                  </ol>
+                </div>
+                <div>
+                  <label className="block text-purple-300 text-sm mb-2">Upload CSV File</label>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-3 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-700 file:text-white file:cursor-pointer"
+                  />
+                  {csvFile && (
+                    <p className="text-green-400 text-sm mt-2">Selected: {csvFile.name}</p>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-purple-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-purple-900 text-purple-300">OR</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-purple-300 text-sm mb-2">Paste CSV Data</label>
+                  <textarea
+                    value={csvData}
+                    onChange={(e) => {
+                      setCsvData(e.target.value);
+                      setCsvFile(null); // Clear file when text is pasted
+                    }}
+                    placeholder="Paste CSV data here (Exness format: Ticket,Symbol,Type,Lots,Open Price,Close Price,Open Time,Close Time,Profit,Commission,Swap)"
+                    className="w-full h-32 bg-purple-800 text-white text-sm rounded-lg px-4 py-3 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400"
+                    disabled={!!csvFile}
+                  />
+                </div>
+                <button
+                  onClick={handleCSVImport}
+                  disabled={isImporting || (!csvData.trim() && !csvFile)}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4 mr-2" />
+                      Import CSV
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
