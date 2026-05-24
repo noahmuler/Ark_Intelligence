@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BookOpen, ArrowRight, TrendingUp, TrendingDown, DollarSign, Target } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 
 interface TradingMetrics {
   winRate: number;
@@ -15,6 +15,9 @@ interface TradingMetrics {
   expectancy: number;
   totalPnL: number;
   totalTrades: number;
+  currentBalance: number;
+  averageRR: number;
+  streaks: { wins: number; losses: number };
 }
 
 interface Trade {
@@ -34,12 +37,40 @@ interface Trade {
 export default function Journal() {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(false);
+  const [calendarView, setCalendarView] = useState<'weekly' | 'monthly'>('monthly');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [symbolFilter, setSymbolFilter] = useState('');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const itemsPerPage = 10;
 
   // Fetch data from Convex
   const connection = useQuery(api.mt5.getMT5Connection, { userId: "user-1" });
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
-  const trades = useQuery(api.mt5Queries.getRecentTrades, { userId: "user-1" });
+  const allTrades = useQuery(api.mt5Queries.getRecentTrades, { userId: "user-1" });
   const equityCurve = useQuery(api.mt5Queries.getEquityCurve, { userId: "user-1" });
+
+  // Filter trades
+  const startDate = dateRange.start ? new Date(dateRange.start) : null;
+  const endDate = dateRange.end ? new Date(dateRange.end) : null;
+  if (endDate) {
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  const filteredTrades = allTrades?.filter(trade => {
+    const symbolMatch = symbolFilter === '' || trade.symbol.toLowerCase().includes(symbolFilter.toLowerCase());
+    const startDateMatch = !startDate || new Date(trade.closeTime) >= startDate;
+    const endDateMatch = !endDate || new Date(trade.closeTime) <= endDate;
+    return symbolMatch && startDateMatch && endDateMatch;
+  }) ?? [];
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTrades.length / itemsPerPage);
+  const paginatedTrades = filteredTrades.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const trades = paginatedTrades;
 
   // Check connection status
   useEffect(() => {
@@ -99,29 +130,39 @@ export default function Journal() {
       <div className="p-3 sm:p-4 lg:p-6 h-full">
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Trading Journal</h1>
-            <p className="text-purple-300 text-sm sm:text-base">
-              Real-time trading analytics and performance metrics
-            </p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Trading Journal</h1>
+              <p className="text-purple-300 text-sm sm:text-base">
+                Real-time trading analytics and performance metrics
+              </p>
+            </div>
+            <button
+              onClick={() => router.push("/journal/analytics")}
+              className="group relative inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <span>Go to Deep Analytics</span>
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </button>
           </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {/* Win Rate */}
+          {/* KPI Cards - 2-row 4-column grid */}
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            {/* Row 1 */}
+            {/* Current Balance */}
             <div className="group relative">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500">
-                    <Target className="h-5 w-5 text-white" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                    <DollarSign className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-2xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                    {(metrics?.winRate ?? 0).toFixed(1)}%
+                  <span className={`text-2xl font-bold ${(metrics?.currentBalance ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ${(metrics?.currentBalance ?? 0).toFixed(2)}
                   </span>
                 </div>
-                <p className="text-purple-300 text-sm font-medium">Win Rate</p>
-                <p className="text-purple-400 text-xs mt-1">{metrics?.totalTrades ?? 0} total trades</p>
+                <p className="text-purple-300 text-sm font-medium">Current Balance</p>
+                <p className="text-purple-400 text-xs mt-1">Deposits + PnL</p>
               </div>
             </div>
 
@@ -142,6 +183,23 @@ export default function Journal() {
               </div>
             </div>
 
+            {/* Win Rate */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500">
+                    <Target className="h-5 w-5 text-white" />
+                  </div>
+                  <span className={`text-2xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                    {(metrics?.winRate ?? 0).toFixed(1)}%
+                  </span>
+                </div>
+                <p className="text-purple-300 text-sm font-medium">Win Rate</p>
+                <p className="text-purple-400 text-xs mt-1">{metrics?.totalTrades ?? 0} total trades</p>
+              </div>
+            </div>
+
             {/* Total PnL */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -159,20 +217,72 @@ export default function Journal() {
               </div>
             </div>
 
-            {/* Max Drawdown */}
+            {/* Row 2 */}
+            {/* Total Trades */}
             <div className="group relative">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-500 to-orange-500">
-                    <TrendingDown className="h-5 w-5 text-white" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                    <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-red-400">
-                    {metrics?.maxDrawdown?.toFixed(1) ?? 0}%
+                  <span className="text-2xl font-bold text-white">
+                    {metrics?.totalTrades ?? 0}
                   </span>
                 </div>
-                <p className="text-purple-300 text-sm font-medium">Max Drawdown</p>
-                <p className="text-purple-400 text-xs mt-1">Peak to trough decline</p>
+                <p className="text-purple-300 text-sm font-medium">Total Trades</p>
+                <p className="text-purple-400 text-xs mt-1">Trade count</p>
+              </div>
+            </div>
+
+            {/* Expectancy */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <span className={`text-2xl font-bold ${(metrics?.expectancy ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ${(metrics?.expectancy ?? 0).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-purple-300 text-sm font-medium">Expectancy</p>
+                <p className="text-purple-400 text-xs mt-1">Average trade profit</p>
+              </div>
+            </div>
+
+            {/* Average R:R */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                    <Target className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-white">
+                    {(metrics?.averageRR ?? 0).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-purple-300 text-sm font-medium">Average R:R</p>
+                <p className="text-purple-400 text-xs mt-1">Risk to Reward ratio</p>
+              </div>
+            </div>
+
+            {/* Streaks */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-white">
+                    W: {metrics?.streaks?.wins ?? 0} / L: {metrics?.streaks?.losses ?? 0}
+                  </span>
+                </div>
+                <p className="text-purple-300 text-sm font-medium">Streaks</p>
+                <p className="text-purple-400 text-xs mt-1">Longest win/loss streaks</p>
               </div>
             </div>
           </div>
@@ -185,14 +295,20 @@ export default function Journal() {
                 <h3 className="text-xl font-semibold text-white mb-6">Equity Curve</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={equityCurve ?? []}>
+                    <AreaChart data={equityCurve ?? []}>
+                      <defs>
+                        <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
                       <XAxis
                         dataKey="timestamp"
                         stroke="#a78bfa"
                         tickFormatter={(value) => new Date(value).toLocaleDateString()}
                       />
-                      <YAxis stroke="#a78bfa" />
+                      <YAxis stroke="#a78bfa" domain={['auto', 'auto']} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: 'rgba(88, 28, 135, 0.9)',
@@ -203,16 +319,160 @@ export default function Journal() {
                         labelFormatter={(value) => new Date(value as number).toLocaleString()}
                         formatter={(value: unknown) => [`$${typeof value === 'number' ? value.toFixed(2) : '0.00'}`, 'Equity']}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="equity"
                         stroke="#8b5cf6"
                         strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorEquity)"
+                        animationDuration={1000}
                         dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
                         activeDot={{ r: 6 }}
                       />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PnL Calendar */}
+          <div className="mb-8">
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white">PnL Calendar</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCalendarView('weekly')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        calendarView === 'weekly'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-800 text-purple-300 hover:bg-purple-700'
+                      }`}
+                    >
+                      Weekly
+                    </button>
+                    <button
+                      onClick={() => setCalendarView('monthly')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        calendarView === 'monthly'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-800 text-purple-300 hover:bg-purple-700'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-7 gap-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center text-purple-400 text-sm font-medium py-2">
+                      {day}
+                    </div>
+                  ))}
+                  {calendarView === 'monthly' ? (() => {
+                    const now = new Date();
+                    const currentYear = now.getFullYear();
+                    const currentMonth = now.getMonth();
+                    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+                    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                    const startDayOfWeek = firstDayOfMonth.getDay();
+                    
+                    const calendarDays = [];
+                    // Add empty cells for days before the first day of the month
+                    for (let i = 0; i < startDayOfWeek; i++) {
+                      calendarDays.push(null);
+                    }
+                    // Add days of the month
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      calendarDays.push(day);
+                    }
+
+                    return calendarDays.map((day, i) => {
+                      if (day === null) {
+                        return <div key={i} className="p-3"></div>;
+                      }
+
+                      const dayPnL = allTrades?.reduce((sum, t) => {
+                        if (t.isDeposit) return sum; // Skip deposits
+                        const tradeDate = new Date(t.closeTime);
+                        if (
+                          tradeDate.getDate() === day &&
+                          tradeDate.getMonth() === currentMonth &&
+                          tradeDate.getFullYear() === currentYear
+                        ) {
+                          return sum + t.profit;
+                        }
+                        return sum;
+                      }, 0) ?? 0;
+
+                      return (
+                        <div
+                          key={i}
+                          className="relative group p-3 rounded-lg bg-purple-800/30 hover:bg-purple-800/50 transition-colors cursor-pointer"
+                        >
+                          <span className="text-white text-sm">{day}</span>
+                          {dayPnL !== 0 && (
+                            <span className={`block text-xs mt-1 ${dayPnL > 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                              ${dayPnL.toFixed(0)}
+                            </span>
+                          )}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-purple-900 rounded-lg border border-purple-700 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {dayPnL !== 0 ? `Day PnL: $${dayPnL.toFixed(2)}` : 'No trades'}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })() : (() => {
+                    // Weekly view - show current week
+                    const now = new Date();
+                    const currentDayOfWeek = now.getDay();
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - currentDayOfWeek);
+                    startOfWeek.setHours(0, 0, 0, 0);
+
+                    const weekDays = [];
+                    for (let i = 0; i < 7; i++) {
+                      const day = new Date(startOfWeek);
+                      day.setDate(startOfWeek.getDate() + i);
+                      weekDays.push(day);
+                    }
+
+                    return weekDays.map((date, i) => {
+                      const dayPnL = allTrades?.reduce((sum, t) => {
+                        if (t.isDeposit) return sum; // Skip deposits
+                        const tradeDate = new Date(t.closeTime);
+                        if (
+                          tradeDate.getDate() === date.getDate() &&
+                          tradeDate.getMonth() === date.getMonth() &&
+                          tradeDate.getFullYear() === date.getFullYear()
+                        ) {
+                          return sum + t.profit;
+                        }
+                        return sum;
+                      }, 0) ?? 0;
+
+                      return (
+                        <div
+                          key={i}
+                          className="relative group p-3 rounded-lg bg-purple-800/30 hover:bg-purple-800/50 transition-colors cursor-pointer"
+                        >
+                          <span className="text-white text-sm">{date.getDate()}</span>
+                          {dayPnL !== 0 && (
+                            <span className={`block text-xs mt-1 ${dayPnL > 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                              ${dayPnL.toFixed(0)}
+                            </span>
+                          )}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-purple-900 rounded-lg border border-purple-700 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {dayPnL !== 0 ? `Day PnL: $${dayPnL.toFixed(2)}` : 'No trades'}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -224,6 +484,48 @@ export default function Journal() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
                 <h3 className="text-xl font-semibold text-white mb-6">Recent Executions</h3>
+                
+                {/* Filters */}
+                <div className="flex gap-4 mb-6 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-purple-300 text-sm mb-2">Symbol</label>
+                    <input
+                      type="text"
+                      value={symbolFilter}
+                      onChange={(e) => {
+                        setSymbolFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      placeholder="Filter by symbol (e.g., XAUUSDm)"
+                      className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-purple-300 text-sm mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={dateRange.start}
+                      onChange={(e) => {
+                        setDateRange({ ...dateRange, start: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-purple-300 text-sm mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={dateRange.end}
+                      onChange={(e) => {
+                        setDateRange({ ...dateRange, end: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -266,6 +568,34 @@ export default function Journal() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-purple-300 text-sm">
+                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTrades.length)} of {filteredTrades.length} trades
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-4 py-2 text-purple-300">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

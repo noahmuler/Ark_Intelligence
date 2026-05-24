@@ -53,7 +53,7 @@ export default defineSchema({
     userId: v.string(), // User identifier
     ticket: v.number(), // Trade ticket ID
     symbol: v.string(), // Trading symbol (e.g., "XAUUSD")
-    type: v.string(), // "BUY" or "SELL"
+    type: v.string(), // "BUY" or "SELL" or "DEPOSIT" or "WITHDRAWAL"
     lots: v.number(), // Lot size
     openPrice: v.number(), // Open price
     closePrice: v.number(), // Close price
@@ -62,6 +62,7 @@ export default defineSchema({
     profit: v.number(), // Profit/loss
     commission: v.number(), // Commission
     swap: v.number(), // Swap
+    isDeposit: v.optional(v.boolean()), // Whether this is a deposit/withdrawal
   }).index("by_userId", ["userId"])
    .index("by_userId_ticket", ["userId", "ticket"]),
 });
