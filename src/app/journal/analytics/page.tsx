@@ -10,13 +10,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Legend
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/charts/chart";
 
 // Animated Counter Component
-function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1500 }: { value: number; prefix?: string; suffix?: string; duration?: number }) {
+function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1500, decimals = 2 }: { value: number; prefix?: string; suffix?: string; duration?: number; decimals?: number }) {
   const [count, setCount] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
     if (hasAnimated) return;
-    
+
     let start = 0;
     const end = value;
     const steps = 50;
@@ -35,13 +35,18 @@ function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1500 }: {
         setCount(start);
       }
     }, incrementTime);
-    
+
     return () => clearInterval(timer);
   }, [value, duration, hasAnimated]);
 
+  // Format: show decimals only if needed, or if explicitly specified
+  const formattedCount = typeof count === 'number'
+    ? (Number.isInteger(count) && decimals === 2 ? count.toString() : count.toFixed(decimals))
+    : count;
+
   return (
     <span>
-      {prefix}{typeof count === 'number' ? count.toFixed(2) : count}{suffix}
+      {prefix}{formattedCount}{suffix}
     </span>
   );
 }
@@ -212,11 +217,12 @@ export default function DeepAnalytics() {
   const bestTrade = winningTrades.length > 0 ? Math.max(...winningTrades.map(t => t.profit)) : 0;
   const worstTrade = losingTrades.length > 0 ? Math.min(...losingTrades.map(t => t.profit)) : 0;
 
-  // Calculate session performance
+  // Calculate session performance using local hours (sessions bucketed by local time via Date.getHours())
   const getSessionPerformance = (sessionStart: number, sessionEnd: number) => {
     const sessionTrades = allTrades?.filter(t => {
       if (t.isDeposit) return false;
-      const tradeHour = new Date(t.closeTime).getUTCHours();
+      // Use local hours since traders think in local time
+      const tradeHour = new Date(t.closeTime).getHours();
       return tradeHour >= sessionStart && tradeHour < sessionEnd;
     }) ?? [];
     
@@ -304,7 +310,7 @@ export default function DeepAnalytics() {
                   <Target className="h-5 w-5 text-white" />
                 </div>
                 <p className="text-3xl font-bold text-white mb-2">
-                  <AnimatedCounter value={metrics?.totalTrades ?? 0} />
+                  <AnimatedCounter value={metrics?.totalTrades ?? 0} decimals={0} />
                 </p>
                 <p className="text-purple-300 text-sm font-medium">Total Trades</p>
               </div>

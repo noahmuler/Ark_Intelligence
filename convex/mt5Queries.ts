@@ -73,10 +73,13 @@ export const getTradingMetrics = query({
       };
     }
 
-    // Separate trades from deposits/withdrawals
-    const actualTrades = trades.filter((t) => !t.isDeposit);
-    const deposits = trades.filter((t) => t.isDeposit && t.profit > 0);
-    const withdrawals = trades.filter((t) => t.isDeposit && t.profit < 0);
+    // Separate trades from deposits/withdrawals using type field
+    // Type field values: 'BUY', 'SELL' = actual trades
+    // Type field values: 'DEPOSIT' = deposit
+    // Type field values: 'WITHDRAWAL' = withdrawal
+    const actualTrades = trades.filter((t) => t.type === 'BUY' || t.type === 'SELL');
+    const deposits = trades.filter((t) => t.type === 'DEPOSIT');
+    const withdrawals = trades.filter((t) => t.type === 'WITHDRAWAL');
 
     // Calculate current balance (deposits - withdrawals + trading PnL)
     const totalDeposits = deposits.reduce((sum, t) => sum + t.profit, 0);
@@ -86,7 +89,7 @@ export const getTradingMetrics = query({
 
     // Calculate basic metrics (only on actual trades)
     const winningTrades = actualTrades.filter((t) => t.profit > 0);
-    const losingTrades = actualTrades.filter((t) => t.profit <= 0);
+    const losingTrades = actualTrades.filter((t) => t.profit < 0);
 
     const winRate = actualTrades.length > 0 ? (winningTrades.length / actualTrades.length) * 100 : 0;
 
@@ -124,18 +127,20 @@ export const getTradingMetrics = query({
         if (tempWinStreak > maxWinStreak) {
           maxWinStreak = tempWinStreak;
         }
-      } else {
+      } else if (trade.profit < 0) {
         tempLossStreak++;
         tempWinStreak = 0;
         if (tempLossStreak > maxLossStreak) {
           maxLossStreak = tempLossStreak;
         }
       }
+      // profit === 0: no-op, do not modify win/loss streaks for breakeven trades
     }
 
     // Calculate maximum drawdown
+    // Track peak equity (starting balance + cumulative PnL)
     let peak = 0;
-    let maxDrawdown = 0;
+    let maxDrawdownAbs = 0;
     let cumulativePnL = 0;
 
     for (const trade of sortedTrades) {
@@ -144,12 +149,15 @@ export const getTradingMetrics = query({
         peak = cumulativePnL;
       }
       const drawdown = peak - cumulativePnL;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
+      if (drawdown > maxDrawdownAbs) {
+        maxDrawdownAbs = drawdown;
       }
     }
 
-    const maxDrawdownPercent = peak === 0 ? 0 : (maxDrawdown / peak) * 100;
+    // Max drawdown as % of peak equity reached (starting balance + peak PnL)
+    const startingBalance = currentBalance - tradingPnL;
+    const peakEquity = startingBalance + peak;
+    const maxDrawdownPercent = peakEquity > 0 ? (maxDrawdownAbs / peakEquity) * 100 : 0;
 
     return {
       winRate: Math.round(winRate * 100) / 100,
@@ -180,8 +188,8 @@ export const getEquityCurve = query({
       return [];
     }
 
-    // Filter out deposits/withdrawals for equity curve
-    const actualTrades = trades.filter((t) => !t.isDeposit);
+    // Filter out deposits/withdrawals for equity curve - only BUY/SELL trades
+    const actualTrades = trades.filter((t) => t.type === 'BUY' || t.type === 'SELL');
 
     // Sort trades by close time
     const sortedTrades = [...actualTrades].sort((a, b) => a.closeTime - b.closeTime);

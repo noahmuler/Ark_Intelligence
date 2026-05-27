@@ -183,12 +183,15 @@ export const importTradesFromCSV = action({
       const trades: Trade[] = [];
       let skippedLines = 0;
 
-      // Detect CSV format by checking header
+      // Detect CSV format and delimiter from header
       const headerLine = lines[0].toLowerCase();
       const isExnessFormat = headerLine.includes('ticket') && headerLine.includes('opening_time_utc') && headerLine.includes('closing_time_utc');
+      // Determine delimiter once from header — Exness uses commas
+      const delimiter = headerLine.includes(';') ? ';' : ',';
 
       console.log("CSV Header:", lines[0]);
       console.log("Total lines:", lines.length);
+      console.log("Delimiter:", delimiter);
       console.log("Format detected:", isExnessFormat ? "Exness" : "Generic");
 
       // Skip header row, process data rows
@@ -199,8 +202,7 @@ export const importTradesFromCSV = action({
           continue;
         }
 
-        // Parse CSV line (handle both comma and semicolon delimiters)
-        const delimiter = line.includes(';') ? ';' : ',';
+        // Parse CSV line using the delimiter detected from header
         const columns = line.split(delimiter).map(col => col.trim());
         
         if (columns.length < 8) {
@@ -265,6 +267,8 @@ export const importTradesFromCSV = action({
         }
 
         // Normalize trade type and identify deposits/withdrawals
+        // Note: isDeposit = true ONLY for deposits (positive profit)
+        // Withdrawals have isDeposit = undefined (falsy) and negative profit
         let isDeposit = false;
         const typeLower = type.toLowerCase();
         if (typeLower.includes('buy')) {
@@ -273,10 +277,10 @@ export const importTradesFromCSV = action({
           type = 'SELL';
         } else if (typeLower.includes('deposit') || typeLower.includes('balance')) {
           type = 'DEPOSIT';
-          isDeposit = true;
+          isDeposit = true; // Only deposits have isDeposit = true
         } else if (typeLower.includes('withdrawal') || typeLower.includes('withdraw')) {
           type = 'WITHDRAWAL';
-          isDeposit = true;
+          isDeposit = false; // Withdrawals have isDeposit = false, profit < 0 to indicate withdrawal
         }
 
         trades.push({

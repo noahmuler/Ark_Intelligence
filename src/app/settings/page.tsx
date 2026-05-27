@@ -147,6 +147,15 @@ export default function Settings() {
         alert(`Successfully imported ${result.tradesCount} trades`);
         setCsvData("");
         setCsvFile(null);
+
+        // Create a connection record in Convex for CSV imports
+        await connectMT5({
+          userId,
+          serverName: "CSV Import",
+          accountLogin: "Imported",
+          investorPassword: "",
+        });
+
         setMt5Connected(true);
         localStorage.setItem("mt5Connected", "true");
         localStorage.setItem("mt5ServerName", "CSV Import");

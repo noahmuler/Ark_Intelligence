@@ -492,7 +492,8 @@ export default function Journal() {
                       }
 
                       const dayPnL = allTrades?.reduce((sum, t) => {
-                        if (t.isDeposit) return sum; // Skip deposits
+                        if (t.isDeposit) return sum; // Skip deposits (isDeposit = true)
+                        if (t.type === 'WITHDRAWAL') return sum; // Skip withdrawals
                         const tradeDate = new Date(t.closeTime);
                         if (
                           tradeDate.getDate() === day &&
@@ -537,7 +538,8 @@ export default function Journal() {
 
                     return weekDays.map((date, i) => {
                       const dayPnL = allTrades?.reduce((sum, t) => {
-                        if (t.isDeposit) return sum; // Skip deposits
+                        if (t.isDeposit) return sum; // Skip deposits (isDeposit = true)
+                        if (t.type === 'WITHDRAWAL') return sum; // Skip withdrawals
                         const tradeDate = new Date(t.closeTime);
                         if (
                           tradeDate.getDate() === date.getDate() &&
