@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -87,6 +87,22 @@ export default function Journal() {
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
   const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
   const equityCurve = useQuery(api.mt5Queries.getEquityCurve, { userId: "user-1" });
+
+  // Calculate max/min and offset for dual-color split gradient in Recharts AreaChart
+  const { maxVal, minVal } = useMemo(() => {
+    if (!equityCurve || equityCurve.length === 0) return { maxVal: 0, minVal: 0 };
+    const values = equityCurve.map(d => d.equity);
+    return {
+      maxVal: Math.max(...values),
+      minVal: Math.min(...values),
+    };
+  }, [equityCurve]);
+
+  const offset = useMemo(() => {
+    if (maxVal <= 0) return 0;
+    if (minVal >= 0) return 1;
+    return maxVal / (maxVal - minVal);
+  }, [maxVal, minVal]);
 
   // Filter trades
   const startDate = dateRange.start ? new Date(dateRange.start) : null;
@@ -193,8 +209,8 @@ export default function Journal() {
             </button>
           </div>
 
-          {/* KPI Cards - 2-row 4-column grid */}
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          {/* KPI Cards - Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Row 1 */}
             {/* Current Balance */}
             <div className="group relative">
@@ -204,7 +220,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <DollarSign className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-3xl font-bold ${(metrics?.currentBalance ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`text-3xl sm:text-4xl font-bold ${(metrics?.currentBalance ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     <AnimatedCounter value={metrics?.currentBalance ?? 0} prefix="$" />
                   </span>
                 </div>
@@ -212,7 +228,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">Deposits + PnL</p>
               </div>
             </div>
-
+ 
             {/* Profit Factor */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -221,7 +237,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-3xl font-bold ${(metrics?.profitFactor ?? 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`text-3xl sm:text-4xl font-bold ${(metrics?.profitFactor ?? 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
                     <AnimatedCounter value={metrics?.profitFactor ?? 0} />
                   </span>
                 </div>
@@ -229,7 +245,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">Gross Win / Gross Loss</p>
               </div>
             </div>
-
+ 
             {/* Win Rate */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -238,7 +254,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-3xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`text-3xl sm:text-4xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
                     <AnimatedCounter value={metrics?.winRate ?? 0} suffix="%" />
                   </span>
                 </div>
@@ -246,7 +262,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">{metrics?.totalTrades ?? 0} total trades</p>
               </div>
             </div>
-
+ 
             {/* Total PnL */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -255,7 +271,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <DollarSign className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-3xl font-bold ${(metrics?.totalPnL ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`text-3xl sm:text-4xl font-bold ${(metrics?.totalPnL ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     <AnimatedCounter value={metrics?.totalPnL ?? 0} prefix="$" />
                   </span>
                 </div>
@@ -263,7 +279,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">Cumulative profit/loss</p>
               </div>
             </div>
-
+ 
             {/* Row 2 */}
             {/* Total Trades */}
             <div className="group relative">
@@ -273,7 +289,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-3xl font-bold text-white">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">
                     <AnimatedCounter value={metrics?.totalTrades ?? 0} />
                   </span>
                 </div>
@@ -281,7 +297,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">Trade count</p>
               </div>
             </div>
-
+ 
             {/* Expectancy */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -290,7 +306,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`text-3xl font-bold ${(metrics?.expectancy ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`text-3xl sm:text-4xl font-bold ${(metrics?.expectancy ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     <AnimatedCounter value={metrics?.expectancy ?? 0} prefix="$" />
                   </span>
                 </div>
@@ -298,7 +314,7 @@ export default function Journal() {
                 <p className="text-purple-400 text-xs mt-1">Average trade profit</p>
               </div>
             </div>
-
+ 
             {/* Average R:R */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -307,7 +323,7 @@ export default function Journal() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
                     <Target className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-3xl font-bold text-white">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">
                     {metrics?.averageRR != null ? <AnimatedCounter value={metrics?.averageRR ?? 0} /> : 'N/A'}
                   </span>
                 </div>
@@ -349,13 +365,15 @@ export default function Journal() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={equityCurve ?? []}>
                       <defs>
-                        <linearGradient id="colorEquityGreen" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset={offset} stopColor="#10b981" stopOpacity={1} />
+                          <stop offset={offset} stopColor="#ef4444" stopOpacity={1} />
                         </linearGradient>
-                        <linearGradient id="colorEquityRed" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                        <linearGradient id="splitFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset={offset} stopColor="#10b981" stopOpacity={0} />
+                          <stop offset={offset} stopColor="#ef4444" stopOpacity={0} />
+                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
@@ -378,10 +396,10 @@ export default function Journal() {
                       <Area
                         type="monotone"
                         dataKey="equity"
-                        stroke={(equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? '#10b981' : '#ef4444'}
+                        stroke="url(#splitColor)"
                         strokeWidth={2}
                         fillOpacity={1}
-                        fill={(equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? 'url(#colorEquityGreen)' : 'url(#colorEquityRed)'}
+                        fill="url(#splitFill)"
                         animationDuration={1000}
                         dot={{ fill: (equityCurve?.[equityCurve.length - 1]?.equity ?? 0) >= 0 ? '#10b981' : '#ef4444', strokeWidth: 2, r: 4 }}
                         activeDot={{ r: 6 }}
@@ -398,7 +416,11 @@ export default function Journal() {
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                  {/* Left spacer to visually balance the toggle on the right */}
+                  <div className="hidden sm:block w-32"></div>
+                  
+                  {/* Positioned precisely at the top-center */}
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => {
@@ -414,7 +436,7 @@ export default function Journal() {
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
-                    <h3 className="text-xl font-semibold text-white">
+                    <h3 className="text-xl font-semibold text-white text-center min-w-[150px]">
                       {calendarView === 'monthly' 
                         ? calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                         : (() => {
@@ -440,7 +462,8 @@ export default function Journal() {
                       <ChevronRight className="h-5 w-5" />
                     </button>
                   </div>
-                  <div className="flex gap-2">
+ 
+                  <div className="flex gap-2 sm:w-32 sm:justify-end">
                     <button
                       onClick={() => setCalendarView('weekly')}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${

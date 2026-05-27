@@ -107,10 +107,25 @@ export const getTradingMetrics = query({
     const totalPnL = tradingPnL;
     const expectancy = actualTrades.length > 0 ? totalPnL / actualTrades.length : 0;
 
-    // Calculate average risk-reward ratio
-    // Note: Cannot compute accurate R:R without pipValue/lotSize data to convert price units to account currency
-    // Returning null to indicate this metric is unavailable with current data
-    const averageRR = null;
+    // Calculate average risk-reward ratio dynamically using Stop Loss and Take Profit
+    const tradesWithRR = actualTrades.filter(
+      (t) => t.stopLoss && t.takeProfit && t.stopLoss > 0 && t.takeProfit > 0 && t.openPrice > 0
+    );
+    
+    let averageRR = null;
+    if (tradesWithRR.length > 0) {
+      let totalRR = 0;
+      let validCount = 0;
+      for (const t of tradesWithRR) {
+        const risk = Math.abs(t.openPrice - t.stopLoss!);
+        const reward = Math.abs(t.openPrice - t.takeProfit!);
+        if (risk > 0) {
+          totalRR += reward / risk;
+          validCount++;
+        }
+      }
+      averageRR = validCount > 0 ? totalRR / validCount : null;
+    }
 
     // Calculate streaks
     let currentStreak = 0;

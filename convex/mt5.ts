@@ -93,6 +93,9 @@ export const storeTrade = mutation({
     commission: v.number(),
     swap: v.number(),
     isDeposit: v.optional(v.boolean()),
+    stopLoss: v.optional(v.number()),
+    takeProfit: v.optional(v.number()),
+    closeReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if trade already exists using the compound index
@@ -117,6 +120,9 @@ export const storeTrade = mutation({
         profit: args.profit,
         commission: args.commission,
         swap: args.swap,
+        stopLoss: args.stopLoss,
+        takeProfit: args.takeProfit,
+        closeReason: args.closeReason,
       });
       return existing._id;
     }
@@ -136,6 +142,9 @@ export const storeTrade = mutation({
       commission: args.commission,
       swap: args.swap,
       isDeposit: args.isDeposit,
+      stopLoss: args.stopLoss,
+      takeProfit: args.takeProfit,
+      closeReason: args.closeReason,
     });
 
     return tradeId;

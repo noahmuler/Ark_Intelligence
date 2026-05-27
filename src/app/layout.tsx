@@ -15,8 +15,7 @@ const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 // Script to prevent theme flash - runs before React hydration
 const themeScript = `
   (function() {
-    const theme = localStorage.getItem('theme') || 'dark';
-    document.documentElement.classList.add(theme);
+    document.documentElement.classList.add('dark');
   })();
 `;
 

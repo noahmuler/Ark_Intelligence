@@ -647,17 +647,14 @@ function determineCurrency(country: string): string {
 /**
  * Updated fetch functions to use real API
  */
+// Updated fetchEconomicCalendar to enforce real data fetching only
+// Updated fetchEconomicCalendar to enforce real data fetching only, with Twelve Data fallback
 export async function fetchEconomicCalendar(
   startDate: Date,
   endDate?: Date
 ): Promise<EconomicCalendarResponse> {
-  // Ensure we always have fallback data first
   const end = endDate || new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const fallbackEvents = generateMockEconomicEvents(startDate, end);
-  
-  console.log('Generated fallback events:', fallbackEvents.length);
-  
-  // Try Alpha Vantage first (user has API key loaded)
+  // Try Alpha Vantage first
   try {
     const { fetchAlphaVantageEconomicCalendar } = await import('./alphaVantageEconomicCalendar');
     const result = await fetchAlphaVantageEconomicCalendar(startDate, end);
@@ -665,7 +662,6 @@ export async function fetchEconomicCalendar(
     return result;
   } catch (error) {
     console.warn('Failed to fetch Alpha Vantage data, trying Finnhub:', error);
-    
     // Fallback to Finnhub
     try {
       const { fetchFinnhubEconomicCalendar } = await import('./finnhubEconomicCalendar');
@@ -673,71 +669,112 @@ export async function fetchEconomicCalendar(
       console.log('Finnhub calendar fetched successfully');
       return result;
     } catch (finnhubError) {
-      console.warn('Failed to fetch Finnhub data, using fallback mock data:', finnhubError);
-      // Return fallback data immediately
-      return {
-        events: fallbackEvents,
-        lastUpdated: new Date(),
-        source: "Mock Data (API Fallback)"
-      };
+      console.warn('Finnhub failed, trying Twelve Data:', finnhubError);
+      // Fallback to Twelve Data
+      try {
+        const { fetchTwelveDataEconomicCalendar } = await import('./twelvedataEconomicCalendar');
+        const result = await fetchTwelveDataEconomicCalendar(startDate, end);
+        console.log('Twelve Data calendar fetched successfully');
+        return result;
+      } catch (twelveError) {
+        console.error('Failed to fetch real economic data from all providers.', twelveError);
+        // Propagate error to caller to indicate no data available
+        throw new Error('Unable to fetch real economic calendar data from any provider.');
+      }
     }
   }
 }
 
+// Updated fetchTodayEconomicEvents to enforce real data fetching only
 export async function fetchTodayEconomicEvents(): Promise<EconomicCalendarResponse> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-  
-  // Generate mock data for today as fallback
-  const fallbackEvents = generateMockEconomicEvents(today, tomorrow);
-  
+
   // Try Alpha Vantage first
   try {
     const { fetchTodayAlphaVantageEconomicEvents } = await import('./alphaVantageEconomicCalendar');
     const result = await fetchTodayAlphaVantageEconomicEvents();
-    if (result.events.length > 0) {
+    if (result.events && result.events.length > 0) {
       return result;
     }
+    console.warn('Alpha Vantage returned no events for today, trying Finnhub.');
   } catch (error) {
-    console.warn('Failed to fetch Alpha Vantage data:', error);
+    console.warn('Failed to fetch Alpha Vantage today data:', error);
   }
-  
-  // Return fallback data
-  return {
-    events: fallbackEvents,
-    lastUpdated: new Date(),
-    source: "Mock Data (Alpha Vantage API)"
-  };
+
+  // Try Finnhub as fallback
+  try {
+    const { fetchTodayFinnhubEconomicEvents } = await import('./finnhubEconomicCalendar');
+    const result = await fetchTodayFinnhubEconomicEvents();
+    if (result.events && result.events.length > 0) {
+      return result;
+    }
+    console.warn('Finnhub returned no events for today.');
+  } catch (finnhubError) {
+    console.warn('Finnhub failed, trying Twelve Data:', finnhubError);
+    try {
+      const { fetchTodayTwelveDataEconomicEvents } = await import('./twelvedataEconomicCalendar');
+      const result = await fetchTodayTwelveDataEconomicEvents();
+      if (result.events && result.events.length > 0) {
+        return result;
+      }
+      console.warn('Twelve Data returned no events for today.');
+    } catch (twelveError) {
+      console.error('Failed to fetch today economic data from all providers.', twelveError);
+    }
+    throw new Error('Unable to fetch real today economic data from any provider.');
+  }
+
+  // If both providers return no data, throw error
+  throw new Error('No real today economic events available from any provider.');
 }
 
+// Updated fetchWeekEconomicEvents to enforce real data fetching only
 export async function fetchWeekEconomicEvents(): Promise<EconomicCalendarResponse> {
   const today = new Date();
   const dayOfWeek = today.getDay();
   const startOfWeek = new Date(today.getTime() - dayOfWeek * 24 * 60 * 60 * 1000);
   startOfWeek.setHours(0, 0, 0, 0);
   const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
-  
-  // Generate mock data for this week as fallback
-  const fallbackEvents = generateMockEconomicEvents(startOfWeek, endOfWeek);
-  
+
   // Try Alpha Vantage first
   try {
     const { fetchWeekAlphaVantageEconomicEvents } = await import('./alphaVantageEconomicCalendar');
     const result = await fetchWeekAlphaVantageEconomicEvents();
-    if (result.events.length > 0) {
+    if (result.events && result.events.length > 0) {
       return result;
     }
+    console.warn('Alpha Vantage returned no events for week, trying Finnhub.');
   } catch (error) {
-    console.warn('Failed to fetch Alpha Vantage data:', error);
+    console.warn('Failed to fetch Alpha Vantage week data:', error);
   }
-  
-  // Return fallback data
-  return {
-    events: fallbackEvents,
-    lastUpdated: new Date(),
-    source: "Mock Data (Alpha Vantage API)"
-  };
+
+  // Try Finnhub as fallback
+  try {
+    const { fetchWeekFinnhubEconomicEvents } = await import('./finnhubEconomicCalendar');
+    const result = await fetchWeekFinnhubEconomicEvents();
+    if (result.events && result.events.length > 0) {
+      return result;
+    }
+    console.warn('Finnhub returned no events for week.');
+  } catch (finnhubError) {
+    console.warn('Finnhub failed, trying Twelve Data:', finnhubError);
+    try {
+      const { fetchWeekTwelveDataEconomicEvents } = await import('./twelvedataEconomicCalendar');
+      const result = await fetchWeekTwelveDataEconomicEvents();
+      if (result.events && result.events.length > 0) {
+        return result;
+      }
+      console.warn('Twelve Data returned no events for week.');
+    } catch (twelveError) {
+      console.error('Failed to fetch week economic data from all providers.', twelveError);
+    }
+    throw new Error('Unable to fetch real week economic data from any provider.');
+  }
+
+  // If both providers return no data, throw error
+  throw new Error('No real week economic events available from any provider.');
 }
 
 export async function fetchMonthEconomicEvents(): Promise<EconomicCalendarResponse> {

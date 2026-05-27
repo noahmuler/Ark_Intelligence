@@ -63,6 +63,9 @@ export default defineSchema({
     commission: v.number(), // Commission
     swap: v.number(), // Swap
     isDeposit: v.optional(v.boolean()), // Whether this is a deposit/withdrawal
+    stopLoss: v.optional(v.number()), // Stop loss price
+    takeProfit: v.optional(v.number()), // Take profit price
+    closeReason: v.optional(v.string()), // Close reason (e.g. "sl", "tp", "user")
   }).index("by_userId", ["userId"])
    .index("by_userId_ticket", ["userId", "ticket"]),
 });

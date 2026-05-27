@@ -17,6 +17,9 @@ interface Trade {
   commission: number;
   swap: number;
   isDeposit?: boolean;
+  stopLoss?: number;
+  takeProfit?: number;
+  closeReason?: string;
 }
 
 // Fetch trade history from MT5 API
@@ -211,7 +214,7 @@ export const importTradesFromCSV = action({
           continue;
         }
 
-        let ticket, symbol, type, lots, openPrice, closePrice, openTime, closeTime, profit, commission, swap;
+        let ticket, symbol, type, lots, openPrice, closePrice, openTime, closeTime, profit, commission, swap, stopLoss, takeProfit, closeReason;
 
         if (isExnessFormat) {
           // Exness MT5 CSV format: ticket,opening_time_utc,closing_time_utc,type,lots,original_position_size,symbol,opening_price,closing_price,stop_loss,take_profit,commission,swap,profit,equity,margin_level,close_reason
@@ -224,14 +227,17 @@ export const importTradesFromCSV = action({
           symbol = columns[6];
           openPrice = parseFloat(columns[7]);
           closePrice = parseFloat(columns[8]);
-          const stopLoss = columns[9];
-          const takeProfit = columns[10];
+          const stopLossVal = parseFloat(columns[9] || '0');
+          const takeProfitVal = parseFloat(columns[10] || '0');
           commission = parseFloat(columns[11] || '0');
           swap = parseFloat(columns[12] || '0');
           profit = parseFloat(columns[13] || '0');
           const equity = columns[14];
           const marginLevel = columns[15];
-          const closeReason = columns[16];
+          
+          stopLoss = isNaN(stopLossVal) || stopLossVal === 0 ? undefined : stopLossVal;
+          takeProfit = isNaN(takeProfitVal) || takeProfitVal === 0 ? undefined : takeProfitVal;
+          closeReason = columns[16] ? columns[16].trim() : undefined;
 
           // Parse ISO date strings
           openTime = new Date(openingTime).getTime();
@@ -250,6 +256,9 @@ export const importTradesFromCSV = action({
           profit = parseFloat(columns[8] || '0');
           commission = parseFloat(columns[9] || '0');
           swap = parseFloat(columns[10] || '0');
+          stopLoss = undefined;
+          takeProfit = undefined;
+          closeReason = undefined;
         }
 
         // Validate required fields
@@ -296,6 +305,9 @@ export const importTradesFromCSV = action({
           commission,
           swap,
           isDeposit,
+          stopLoss,
+          takeProfit,
+          closeReason,
         });
       }
 
