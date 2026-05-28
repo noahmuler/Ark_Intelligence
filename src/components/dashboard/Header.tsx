@@ -22,7 +22,6 @@
 
 import React, { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
-import { fetchStockQuote } from "@/services/polygonStockData";
 
 
 
@@ -50,7 +49,7 @@ interface TickerData {
 /**
  * Real-time ticker data fetching
  * 
- * Fetches actual market data from Polygon.io API for:
+ * Fetches actual market data from Convex/Yahoo Finance API for:
  * - WTI: Crude Oil futures (CL=F)
  * - DXY: US Dollar Index (DX-Y.NYB)
  * - US10Y: 10-Year Treasury Yield (^TNX)
@@ -64,19 +63,29 @@ const fetchRealTickerData = async (): Promise<TickerData[]> => {
       'US10Y': { symbol: '^TNX', name: '10Y Yield' }
     };
 
+    // Fetch all symbols at once using the new API route
+    const symbols = Object.values(symbolMap).map(config => config.symbol).join(',');
+    const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbols)}`);
+    
+    if (!res.ok) {
+      throw new Error(`Ticker request failed: ${res.status}`);
+    }
+    
+    const json = await res.json();
+    const data = json?.data || {};
+
     const tickerPromises = Object.entries(symbolMap).map(async ([displaySymbol, config]) => {
-      try {
-        const quote = await fetchStockQuote(config.symbol);
+      const quote = data[config.symbol];
+      if (quote && typeof quote.price === 'number') {
         return {
           symbol: displaySymbol,
           name: config.name,
           price: quote.price,
-          change: quote.change,
-          changePercent: quote.changePercent
+          change: quote.change || 0,
+          changePercent: quote.changePercent || 0
         };
-      } catch (error) {
-        console.warn(`Failed to fetch data for ${config.symbol}:`, error);
-        // Fallback to mock data if API fails
+      } else {
+        console.warn(`Failed to fetch data for ${config.symbol}`);
         return getFallbackTickerData(displaySymbol);
       }
     });

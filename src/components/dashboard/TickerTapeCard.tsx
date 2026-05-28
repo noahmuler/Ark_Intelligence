@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 type Quote = {
   symbol: string;
   name?: string;
   price: number;
   percentChange: number;
+  priceChanged: boolean;
 };
 
 function pctStr(p: number) {
@@ -20,7 +23,7 @@ const TickerItem = React.memo(function TickerItem({ quote }: { quote: Quote }) {
   const up = quote.percentChange >= 0;
 
   return (
-    <div className="min-w-[190px] rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer hover:bg-purple-900/60 hover:border-purple-500/40 transition-all duration-200 shadow-md shadow-purple-500/5">
+    <div className={`min-w-[190px] rounded-2xl border border-purple-900/70 bg-purple-950/70 p-3 cursor-pointer hover:bg-purple-900/60 hover:border-purple-500/40 transition-all duration-200 shadow-md shadow-purple-500/5 ${quote.priceChanged ? 'animate-pulse border-emerald-400/50' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs text-purple-300/90 font-mono font-bold">{quote.symbol}</div>
@@ -45,61 +48,44 @@ const TickerItem = React.memo(function TickerItem({ quote }: { quote: Quote }) {
   );
 });
 
-const DEFAULT_QUOTES: Quote[] = [
-  { symbol: "XAUUSD", name: "Gold / USD", price: 2748.32, percentChange: 0.85 },
-  { symbol: "BTCUSD", name: "Bitcoin / USD", price: 67845.0, percentChange: 1.25 },
-  { symbol: "ETHUSD", name: "Ethereum / USD", price: 3450.45, percentChange: 1.62 },
-  { symbol: "EURUSD", name: "Euro / USD", price: 1.0876, percentChange: 0.21 },
-  { symbol: "GBPUSD", name: "Sterling / USD", price: 1.2654, percentChange: -0.14 },
-  { symbol: "USDJPY", name: "Dollar / Yen", price: 154.32, percentChange: 0.29 },
-  { symbol: "AUDUSD", name: "Aussie / USD", price: 0.6654, percentChange: 0.45 },
-  { symbol: "USDCAD", name: "Loonie / USD", price: 1.3654, percentChange: -0.12 },
-  { symbol: "WTIUSD", name: "Crude Oil", price: 82.35, percentChange: -0.35 },
-  { symbol: "DXY", name: "US Dollar Index", price: 105.82, percentChange: 0.42 },
-  { symbol: "NQ", name: "Nasdaq 100 Fut", price: 18450.5, percentChange: 1.12 },
-  { symbol: "ES", name: "S&P 500 Fut", price: 5240.75, percentChange: 0.85 },
-];
+// Mapping of Convex symbols to ticker display symbols
+const SYMBOL_MAP: Record<string, { symbol: string; name: string }> = {
+  XAU: { symbol: "XAUUSD", name: "Gold / USD" },
+  BTC: { symbol: "BTCUSD", name: "Bitcoin / USD" },
+  OIL: { symbol: "WTIUSD", name: "Crude Oil" },
+  DXY: { symbol: "DXY", name: "US Dollar Index" },
+  NQ: { symbol: "NQ", name: "Nasdaq 100 Fut" },
+  ES: { symbol: "ES", name: "S&P 500 Fut" },
+};
 
 const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { className?: string }) {
-  const [quotes, setQuotes] = useState<Quote[]>(DEFAULT_QUOTES);
+  // Fetch real data from Convex
+  const priceRecords = useQuery(api.actions.getAllPrices) ?? [];
 
-  useEffect(() => {
-    let cancelled = false;
+  // Track previous prices to detect changes
+  const previousPricesRef = useRef<Map<string, number>>(new Map());
 
-    const fetchQuotes = async () => {
-      try {
-        const symbols = DEFAULT_QUOTES.map((q) => q.symbol).join(",");
-        const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbols)}`);
-        if (!res.ok) throw new Error(`Ticker request failed: ${res.status}`);
-        const json = await res.json();
-        const data = json?.data ?? {};
-
-        const mapped: Quote[] = DEFAULT_QUOTES.map((fallback) => {
-          const apiData = data[fallback.symbol];
-          if (apiData && typeof apiData.price === "number" && apiData.price !== 0) {
-            return {
-              symbol: fallback.symbol,
-              name: fallback.name,
-              price: apiData.price,
-              percentChange: typeof apiData.changePercent === "number" ? apiData.changePercent : fallback.percentChange,
-            };
-          }
-          return fallback;
-        });
-
-        if (!cancelled) setQuotes(mapped);
-      } catch {
-        if (!cancelled) setQuotes(DEFAULT_QUOTES);
-      }
-    };
-
-    fetchQuotes();
-    const interval = setInterval(fetchQuotes, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  // Map Convex data to ticker format
+  const quotes: Quote[] = React.useMemo(() => {
+    return priceRecords.map((record) => {
+      const mapping = SYMBOL_MAP[record.symbol];
+      
+      // Detect if price changed
+      const previousPrice = previousPricesRef.current.get(record.symbol);
+      const priceChanged = previousPrice !== undefined && previousPrice !== record.price;
+      
+      // Update previous price
+      previousPricesRef.current.set(record.symbol, record.price);
+      
+      return {
+        symbol: mapping?.symbol || record.symbol,
+        name: mapping?.name,
+        price: record.price,
+        percentChange: record.change24h,
+        priceChanged,
+      };
+    });
+  }, [priceRecords]);
 
   return (
     <Card className={`overflow-hidden rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>

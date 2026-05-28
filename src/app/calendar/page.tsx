@@ -67,7 +67,7 @@ interface CalendarEvent {
 
 export default function Calendar() {
   const [mounted, setMounted] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 13)); // Wed, May 13th
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,52 +124,6 @@ export default function Calendar() {
     setError(null);
     
     try {
-      // Use mock data for This Week view as specified in gemini_prompt.md
-      if (viewType === 'week') {
-        const mockEvents: CalendarEvent[] = [
-          {
-            id: 'mock-1',
-            time: '14:00',
-            currency: 'USD',
-            impact: 'High',
-            title: 'FOMC Interest Rate Decision',
-            confidence: '68%',
-            date: new Date(2026, 4, 11).toISOString(), // Mon, 5/11
-          },
-          {
-            id: 'mock-2',
-            time: '8:30',
-            currency: 'USD',
-            impact: 'Medium',
-            title: 'OPEC Monthly Report',
-            confidence: '81%',
-            date: new Date(2026, 4, 12).toISOString(), // Tue, 5/12
-          },
-          {
-            id: 'mock-3',
-            time: '8:30',
-            currency: 'USD',
-            impact: 'Medium',
-            title: 'US Retail Sales',
-            confidence: '61%',
-            date: new Date(2026, 4, 12).toISOString(), // Tue, 5/12
-          },
-          {
-            id: 'mock-4',
-            time: '14:00',
-            currency: 'JPY',
-            impact: 'Medium',
-            title: 'Bank of Japan Policy Meeting',
-            confidence: '71%',
-            date: new Date(2026, 4, 13).toISOString(), // Wed, 5/13
-          },
-        ];
-        setEvents(mockEvents);
-        setDataSource('Mock Data (Alpha Vantage API)');
-        setLoading(false);
-        return;
-      }
-      
       let url = '/api/calendar?';
       
       if (viewType === 'today') {
@@ -178,6 +132,8 @@ export default function Calendar() {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         url += `viewType=day&date=${tomorrow.toISOString().split('T')[0]}`;
+      } else if (viewType === 'week') {
+        url += 'viewType=week';
       } else if (viewType === 'custom') {
         url += `viewType=day&date=${selectedDate.toISOString().split('T')[0]}`;
       }
@@ -228,13 +184,7 @@ export default function Calendar() {
     const [hour] = interval.split(':').map(Number);
     return filteredEvents.filter(event => {
       const eventDate = new Date(event.date);
-      const eventHour = parseInt(
-        eventDate.toLocaleString('en-US', { 
-          timeZone: timezone, 
-          hour: 'numeric', 
-          hour12: false 
-        })
-      );
+      const eventHour = eventDate.getHours();
       return eventHour >= hour && eventHour < hour + 2;
     });
   };
@@ -546,9 +496,9 @@ export default function Calendar() {
             />
 
             {/* Timeline Container - Unified Horizontal Scroll */}
-            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20">
+            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory">
               {/* Live Current-Time Tracker - Now inside scrollable container */}
-              <div className="absolute top-0 bottom-0 left-0 pointer-events-none z-30">
+              <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none z-30">
                 <div 
                   className="absolute top-0 bottom-0 w-0.5 bg-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
                   style={{
@@ -590,7 +540,7 @@ export default function Calendar() {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
-                    <div key={day.label} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20">
+                    <div key={day.label} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20 snap-start">
                       {/* Day Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {day.label}
@@ -685,7 +635,7 @@ export default function Calendar() {
                   const intervalEvents = getEventsForInterval(interval);
                   
                   return (
-                    <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20">
+                    <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20 snap-start">
                       {/* Hour Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {interval}

@@ -33,10 +33,9 @@ export interface CryptoPriceResponse {
 /**
  * Fetch cryptocurrency data by ID
  */
-export async function fetchCryptoData(cryptoId: string): Promise<CryptoData | null> {
+export async function fetchCryptoData(cryptoId: string): Promise<CryptoData> {
   if (!API_KEY) {
-    console.warn('COIN_GECKO_API_KEY not found, using fallback data');
-    return null;
+    throw new Error('COIN_GECKO_API_KEY not found');
   }
 
   try {
@@ -58,8 +57,7 @@ export async function fetchCryptoData(cryptoId: string): Promise<CryptoData | nu
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`CoinGecko API request failed for ${cryptoId}: ${response.status} ${response.statusText}`);
-      return null;
+      throw new Error(`CoinGecko API request failed for ${cryptoId}: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -81,7 +79,7 @@ export async function fetchCryptoData(cryptoId: string): Promise<CryptoData | nu
 
   } catch (error) {
     console.error(`Error fetching crypto data for ${cryptoId}:`, error);
-    return null;
+    throw error;
   }
 }
 
@@ -90,8 +88,7 @@ export async function fetchCryptoData(cryptoId: string): Promise<CryptoData | nu
  */
 export async function fetchMultipleCryptoData(cryptoIds: string[]): Promise<CryptoData[]> {
   if (!API_KEY) {
-    console.warn('COIN_GECKO_API_KEY not found, using fallback data');
-    return [];
+    throw new Error('COIN_GECKO_API_KEY not found');
   }
 
   try {
@@ -113,8 +110,7 @@ export async function fetchMultipleCryptoData(cryptoIds: string[]): Promise<Cryp
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`CoinGecko API request failed: ${response.status} ${response.statusText}`);
-      return [];
+      throw new Error(`CoinGecko API request failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -136,17 +132,16 @@ export async function fetchMultipleCryptoData(cryptoIds: string[]): Promise<Cryp
 
   } catch (error) {
     console.error('Error fetching multiple crypto data:', error);
-    return [];
+    throw error;
   }
 }
 
 /**
  * Get simple price data for multiple cryptocurrencies
  */
-export async function fetchSimplePrices(cryptoIds: string[]): Promise<CryptoPriceResponse | null> {
+export async function fetchSimplePrices(cryptoIds: string[]): Promise<CryptoPriceResponse> {
   if (!API_KEY) {
-    console.warn('COIN_GECKO_API_KEY not found, using fallback data');
-    return null;
+    throw new Error('COIN_GECKO_API_KEY not found');
   }
 
   try {
@@ -168,54 +163,15 @@ export async function fetchSimplePrices(cryptoIds: string[]): Promise<CryptoPric
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`CoinGecko simple price request failed: ${response.status} ${response.statusText}`);
-      return null;
+      throw new Error(`CoinGecko simple price request failed: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
 
   } catch (error) {
     console.error('Error fetching simple crypto prices:', error);
-    return null;
+    throw error;
   }
-}
-
-/**
- * Get fallback crypto data when API fails
- */
-export function getFallbackCryptoData(symbol: string): CryptoData {
-  const fallbackData: { [key: string]: CryptoData } = {
-    'BTC': {
-      id: 'bitcoin',
-      symbol: 'BTC',
-      name: 'Bitcoin',
-      current_price: 67234.89,
-      price_change_percentage_24h: 3.6,
-      price_change_percentage_7d: 12.45,
-      market_cap: 1310000000000,
-      total_volume: 2800000000,
-      high_24h: 68500,
-      low_24h: 66500,
-      sparkline_7d: [],
-      last_updated: new Date().toISOString()
-    },
-    'ETH': {
-      id: 'ethereum',
-      symbol: 'ETH',
-      name: 'Ethereum',
-      current_price: 3524.78,
-      price_change_percentage_24h: 3.5,
-      price_change_percentage_7d: 8.34,
-      market_cap: 423500000000,
-      total_volume: 1200000000,
-      high_24h: 3580,
-      low_24h: 3450,
-      sparkline_7d: [],
-      last_updated: new Date().toISOString()
-    }
-  };
-
-  return fallbackData[symbol] || fallbackData['BTC'];
 }
 
 /**

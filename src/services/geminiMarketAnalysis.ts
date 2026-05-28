@@ -79,56 +79,11 @@ const ANALYSIS_PROMPTS = {
 };
 
 /**
- * Get fallback analysis when Gemini API fails
- */
-function getFallbackAnalysis(prompt: string): any {
-  const fallbackResponses = {
-    marketOverview: {
-      summary: "Market conditions are currently mixed with moderate volatility. Technical indicators suggest a neutral to slightly bullish bias in the short term, with key support levels holding. Economic data releases are being closely monitored for directional cues.",
-      sentiment: "neutral",
-      keyInsights: ["Moderate market volatility", "Technical levels holding", "Economic data in focus"],
-      riskLevel: "medium",
-      recommendations: ["Monitor key support levels", "Watch economic releases", "Maintain balanced portfolio"]
-    },
-    stockAnalysis: {
-      summary: "The stock is currently trading in a consolidation pattern with moderate volume. Technical indicators suggest neutral momentum with key support and resistance levels defining the current range.",
-      outlook: "neutral",
-      riskLevel: "medium",
-      recommendations: ["Wait for breakout confirmation", "Monitor volume patterns", "Set stop-loss at support"]
-    },
-    economicImpact: {
-      summary: "Recent economic data suggests mixed signals with inflation concerns balanced by economic growth. Markets are likely to remain range-bound until clearer directional signals emerge.",
-      outlook: "neutral",
-      riskLevel: "medium",
-      recommendations: ["Diversify across sectors", "Monitor central bank policies", "Focus on quality assets"]
-    },
-    riskAnalysis: {
-      summary: "Current market risks are moderate with geopolitical tensions and inflation concerns being the primary factors. Technical indicators suggest stable market conditions with defined risk parameters.",
-      outlook: "neutral",
-      riskLevel: "medium",
-      recommendations: ["Maintain diversification", "Use position sizing", "Monitor volatility indicators"]
-    }
-  };
-
-  // Return appropriate fallback based on prompt content
-  if (prompt.includes('market conditions') || prompt.includes('comprehensive')) {
-    return fallbackResponses.marketOverview;
-  } else if (prompt.includes('stock') || prompt.includes('symbol')) {
-    return fallbackResponses.stockAnalysis;
-  } else if (prompt.includes('economic')) {
-    return fallbackResponses.economicImpact;
-  } else {
-    return fallbackResponses.riskAnalysis;
-  }
-}
-
-/**
  * Call Gemini API for AI analysis
  */
 async function callGemini(prompt: string): Promise<any> {
   if (!API_KEY) {
-    console.warn('GEMINI_API_KEY not found, using fallback analysis');
-    return getFallbackAnalysis(prompt);
+    throw new Error('GEMINI_API_KEY not found');
   }
 
   try {
@@ -157,27 +112,24 @@ async function callGemini(prompt: string): Promise<any> {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
-      console.warn(`Gemini API request failed: ${response.status} ${response.statusText}. Response: ${errorText}, using fallback analysis`);
-      return getFallbackAnalysis(prompt);
+      throw new Error(`Gemini API request failed: ${response.status} ${response.statusText}. Response: ${errorText}`);
     }
 
     const data = await response.json();
     
     if (data.error) {
-      console.warn(`Gemini API Error: ${data.error.message}, using fallback analysis`);
-      return getFallbackAnalysis(prompt);
+      throw new Error(`Gemini API Error: ${data.error.message}`);
     }
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-      console.warn('Invalid Gemini API response structure, using fallback analysis');
-      return getFallbackAnalysis(prompt);
+      throw new Error('Invalid Gemini API response structure');
     }
     
     return data.candidates[0].content.parts[0].text;
 
   } catch (error) {
-    console.error('Error calling Gemini API, using fallback analysis:', error instanceof Error ? error.message : error);
-    return getFallbackAnalysis(prompt);
+    console.error('Error calling Gemini API:', error instanceof Error ? error.message : error);
+    throw error;
   }
 }
 
@@ -261,38 +213,7 @@ export async function generateMarketOverview(): Promise<GeminiAnalysisResponse> 
 
   } catch (error) {
     console.error('Error generating market overview:', error);
-    // Return fallback response instead of throwing
-    const fallbackData = getFallbackAnalysis(ANALYSIS_PROMPTS.marketOverview);
-    const insights: MarketInsight[] = [
-      {
-        id: `ai-overview-${Date.now()}`,
-        title: 'Market Sentiment Analysis',
-        description: fallbackData.summary || 'Market analysis completed',
-        sentiment: fallbackData.sentiment === 'bullish' ? 'Bullish' : 
-                 fallbackData.sentiment === 'bearish' ? 'Bearish' : 'Neutral',
-        confidence: 0.75,
-        category: 'Technical',
-        timestamp: new Date(),
-        relatedSymbols: ['SPY', 'QQQ', 'DIA']
-      }
-    ];
-    
-    const analysis: AIAnalysis = {
-      summary: fallbackData.summary || 'Market overview analysis completed',
-      keyInsights: insights,
-      marketOutlook: fallbackData.riskLevel === 'low' ? 'Positive' : 
-                   fallbackData.riskLevel === 'high' ? 'Negative' : 'Neutral',
-      riskLevel: fallbackData.riskLevel === 'low' ? 'Low' : 
-                 fallbackData.riskLevel === 'high' ? 'High' : 'Medium',
-      recommendations: fallbackData.recommendations || ['Monitor market conditions'],
-      timestamp: new Date()
-    };
-
-    return {
-      analysis,
-      lastUpdated: new Date(),
-      source: "Gemini AI Market Analysis (Fallback)"
-    };
+    throw error;
   }
 }
 
@@ -337,8 +258,8 @@ export async function analyzeStock(symbol: string, stockData: any): Promise<Gemi
     };
 
   } catch (error) {
-    console.error(`Error analyzing stock ${symbol}, using fallback analysis:`, error instanceof Error ? error.message : 'Unknown error');
-    return getFallbackAnalysis(ANALYSIS_PROMPTS.stockAnalysis(symbol, stockData));
+    console.error(`Error analyzing stock ${symbol}:`, error instanceof Error ? error.message : 'Unknown error');
+    throw error;
   }
 }
 

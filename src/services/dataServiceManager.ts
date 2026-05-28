@@ -182,9 +182,8 @@ export async function fetchComprehensiveMarketData(): Promise<DataServiceRespons
     const healthyServices = health.filter(h => h.status === 'healthy');
     
     if (healthyServices.length === 0) {
-      console.warn('No healthy API services available, using fallback data');
-      // Don't throw error, instead continue with empty data and let fallback handle it
-      // This prevents the app from crashing when all APIs are temporarily unavailable
+      console.warn('No healthy API services available');
+      throw new Error('No healthy API services available');
     }
     
     // Fetch stock market data from Polygon

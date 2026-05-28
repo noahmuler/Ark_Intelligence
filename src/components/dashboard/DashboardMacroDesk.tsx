@@ -1,6 +1,6 @@
-// "use client"
+"use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { TrendingUp, TrendingDown } from "lucide-react";
@@ -15,6 +15,7 @@ type AssetCard = {
   sentiment: Sentiment;
   confidence: number;
   aiOneSentence: string;
+  priceChanged: boolean;
 };
 
 // Mapping of symbols to display names
@@ -34,9 +35,22 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   const priceRecords = useQuery(api.prices.getAll) ?? [];
   const briefs = useQuery(api.asset_briefs.getAll) ?? [];
 
+  // Track previous prices to detect changes
+  const previousPricesRef = useRef<Map<string, number>>(new Map());
+
   // Build asset cards from live data
   const ASSETS: AssetCard[] = useMemo(() => {
-    return priceRecords.map((p) => {
+    // Define the desired order
+    const desiredOrder = ["XAU", "OIL", "BTC", "DXY", "NQ", "ES"];
+    
+    // Create a map of symbol to price record
+    const priceMap = new Map(priceRecords.map(p => [p.symbol, p]));
+    
+    // Build assets in the desired order
+    return desiredOrder.map((symbol) => {
+      const p = priceMap.get(symbol);
+      if (!p) return null;
+      
       const name = ASSET_NAME_MAP[p.symbol] ?? p.symbol;
       const priceText = `$${p.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       const delta = p.change24h ?? 0;
@@ -45,8 +59,16 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
       const confidence = Math.min(100, Math.max(0, Math.round(Math.abs(delta) * 10)));
       const briefObj = briefs.find((b) => b.symbol === p.symbol);
       const aiOneSentence = briefObj?.brief ?? "Data sourced live from Convex backend.";
-      return { symbol: p.symbol, name, priceText, deltaPercentText, sentiment, confidence, aiOneSentence };
-    });
+      
+      // Detect if price changed
+      const previousPrice = previousPricesRef.current.get(symbol);
+      const priceChanged = previousPrice !== undefined && previousPrice !== p.price;
+      
+      // Update previous price
+      previousPricesRef.current.set(symbol, p.price);
+      
+      return { symbol: p.symbol, name, priceText, deltaPercentText, sentiment, confidence, aiOneSentence, priceChanged };
+    }).filter((asset): asset is AssetCard => asset !== null);
   }, [priceRecords, briefs]);
 
   // Mounting state for skeleton loading (prevents layout shift)
@@ -98,7 +120,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
               return (
                 <div
                   key={p.symbol}
-                  className="bg-purple-900/20 border border-white/5 rounded-xl p-3 hover:bg-purple-900/30 hover:border-purple-500/30 hover:shadow-md hover:shadow-purple-500/5 transition-all duration-300 ease-in-out flex flex-col justify-between"
+                  className={`bg-purple-900/20 border border-white/5 rounded-xl p-3 hover:bg-purple-900/30 hover:border-purple-500/30 hover:shadow-md hover:shadow-purple-500/5 transition-all duration-300 ease-in-out flex flex-col justify-between ${p.priceChanged ? 'animate-pulse border-purple-400/50' : ''}`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">

@@ -81,10 +81,11 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
 const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ className = "" }: { className?: string }) {
   const [isMounted, setIsMounted] = useState(false);
+  const [dataUpdated, setDataUpdated] = useState(false);
+  
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
 
   // Convex query and data preparation
   const rawHistory = useQuery(api.currencyStrength.getHistory) ?? null;
@@ -94,6 +95,15 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
     JPY: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "JPY")?.value ?? 0),
     USD: generateSeedHistory(DEFAULT_STRENGTH.find(s => s.label === "USD")?.value ?? 0),
   };
+
+  // Trigger animation when data updates
+  useEffect(() => {
+    if (rawHistory) {
+      setDataUpdated(true);
+      const timer = setTimeout(() => setDataUpdated(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [rawHistory]);
 
   // Derive current strength values from the latest history point
   const strength: StrengthSeries[] = [
@@ -122,7 +132,7 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
   }, [history]);
 
   return (
-    <Card className={`overflow-hidden min-h-[300px] rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>
+    <Card className={`overflow-hidden min-h-[300px] rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${dataUpdated ? 'animate-pulse border-purple-400/50' : ''} ${className}`}>
       <CardContent className="p-4 flex flex-col h-full justify-between">
         {/* Header Block */}
         <div className="flex items-center justify-between mb-4 border-b border-purple-900/30 pb-3">

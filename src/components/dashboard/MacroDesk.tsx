@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -18,10 +20,6 @@ import {
   BarChart3,
   Activity
 } from "lucide-react";
-import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
-import { StockData } from "@/services/polygonStockData";
-import { analyzeStock } from "@/services/geminiMarketAnalysis";
-import { fetchMultipleCryptoData, CRYPTO_SYMBOL_MAP, getFallbackCryptoData } from "@/services/coinGeckoCryptoData";
 
 type AssetCategory = "forex" | "crypto" | "stocks" | "metals";
 
@@ -53,8 +51,8 @@ interface Asset {
  */
 const getAssetCategory = (symbol: string): AssetCategory => {
   const cryptoSymbols = ['BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOTUSD'];
-  const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'SPX', 'QQQ', 'DIA'];
-  const metalsSymbols = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']; // Gold, Silver, Platinum, Palladium
+  const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NQ', 'ES'];
+  const metalsSymbols = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'WTIUSD']; // Gold, Silver, Platinum, Palladium, Oil
   
   if (cryptoSymbols.includes(symbol)) return 'crypto';
   if (stockSymbols.includes(symbol)) return 'stocks';
@@ -63,144 +61,56 @@ const getAssetCategory = (symbol: string): AssetCategory => {
 };
 
 /**
- * Transform StockData to Asset format
+ * Transform Convex price record to Asset format
  */
-const transformStockToAsset = (stock: StockData): Asset => {
-  const sentiment = stock.changePercent > 1 ? "Bullish" : 
-                   stock.changePercent < -1 ? "Bearish" : "Neutral";
-  const confidence = Math.min(95, Math.max(50, Math.abs(stock.changePercent) * 10 + 50));
+const transformConvexToAsset = (price: any, brief: any): Asset => {
+  const sentiment = (price.change24h || 0) > 1 ? "Bullish" : 
+                   (price.change24h || 0) < -1 ? "Bearish" : "Neutral";
+  const confidence = Math.min(95, Math.max(50, Math.abs(price.change24h || 0) * 10 + 50));
+  
+  // Map Convex symbols to display symbols (add USD suffix where needed for routing)
+  const symbolMap: Record<string, string> = {
+    XAU: "XAUUSD",
+    BTC: "BTCUSD",
+    OIL: "WTIUSD",
+    DXY: "DXY",
+    NQ: "NQ",
+    ES: "ES",
+  };
+  
+  const displaySymbol = symbolMap[price.symbol] || price.symbol;
+  
+  const assetNameMap: Record<string, string> = {
+    XAUUSD: "Gold / US Dollar",
+    BTCUSD: "Bitcoin / US Dollar",
+    WTIUSD: "Crude Oil WTI",
+    DXY: "US Dollar Index",
+    NQ: "Nasdaq 100 Futures",
+    ES: "S&P 500 Futures",
+  };
   
   return {
-    symbol: stock.symbol,
-    name: stock.name,
-    price: stock.price,
-    dayChange: stock.change,
-    overallChange: stock.changePercent,
+    symbol: displaySymbol,
+    name: assetNameMap[displaySymbol] || displaySymbol,
+    price: price.price,
+    dayChange: (price.change24h || 0) * price.price / 100,
+    overallChange: price.change24h || 0,
     sentiment,
     confidence: Math.round(confidence),
-    aiAnalysis: `${stock.name} is currently trading at $${stock.price.toFixed(2)} with a ${stock.changePercent > 0 ? 'positive' : 'negative'} sentiment. Recent price action suggests ${sentiment.toLowerCase()} conditions with ${confidence}% confidence.`,
-    volume: stock.volume > 1000000 ? `${(stock.volume / 1000000).toFixed(1)}M` : `${(stock.volume / 1000).toFixed(1)}K`,
-    marketCap: stock.marketCap > 1000000000000 ? `${(stock.marketCap / 1000000000000).toFixed(1)}T` : 
-               stock.marketCap > 1000000000 ? `${(stock.marketCap / 1000000000).toFixed(1)}B` :
-               `${(stock.marketCap / 1000000).toFixed(1)}M`,
-    dayHigh: stock.dayHigh || stock.price * 1.01,
-    dayLow: stock.dayLow || stock.price * 0.99,
-    weekHigh: stock.fiftyTwoWeekHigh || stock.price * 1.15,
-    weekLow: stock.fiftyTwoWeekLow || stock.price * 0.85,
+    aiAnalysis: brief?.brief || `${assetNameMap[displaySymbol] || displaySymbol} is currently trading at $${price.price.toFixed(2)} with a ${price.change24h > 0 ? 'positive' : 'negative'} sentiment. Recent price action suggests ${sentiment.toLowerCase()} conditions with ${confidence}% confidence.`,
+    volume: "1.2M",
+    marketCap: displaySymbol === 'BTCUSD' ? '835.2B' : displaySymbol === 'XAUUSD' ? '14.2T' : 'N/A',
+    dayHigh: price.high || price.price * 1.01,
+    dayLow: price.low || price.price * 0.99,
+    weekHigh: price.high * 1.05,
+    weekLow: price.low * 0.95,
     technicalIndicators: {
-      rsi: 50 + (stock.changePercent * 2),
-      macd: stock.change * 10,
-      bollinger: stock.price
+      rsi: 50 + ((price.change24h || 0) * 2),
+      macd: (price.change24h || 0) * 10,
+      bollinger: price.price
     },
-    category: getAssetCategory(stock.symbol)
+    category: getAssetCategory(displaySymbol)
   };
-};
-
-/**
- * Fetch real crypto prices from CoinGecko
- */
-const fetchRealCryptoPrices = async (): Promise<{ [key: string]: any }> => {
-  try {
-    const cryptoSymbols = ['bitcoin', 'ethereum'];
-    const cryptoData = await fetchMultipleCryptoData(cryptoSymbols);
-    
-    const cryptoPrices: { [key: string]: any } = {};
-    cryptoData.forEach(crypto => {
-      cryptoPrices[crypto.symbol] = {
-        price: crypto.current_price,
-        dayChange: crypto.price_change_percentage_24h * crypto.current_price / 100,
-        overallChange: crypto.price_change_percentage_7d * crypto.current_price / 100,
-        volume: crypto.total_volume.toString(),
-        marketCap: crypto.market_cap.toString(),
-        dayHigh: crypto.high_24h,
-        dayLow: crypto.low_24h
-      };
-    });
-    
-    return cryptoPrices;
-  } catch (error) {
-    console.error('Error fetching crypto prices:', error);
-    return {};
-  }
-};
-
-/**
- * Fetch real assets from APIs
- */
-const fetchRealAssets = async (): Promise<Asset[]> => {
-  try {
-    // Fetch both stock and crypto data
-    const [marketResponse, cryptoPrices] = await Promise.all([
-      fetchComprehensiveMarketData(),
-      fetchRealCryptoPrices()
-    ]);
-    
-    const stockData = marketResponse.data.stocks;
-    
-    // Transform stock data to assets
-    const stockAssets = stockData.map(transformStockToAsset);
-    
-    // Get fallback assets to merge with real data
-    const fallbackAssets = getFallbackAssets();
-    
-    // Merge real data with fallback for better coverage
-    const mergedAssets = fallbackAssets.map(fallbackAsset => {
-      // Check if we have real crypto data for this asset
-      if (cryptoPrices[fallbackAsset.symbol]) {
-        const cryptoData = cryptoPrices[fallbackAsset.symbol];
-        return {
-          ...fallbackAsset,
-          price: cryptoData.price,
-          dayChange: cryptoData.dayChange,
-          overallChange: cryptoData.overallChange,
-          volume: cryptoData.volume,
-          marketCap: cryptoData.marketCap,
-          dayHigh: cryptoData.dayHigh,
-          dayLow: cryptoData.dayLow
-        };
-      }
-      
-      // Check if we have real stock data for this asset
-      const stockAsset = stockAssets.find(sa => sa.symbol === fallbackAsset.symbol);
-      if (stockAsset) {
-        return stockAsset;
-      }
-      
-      // Return fallback if no real data available
-      return fallbackAsset;
-    });
-    
-    // Get AI analysis for each asset
-    const assetsWithAI = await Promise.all(
-      mergedAssets.map(async (asset) => {
-        try {
-          const analysis = await analyzeStock(asset.symbol, {
-            price: asset.price,
-            change: asset.dayChange,
-            changePercent: (asset.dayChange / asset.price) * 100,
-            volume: parseInt(asset.volume.replace(/[^0-9]/g, '')) || 0
-          });
-          
-          return {
-            ...asset,
-            aiAnalysis: analysis.analysis.summary,
-            confidence: Math.round(analysis.analysis.riskLevel === 'Low' ? 85 : 
-                                     analysis.analysis.riskLevel === 'High' ? 65 : 75),
-            sentiment: (analysis.analysis.marketOutlook === 'Positive' ? 'Bullish' : 
-                       analysis.analysis.marketOutlook === 'Negative' ? 'Bearish' : 'Neutral') as "Bullish" | "Bearish" | "Neutral"
-          };
-        } catch (error) {
-          console.warn(`Failed to get AI analysis for ${asset.symbol}:`, error);
-          return asset;
-        }
-      })
-    );
-    
-    return assetsWithAI;
-  } catch (error) {
-    console.error('Error fetching real assets:', error);
-    return [];
-  }
 };
 
 /**
@@ -564,6 +474,11 @@ const getFallbackAssets = (): Asset[] => [
 export function MacroDesk({ className = "" }: { className?: string }) {
   const router = useRouter();
   const { theme } = useTheme();
+  
+  // Fetch real data from Convex
+  const priceRecords = useQuery(api.actions.getAllPrices) ?? [];
+  const briefs = useQuery(api.asset_briefs.getAll) ?? [];
+  
   const [assets, setAssets] = useState<Asset[]>(getFallbackAssets());
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | 'all'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -605,47 +520,16 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   }, []);
 
 
+  // Transform Convex data to assets
   useEffect(() => {
-    if (!mounted) return;
-    
-    // Ensure we have fallback data immediately
-    const fallbackAssets = getFallbackAssets();
-    setAssets(fallbackAssets);
-    console.log('Loaded fallback assets:', fallbackAssets.length);
-    
-    // Initial data fetch
-    const fetchInitialData = async () => {
-      try {
-        console.log('Attempting to fetch real assets...');
-        const realAssets = await fetchRealAssets();
-        console.log('Successfully fetched real assets:', realAssets.length);
-        setAssets(realAssets);
-      } catch (error) {
-        console.error('Initial asset data fetch failed:', error);
-        // Fallback data is already set
-      }
-    };
-
-    // Delay initial fetch to allow component to render first
-    const timeoutId = setTimeout(fetchInitialData, 1000);
-    
-    // Set up interval for real-time data updates
-    const interval = setInterval(async () => {
-      try {
-        console.log('Fetching periodic asset data...');
-        const realAssets = await fetchRealAssets();
-        setAssets(realAssets);
-      } catch (error) {
-        console.error('Periodic asset data fetch failed:', error);
-        // Keep current data if periodic fetch fails
-      }
-    }, 60000); // Update every 60 seconds for real API data
-
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(interval);
-    };
-  }, [mounted]);
+    if (priceRecords.length > 0) {
+      const transformedAssets = priceRecords.map((price) => {
+        const brief = briefs.find(b => b.symbol === price.symbol);
+        return transformConvexToAsset(price, brief);
+      });
+      setAssets(transformedAssets);
+    }
+  }, [priceRecords, briefs]);
 
 
   const getSentimentIcon = (sentiment: string) => {
@@ -672,15 +556,10 @@ export function MacroDesk({ className = "" }: { className?: string }) {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      const realAssets = await fetchRealAssets();
-      setAssets(realAssets);
-    } catch (error) {
-      console.error('Refresh failed:', error);
-      // Keep current data if refresh fails
-    } finally {
+    // Convex useQuery automatically refreshes, so we just show a loading state
+    setTimeout(() => {
       setIsRefreshing(false);
-    }
+    }, 1000);
   };
 
   const toggleCardExpansion = (cardId: string) => {

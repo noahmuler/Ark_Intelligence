@@ -2,11 +2,11 @@ import { EconomicCalendarResponse, EconomicEvent } from './economicCalendar';
 
 /**
  * Fetch economic calendar data from Twelve Data API.
- * The API key is read from the environment variable TWELVEDATA_API_KEY.
+ * The API key is read from the environment variable NEXT_PUBLIC_TWELVEDATA_API_KEY (client) or TWELVEDATA_API_KEY (server).
  */
 export async function fetchTwelveDataEconomicCalendar(startDate: Date, endDate: Date): Promise<EconomicCalendarResponse> {
-  const apiKey = process.env.TWELVEDATA_API_KEY;
-  if (!apiKey) throw new Error('TWELVEDATA_API_KEY not set in environment');
+  const apiKey = process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY || process.env.TWELVEDATA_API_KEY;
+  if (!apiKey) throw new Error('TWELVEDATA_API_KEY or NEXT_PUBLIC_TWELVEDATA_API_KEY must be set in environment');
 
   // Twelve Data provides a date range filter via start_date and end_date parameters (YYYY-MM-DD).
   const start = startDate.toISOString().split('T')[0];
@@ -25,7 +25,7 @@ export async function fetchTwelveDataEconomicCalendar(startDate: Date, endDate: 
     return {
       id: e.id?.toString() || `${date.getTime()}`,
       title: e.title || e.event || 'Unknown',
-      date,
+      date: date.toISOString(),
       time: e.time || '00:00',
       impact: e.impact || 'Medium',
       category: e.country ? e.country : 'Economic',
@@ -41,7 +41,7 @@ export async function fetchTwelveDataEconomicCalendar(startDate: Date, endDate: 
 
   return {
     events,
-    lastUpdated: new Date(),
+    lastUpdated: new Date().toISOString(),
     source: 'Twelve Data API',
   };
 }

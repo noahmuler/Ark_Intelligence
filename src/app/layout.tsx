@@ -1,23 +1,12 @@
-"use client";
-
-import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "next-themes";
+import { ThemeProviderWrapper } from "@/components/theme-provider";
+import { ConvexProviderWrapper } from "@/components/convex-provider";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
-
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
-// Script to prevent theme flash - runs before React hydration
-const themeScript = `
-  (function() {
-    document.documentElement.classList.add('dark');
-  })();
-`;
 
 export default function RootLayout({
   children,
@@ -27,14 +16,27 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('ark-theme') || 'dark';
+                  document.documentElement.classList.add(theme);
+                } catch (e) {
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body className={`${inter.variable} min-h-full flex flex-col font-sans`}>
-        <ConvexProvider client={convex}>
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+        <ConvexProviderWrapper>
+          <ThemeProviderWrapper>
             {children}
-          </ThemeProvider>
-        </ConvexProvider>
+          </ThemeProviderWrapper>
+        </ConvexProviderWrapper>
       </body>
     </html>
   );

@@ -2,11 +2,27 @@
 // IMPORTANT: `convex/crons.ts` must default-export a Crons object.
 
 import { cronJobs } from "convex/server";
+import { internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const cron = cronJobs();
 
-// Temporarily export an empty cron configuration so Convex can build.
-// We'll re-add cron interval registrations once we align with this repo's cron scheduling API expectations.
+// Fetch market prices every 1 minute for real-time updates
+cron.interval(
+  "fetch market prices",
+  { minutes: 1 },
+  internal.apiData.fetchAndStorePrices,
+  {}
+);
+
+// Update asset briefs every 5 minutes with new market analysis
+cron.interval(
+  "update asset briefs",
+  { minutes: 5 },
+  internal.actions.updateAllAssetBriefs,
+  {}
+);
+
 export default cron;
 
 

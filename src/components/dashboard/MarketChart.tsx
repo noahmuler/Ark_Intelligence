@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import TradingViewWidget from "./TradingViewWidget";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 interface ChartDataPoint {
   time: string;
@@ -26,6 +28,9 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Fetch market price from Convex
+  const marketPrice = useQuery(api.marketDataQueries.getMarketPrice, { symbol });
+
   // Memoize timeframe configuration to prevent recreating objects
   const timeframeConfig = useMemo(() => ({
     points: {
@@ -48,15 +53,27 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
   useEffect(() => {
     const fetchChartData = async () => {
       try {
-        // Current quote
-        const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbol)}`);
-        if (!res.ok) {
-          throw new Error(`Ticker request failed: ${res.status}`);
-        }
-        const json = await res.json();
-        const quote = json?.data?.[symbol];
-        if (!quote || typeof quote.price !== 'number') {
-          throw new Error('Invalid ticker response');
+        // Use Convex market price if available, otherwise fall back to API
+        let quote: any;
+        
+        if (marketPrice) {
+          quote = {
+            price: marketPrice.price,
+            change: marketPrice.price * (marketPrice.changePercent / 100),
+            changePercent: marketPrice.changePercent,
+            volume: marketPrice.volume,
+          };
+        } else {
+          // Fallback to API
+          const res = await fetch(`/api/market/ticker?symbols=${encodeURIComponent(symbol)}`);
+          if (!res.ok) {
+            throw new Error(`Ticker request failed: ${res.status}`);
+          }
+          const json = await res.json();
+          quote = json?.data?.[symbol];
+          if (!quote || typeof quote.price !== 'number') {
+            throw new Error('Invalid ticker response');
+          }
         }
 
         // Build a synthesized mini-history for the canvas display using quote.change when possible
@@ -98,7 +115,7 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
     fetchChartData();
     const interval = setInterval(fetchChartData, 30000);
     return () => clearInterval(interval);
-  }, [symbol, timeframe, timeframeConfig]);
+  }, [symbol, timeframe, timeframeConfig, marketPrice]);
 
   // Optimized canvas drawing effect with proper cleanup
   useEffect(() => {

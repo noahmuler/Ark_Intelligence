@@ -51,7 +51,7 @@ export interface PolygonStockResponse {
 }
 
 const API_BASE_URL = 'https://api.polygon.io/v2';
-const API_KEY = process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'demo_key';
+const API_KEY = process.env.POLYGON_API_KEY || process.env.NEXT_PUBLIC_POLYGON_API_KEY || 'demo_key';
 
 // Circuit breaker pattern to prevent repeated failed requests
 let consecutiveFailures = 0;
@@ -102,50 +102,16 @@ const MARKET_INDICES = [
 ];
 
 /**
- * Get demo stock quote for fallback when API fails
- */
-function getDemoStockQuote(symbol: string): StockQuote {
-  const demoData: { [key: string]: StockQuote } = {
-    'XAUUSD': { symbol: 'XAUUSD', price: 2345.67, change: -8.23, changePercent: -0.35, volume: 124500, timestamp: new Date() },
-    'XAGUSD': { symbol: 'XAGUSD', price: 28.45, change: 0.12, changePercent: 0.42, volume: 89700, timestamp: new Date() },
-    'CL=F': { symbol: 'CL=F', price: 78.45, change: -1.23, changePercent: -1.54, volume: 567800, timestamp: new Date() },
-    'DX-Y.NYB': { symbol: 'DX-Y.NYB', price: 105.82, change: 1.24, changePercent: 1.18, volume: 89200, timestamp: new Date() },
-    '^TNX': { symbol: '^TNX', price: 4.32, change: -0.05, changePercent: -1.14, volume: 0, timestamp: new Date() },
-    'EURUSD': { symbol: 'EURUSD', price: 1.0876, change: 0.0023, changePercent: 0.21, volume: 250000000, timestamp: new Date() },
-    'GBPUSD': { symbol: 'GBPUSD', price: 1.2654, change: -0.0018, changePercent: -0.14, volume: 180000000, timestamp: new Date() },
-    'USDJPY': { symbol: 'USDJPY', price: 154.32, change: 0.45, changePercent: 0.29, volume: 220000000, timestamp: new Date() },
-    'AAPL': { symbol: 'AAPL', price: 178.45, change: 2.34, changePercent: 1.33, volume: 45200000, timestamp: new Date() },
-    'MSFT': { symbol: 'MSFT', price: 378.22, change: 3.12, changePercent: 0.83, volume: 32100000, timestamp: new Date() },
-    'GOOGL': { symbol: 'GOOGL', price: 142.56, change: -1.45, changePercent: -1.01, volume: 28900000, timestamp: new Date() },
-    'AMZN': { symbol: 'AMZN', price: 145.78, change: 2.67, changePercent: 1.87, volume: 41200000, timestamp: new Date() },
-    'META': { symbol: 'META', price: 485.23, change: 5.89, changePercent: 1.23, volume: 19800000, timestamp: new Date() },
-    'NVDA': { symbol: 'NVDA', price: 875.28, change: 12.45, changePercent: 1.44, volume: 45600000, timestamp: new Date() },
-    'TSLA': { symbol: 'TSLA', price: 245.67, change: -3.45, changePercent: -1.38, volume: 112000000, timestamp: new Date() }
-  };
-  
-  return demoData[symbol] || {
-    symbol,
-    price: 100 + Math.random() * 1000,
-    change: (Math.random() - 0.5) * 10,
-    changePercent: (Math.random() - 0.5) * 5,
-    volume: Math.floor(Math.random() * 1000000),
-    timestamp: new Date()
-  };
-}
-
-/**
  * Fetch real-time quote for a single stock
  */
 export async function fetchStockQuote(symbol: string): Promise<StockQuote> {
   if (!API_KEY || API_KEY === 'demo_key') {
-    console.warn('Invalid or missing POLYGON_API_KEY, using demo data');
-    return getDemoStockQuote(symbol);
+    throw new Error('Invalid or missing POLYGON_API_KEY');
   }
 
   // Check circuit breaker
   if (shouldUseCircuitBreaker()) {
-    console.warn(`Circuit breaker active for Polygon API, using demo data for ${symbol}`);
-    return getDemoStockQuote(symbol);
+    throw new Error(`Circuit breaker active for Polygon API`);
   }
 
   try {
@@ -167,15 +133,13 @@ export async function fetchStockQuote(symbol: string): Promise<StockQuote> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`Polygon API request failed: ${response.status} ${response.statusText}, using demo data`);
-      return getDemoStockQuote(symbol);
+      throw new Error(`Polygon API request failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     
     if (data.resultsCount === 0 || !data.results || data.results.length === 0) {
-      console.warn(`No data found for symbol ${symbol}, using demo data`);
-      return getDemoStockQuote(symbol);
+      throw new Error(`No data found for symbol ${symbol}`);
     }
 
     const apiResult = data.results[0];
@@ -202,19 +166,24 @@ export async function fetchStockQuote(symbol: string): Promise<StockQuote> {
     // Handle specific network errors
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        console.warn(`Polygon API request timed out for ${symbol}, using demo data`);
+        console.error(`Polygon API request timed out for ${symbol}`);
+        throw new Error(`Polygon API request timed out for ${symbol}`);
       } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        console.warn(`Network error fetching ${symbol}, using demo data:`, error.message);
+        console.error(`Network error fetching ${symbol}:`, error.message);
+        throw new Error(`Network error fetching ${symbol}: ${error.message}`);
       } else if (error.message.includes('CORS')) {
-        console.warn(`CORS error fetching ${symbol}, using demo data:`, error.message);
+        console.error(`CORS error fetching ${symbol}:`, error.message);
+        throw new Error(`CORS error fetching ${symbol}: ${error.message}`);
       } else {
-        console.error(`Unexpected error fetching ${symbol}, using demo data:`, error);
+        console.error(`Unexpected error fetching ${symbol}:`, error);
+        throw error;
       }
     } else {
-      console.error(`Unknown error fetching ${symbol}, using demo data:`, error);
+      console.error(`Unknown error fetching ${symbol}:`, error);
+      throw new Error(`Unknown error fetching ${symbol}`);
     }
     recordFailure(); // Increment failure count for circuit breaker
-    return getDemoStockQuote(symbol);
+    throw error;
   }
 }
 
@@ -235,41 +204,7 @@ export async function fetchMultipleStockQuotes(symbols: string[]): Promise<Stock
  */
 export async function fetchStockMarketData(): Promise<PolygonStockResponse> {
   if (!API_KEY || API_KEY === 'demo_key') {
-    console.warn('Invalid or missing POLYGON_API_KEY, using demo data');
-    // Return demo data
-    const stockQuotes = POPULAR_STOCKS.map(symbol => getDemoStockQuote(symbol));
-    const indexQuotes = MARKET_INDICES.map(idx => getDemoStockQuote(idx.symbol));
-    
-    const stocks: StockData[] = stockQuotes.map(quote => ({
-      symbol: quote.symbol,
-      name: getStockName(quote.symbol),
-      price: quote.price,
-      change: quote.change,
-      changePercent: quote.changePercent,
-      volume: quote.volume,
-      marketCap: 0,
-      dayHigh: quote.dayHigh || 0,
-      dayLow: quote.dayLow || 0,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh || 0,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow || 0,
-      lastUpdated: quote.timestamp
-    }));
-
-    const indices: MarketIndex[] = indexQuotes.map((quote, index) => ({
-      symbol: quote.symbol,
-      name: MARKET_INDICES[index].name,
-      value: quote.price,
-      change: quote.change,
-      changePercent: quote.changePercent,
-      timestamp: quote.timestamp
-    }));
-
-    return {
-      data: stocks,
-      indices,
-      lastUpdated: new Date(),
-      source: "Demo Data (Polygon API unavailable)"
-    };
+    throw new Error('Invalid or missing POLYGON_API_KEY');
   }
 
   try {

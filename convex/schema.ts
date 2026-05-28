@@ -68,4 +68,33 @@ export default defineSchema({
     closeReason: v.optional(v.string()), // Close reason (e.g. "sl", "tp", "user")
   }).index("by_userId", ["userId"])
    .index("by_userId_ticket", ["userId", "ticket"]),
+
+  // Market prices from Yahoo Finance (cached)
+  marketPrices: defineTable({
+    symbol: v.string(), // e.g., "AAPL", "BTC-USD"
+    price: v.number(), // Current price
+    changePercent: v.number(), // Percentage change
+    type: v.union(v.literal("stock"), v.literal("crypto")), // Asset type
+    timestamp: v.number(), // Cache timestamp
+    high: v.optional(v.number()), // Day high
+    low: v.optional(v.number()), // Day low
+    volume: v.optional(v.number()), // Volume
+    marketCap: v.optional(v.number()), // Market cap
+  }).index("by_symbol", ["symbol"])
+   .index("by_type", ["type"])
+   .index("by_timestamp", ["timestamp"]),
+
+  // Economic calendar events from Yahoo Finance
+  economicCalendar: defineTable({
+    event: v.string(), // Event name
+    country: v.string(), // Country code
+    date: v.string(), // Event date (ISO format)
+    importance: v.union(v.literal("high"), v.literal("medium"), v.literal("low")), // Importance level
+    actual: v.union(v.string(), v.null()), // Actual value
+    forecast: v.union(v.string(), v.null()), // Forecast value
+    previous: v.union(v.string(), v.null()), // Previous value
+    timestamp: v.number(), // Cache timestamp
+  }).index("by_date", ["date"])
+   .index("by_importance", ["importance"])
+   .index("by_timestamp", ["timestamp"]),
 });

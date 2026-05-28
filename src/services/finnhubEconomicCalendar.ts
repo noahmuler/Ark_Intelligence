@@ -8,7 +8,7 @@
 export interface FinnhubEconomicEvent {
   id: string;
   title: string;
-  date: Date;
+  date: string; // ISO string instead of Date
   time: string;
   impact: "High" | "Medium" | "Low";
   category: "Fed" | "Macro" | "Economic" | "Geopolitical" | "Earnings";
@@ -24,7 +24,7 @@ export interface FinnhubEconomicEvent {
 
 export interface FinnhubEconomicCalendarResponse {
   events: FinnhubEconomicEvent[];
-  lastUpdated: Date;
+  lastUpdated: string; // ISO string instead of Date
   source: string;
 }
 
@@ -236,12 +236,13 @@ export async function fetchFinnhubEconomicCalendar(
       const country = event.country || 'Unknown';
       const category = mapCategory(title, country);
       const assets = determineAssets(country, category, title);
+      const eventDate = new Date(event.time * 1000); // Finnhub uses Unix timestamp
       
       return {
         id: event.id || `${event.time}-${title}`,
         title,
-        date: new Date(event.time * 1000), // Finnhub uses Unix timestamp
-        time: new Date(event.time * 1000).toLocaleTimeString('en-US', { 
+        date: eventDate.toISOString(),
+        time: eventDate.toLocaleTimeString('en-US', { 
           hour: 'numeric', 
           minute: '2-digit',
           hour12: true 
@@ -261,7 +262,7 @@ export async function fetchFinnhubEconomicCalendar(
 
     return {
       events,
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
       source: "Finnhub Economic Calendar"
     };
 

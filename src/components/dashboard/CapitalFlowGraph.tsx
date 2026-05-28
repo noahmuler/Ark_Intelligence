@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 
 type AssetKey = "XAU" | "BTC" | "OIL" | "DXY" | "NQ" | "ES";
@@ -13,14 +15,16 @@ function clamp01(n: number) {
 
 // This is a lightweight, self-contained visual that matches the prompt requirement:
 // remove the placeholder DXY chart and replace it with a relational "Capital Flow" graph.
-// If/when Convex price + economic bias ingestion is added, this can be wired to live data.
+// Now wired to live Convex price data.
 export function CapitalFlowGraph({
   className = "",
 }: {
   className?: string;
 }) {
-  // Deterministic pseudo-flow so the card renders immediately without external data.
-  // The goal here is to ship the UI overhaul; real wiring comes after ingestion.
+  // Fetch real price data from Convex
+  const prices = useQuery(api.actions.getAllPrices) ?? [];
+
+  // Calculate capital flow based on real price changes
   const { nodes, edges } = useMemo(() => {
     // Node positions: hexagon layout
     const cx = 130;
@@ -36,9 +40,15 @@ export function CapitalFlowGraph({
     });
 
     // Edge weights: risk-on -> risk-off and central pivot.
-    // (Heuristic only; deterministic.)
+    // Now based on real price changes from Convex
     const riskOn: AssetKey[] = ["NQ", "ES", "BTC", "OIL"];
     const riskOff: AssetKey[] = ["DXY", "XAU"];
+
+    // Get price changes for each asset
+    const getPriceChange = (symbol: AssetKey): number => {
+      const priceData = prices.find(p => p.symbol === symbol);
+      return priceData?.change24h || 0;
+    };
 
     const edges: Array<{
       from: AssetKey;
@@ -49,28 +59,37 @@ export function CapitalFlowGraph({
 
     for (const from of riskOn) {
       for (const to of riskOff) {
-        // Pseudo weight based on index relationship
-        const fi = ASSETS.indexOf(from);
-        const ti = ASSETS.indexOf(to);
-        const raw = 0.35 + 0.35 * (1 - Math.abs(fi - ti) / ASSETS.length);
-        const w = clamp01(raw);
-        edges.push({ from, to, w, dir: "up" });
+        // Weight based on real price changes
+        const fromChange = getPriceChange(from);
+        const toChange = getPriceChange(to);
+        
+        // Calculate flow strength based on relative performance
+        const flowStrength = (fromChange - toChange) / 10; // Normalize
+        const w = clamp01(0.3 + Math.abs(flowStrength));
+        
+        // Direction based on which is performing better
+        const dir = fromChange > toChange ? "up" : "down";
+        
+        edges.push({ from, to, w, dir });
       }
     }
 
-    // Add a return drift (risk-off -> risk-on) with smaller weights.
+    // Add return flows (risk-off -> risk-on)
     for (const from of riskOff) {
       for (const to of riskOn) {
-        const fi = ASSETS.indexOf(from);
-        const ti = ASSETS.indexOf(to);
-        const raw = 0.12 + 0.25 * (1 - Math.abs(fi - ti) / ASSETS.length);
-        const w = clamp01(raw);
-        edges.push({ from, to, w, dir: "down" });
+        const fromChange = getPriceChange(from);
+        const toChange = getPriceChange(to);
+        
+        const flowStrength = (toChange - fromChange) / 10;
+        const w = clamp01(0.1 + Math.abs(flowStrength) * 0.5);
+        const dir = toChange > fromChange ? "up" : "down";
+        
+        edges.push({ from, to, w, dir });
       }
     }
 
     return { nodes, edges };
-  }, []);
+  }, [prices]);
 
   const nodeByKey = useMemo(() => {
     const m = new Map<AssetKey, { x: number; y: number }>();

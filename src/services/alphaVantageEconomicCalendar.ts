@@ -8,7 +8,7 @@
 export interface AlphaVantageEconomicEvent {
   id: string;
   title: string;
-  date: Date;
+  date: string; // ISO string instead of Date
   time: string;
   impact: "High" | "Medium" | "Low";
   category: "Fed" | "Macro" | "Economic" | "Geopolitical" | "Earnings";
@@ -24,7 +24,7 @@ export interface AlphaVantageEconomicEvent {
 
 export interface AlphaVantageEconomicCalendarResponse {
   events: AlphaVantageEconomicEvent[];
-  lastUpdated: Date;
+  lastUpdated: string; // ISO string instead of Date
   source: string;
 }
 
@@ -44,7 +44,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-gdp-${Date.now()}`,
         title: 'US Real GDP Release',
-        date: getNextQuarterEnd(today),
+        date: getNextQuarterEnd(today).toISOString(),
         time: '8:30am',
         impact: 'High',
         category: 'Economic',
@@ -62,7 +62,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-cpi-${Date.now()}`,
         title: 'US Consumer Price Index (CPI)',
-        date: getNextMonthStart(today),
+        date: getNextMonthStart(today).toISOString(),
         time: '8:30am',
         impact: 'High',
         category: 'Economic',
@@ -80,7 +80,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-unemp-${Date.now()}`,
         title: 'US Unemployment Rate',
-        date: getNextMonthStart(today),
+        date: getNextMonthStart(today).toISOString(),
         time: '8:30am',
         impact: 'High',
         category: 'Economic',
@@ -98,7 +98,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-fed-${Date.now()}`,
         title: 'Federal Funds Rate Decision',
-        date: getNextFOMCMeeting(today),
+        date: getNextFOMCMeeting(today).toISOString(),
         time: '2:00pm',
         impact: 'High',
         category: 'Fed',
@@ -116,7 +116,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-retail-${Date.now()}`,
         title: 'US Retail Sales',
-        date: getNextMonthStart(today),
+        date: getNextMonthStart(today).toISOString(),
         time: '8:30am',
         impact: 'Medium',
         category: 'Economic',
@@ -134,7 +134,7 @@ function mapIndicatorToEvent(indicator: string, data: any): AlphaVantageEconomic
       events.push({
         id: `av-durable-${Date.now()}`,
         title: 'US Durable Goods Orders',
-        date: getNextMonthStart(today),
+        date: getNextMonthStart(today).toISOString(),
         time: '8:30am',
         impact: 'Medium',
         category: 'Economic',
@@ -202,15 +202,13 @@ async function fetchEconomicIndicator(indicator: string): Promise<any> {
   
   // Handle Alpha Vantage error messages
   if (data['Error Message']) {
-    console.warn(`Alpha Vantage API Error: ${data['Error Message']}`);
-    // Return mock data instead of throwing error
-    return createMockIndicatorData(indicator);
+    console.error(`Alpha Vantage API Error: ${data['Error Message']}`);
+    throw new Error(`Alpha Vantage API Error: ${data['Error Message']}`);
   }
   
   if (data['Note']) {
-    console.warn(`Alpha Vantage API Limit: ${data['Note']}`);
-    // Return mock data instead of throwing error
-    return createMockIndicatorData(indicator);
+    console.error(`Alpha Vantage API Limit: ${data['Note']}`);
+    throw new Error(`Alpha Vantage API Limit: ${data['Note']}`);
   }
   
   return data;
@@ -289,7 +287,7 @@ export async function fetchAlphaVantageEconomicCalendar(
         
         // Filter events within the requested date range
         const filteredEvents = events.filter(event => 
-          event.date >= startDate && event.date <= endDate
+          new Date(event.date) >= startDate && new Date(event.date) <= endDate
         );
         
         allEvents.push(...filteredEvents);
@@ -300,11 +298,11 @@ export async function fetchAlphaVantageEconomicCalendar(
     }
     
     // Sort events by date
-    allEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
+    allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     return {
       events: allEvents,
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
       source: "Alpha Vantage Economic Indicators"
     };
 

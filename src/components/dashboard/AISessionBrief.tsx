@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { generateMarketOverview } from "@/services/geminiMarketAnalysis";
-import { fetchComprehensiveMarketData } from "@/services/dataServiceManager";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 interface SessionBrief {
   mainDriver: string;
@@ -17,55 +17,48 @@ interface SessionBrief {
 }
 
 /**
- * Transform AI analysis to SessionBrief format
+ * Transform Convex data to SessionBrief format
  */
-function transformAIToSessionBrief(aiAnalysis: any, marketData: any): SessionBrief {
-  // Validate aiAnalysis and marketData shapes
-  const isValidAI = aiAnalysis && aiAnalysis.analysis;
-  const isValidMarket = marketData && Array.isArray(marketData.stocks);
+function transformConvexToSessionBrief(prices: any[], briefs: any[]): SessionBrief {
+  // Calculate overall market bias from price changes
+  const totalChange = prices.reduce((sum, p) => sum + (p.change24h || 0), 0);
+  const avgChange = prices.length > 0 ? totalChange / prices.length : 0;
+  
+  const bias = avgChange > 0.5 ? "Bullish" : avgChange < -0.5 ? "Bearish" : "Neutral";
 
-  const bias = isValidAI && aiAnalysis.analysis.marketOutlook === "Positive" ? "Bullish" :
-               isValidAI && aiAnalysis.analysis.marketOutlook === "Negative" ? "Bearish" : "Neutral";
+  // Find main driver (asset with largest absolute change)
+  const mainDriverAsset = prices.reduce((max, p) => 
+    Math.abs(p.change24h || 0) > Math.abs(max.change24h || 0) ? p : max, prices[0]
+  );
+  
+  const mainDriver = `${mainDriverAsset?.symbol || "Market"} leading ${Math.abs(mainDriverAsset?.change24h || 0).toFixed(2)}%`;
 
-  // Extract key levels from market data (simplified)
-  const getTopStocks = () => {
-    if (!isValidMarket || !Array.isArray(marketData.stocks)) {
-      return [];
-    }
-    return marketData.stocks.slice(0, 3);
-  };
+  // Calculate support and resistance from prices
+  const support = prices.slice(0, 3).map(p => `$${(p.price * 0.98).toFixed(2)}`);
+  const resistance = prices.slice(0, 3).map(p => `$${(p.price * 1.02).toFixed(2)}`);
 
-  const topStocks = getTopStocks();
-  const support = topStocks.map((stock: any) => `$${(stock.price * 0.98).toFixed(2)}`);
-  const resistance = topStocks.map((stock: any) => `$${(stock.price * 1.02).toFixed(2)}`);
+  // Get AI brief from Convex if available
+  const briefText = briefs.find(b => b.symbol === mainDriverAsset?.symbol)?.brief || 
+                    "Market data sourced live from Convex backend with real-time price feeds.";
 
   return {
-    mainDriver: (isValidAI && Array.isArray(aiAnalysis.analysis.keyInsights) && aiAnalysis.analysis.keyInsights[0]?.title) || "Market Analysis",
+    mainDriver,
     bias,
-    analysis: (isValidAI && aiAnalysis.analysis.summary) || "Market analysis in progress...",
+    analysis: briefText,
     keyLevels: {
       support: support.slice(0, 3),
       resistance: resistance.slice(0, 3)
     },
-    timestamp: "2024-01-01T00:00:00.000Z"
+    timestamp: new Date().toISOString()
   };
 }
 
 /**
- * Fetch real AI session brief
+ * Fetch real session brief from Convex
  */
 async function fetchRealSessionBrief(): Promise<SessionBrief> {
-  try {
-    const [aiAnalysis, marketData] = await Promise.all([
-      generateMarketOverview(),
-      fetchComprehensiveMarketData()
-    ]);
-    
-    return transformAIToSessionBrief(aiAnalysis, marketData.data);
-  } catch (error) {
-    console.error('Error fetching session brief:', error);
-    return getFallbackSessionBrief();
-  }
+  // This function is no longer needed as we use Convex useQuery
+  return getFallbackSessionBrief();
 }
 
 /**
@@ -85,43 +78,30 @@ function getFallbackSessionBrief(): SessionBrief {
 }
 
 export const AISessionBrief = React.memo(function AISessionBrief({ className = "" }: { className?: string }) {
-  const [sessionBrief, setSessionBrief] = useState<SessionBrief>(getFallbackSessionBrief());
+  // Fetch real data from Convex
+  const prices = useQuery(api.actions.getAllPrices) ?? [];
+  const briefs = useQuery(api.actions.getAllAssetBriefs) ?? [];
+
+  // Transform Convex data to session brief format
+  const sessionBrief = React.useMemo(() => {
+    if (prices.length === 0) {
+      return getFallbackSessionBrief();
+    }
+    return transformConvexToSessionBrief(prices, briefs);
+  }, [prices, briefs]);
+
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Simulate loading state for UX
   useEffect(() => {
-    
-    // Initial AI brief fetch
-    const fetchInitialBrief = async () => {
-      try {
-        setIsGenerating(true);
-        const realBrief = await fetchRealSessionBrief();
-        setSessionBrief(realBrief);
-      } catch (error) {
-        console.error('Initial AI brief fetch failed:', error);
-        // Keep fallback data if initial fetch fails
-      } finally {
-        setIsGenerating(false);
-      }
-    };
-
-    fetchInitialBrief();
-    
-    // Set up interval for real-time AI brief updates
-    const interval = setInterval(async () => {
-      try {
-        setIsGenerating(true);
-        const realBrief = await fetchRealSessionBrief();
-        setSessionBrief(realBrief);
-      } catch (error) {
-        console.error('Periodic AI brief fetch failed:', error);
-        // Keep current data if periodic fetch fails
-      } finally {
-        setIsGenerating(false);
-      }
-    }, 300000); // Update every 5 minutes for AI analysis
-
-    return () => clearInterval(interval);
-  }, []);
+    if (prices.length > 0) {
+      setIsGenerating(false);
+    } else {
+      setIsGenerating(true);
+      const timer = setTimeout(() => setIsGenerating(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [prices.length]);
 
   const getBiasColor = useCallback((bias: string) => {
     switch (bias) {
@@ -140,14 +120,9 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
   }, []);
 
   const handleRefresh = useCallback(() => {
+    // Convex useQuery automatically refreshes, just show loading state
     setIsGenerating(true);
-    fetchRealSessionBrief().then(realBrief => {
-      setSessionBrief(realBrief);
-      setIsGenerating(false);
-    }).catch(error => {
-      console.error('Manual refresh failed:', error);
-      setIsGenerating(false);
-    });
+    setTimeout(() => setIsGenerating(false), 500);
   }, []);
 
   // Memoize the timestamp display to prevent unnecessary recalculations
