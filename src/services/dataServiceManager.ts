@@ -7,6 +7,7 @@
 
 import { fetchStockMarketData, StockData, MarketIndex } from './polygonStockData';
 import { fetchAlphaVantageEconomicCalendar, AlphaVantageEconomicCalendarResponse } from './alphaVantageEconomicCalendar';
+
 import { generateMarketOverview, analyzeStock, analyzeEconomicImpact, GeminiAnalysisResponse } from './geminiMarketAnalysis';
 import { fetchMultipleCryptoData, CRYPTO_SYMBOL_MAP } from './coinGeckoCryptoData';
 
@@ -213,7 +214,7 @@ export async function fetchComprehensiveMarketData(): Promise<DataServiceRespons
       // Fallback to empty calendar
       economicCalendar = {
         events: [],
-        lastUpdated: new Date(),
+        lastUpdated: new Date().toISOString(),
         source: "No Data Available"
       };
     }
@@ -267,7 +268,7 @@ export async function fetchComprehensiveMarketData(): Promise<DataServiceRespons
         indices: [],
         economicCalendar: {
           events: [],
-          lastUpdated: new Date(),
+          lastUpdated: new Date().toISOString(),
           source: "Service Unavailable"
         },
         aiAnalysis: {

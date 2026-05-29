@@ -16,8 +16,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Time intervals for horizontal timeline (daily view)
-const TIME_INTERVALS = ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00", "19:00", "21:00"];
+// Hour markers for the 24h horizontal timeline view (00:00 → 23:00 in 2-hour steps)
+const TIME_INTERVALS = ["00:00","02:00","04:00","06:00","08:00","10:00","12:00","14:00","16:00","18:00","20:00","22:00"];
+
 
 // Helper function to get day columns for weekly view
 const getWeekDays = (startDate: Date) => {
@@ -281,28 +282,26 @@ export default function Calendar() {
     });
   };
   
-  // Calculate spotlight position based on view type
+  // Calculate spotlight position for current time within the timeline.
+  // For weekly view, align with the current day's column and add intra-day fraction.
+  // NOTE: We intentionally do NOT key off `selectedDate` to avoid the "wrong day" drift in daily mode.
   const getSpotlightPosition = () => {
+    const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+
     if (viewType === 'week') {
       const weekDays = getWeekDays(selectedDate);
-      const currentDayIndex = weekDays.findIndex(day => 
-        day.date.toDateString() === new Date().toDateString()
-      );
+      const currentDayIndex = weekDays.findIndex(day => day.date.toDateString() === new Date().toDateString());
       if (currentDayIndex >= 0) {
-        return ((currentDayIndex + 0.5) / weekDays.length) * 100;
+        const columnStart = (currentDayIndex / weekDays.length) * 100;
+        const intraDayOffset = (currentMinutes / 1440) * (100 / weekDays.length);
+        return columnStart + intraDayOffset;
       }
       return 50;
-    } else {
-      const visibleStartHour = 7;
-      const visibleEndHour = 21;
-      const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
-      const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-      const visibleStartMinutes = visibleStartHour * 60;
-      const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
-      const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
-      return fraction * 100;
     }
+
+    return (currentMinutes / 1440) * 100;
   };
+
 
   return (
     <MainLayout>
@@ -515,14 +514,10 @@ export default function Calendar() {
                         return 50; // Default to middle if today not in view
                       } else {
                         // For daily view (Today/Tomorrow), position based on current hour with fluid movement
-                        const visibleStartHour = 7; // 07:00
-                        const visibleEndHour = 21; // 21:00
-                        const visibleDurationMinutes = (visibleEndHour - visibleStartHour) * 60;
                         const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-                        const visibleStartMinutes = visibleStartHour * 60;
-                        const minutesSinceVisibleStart = currentMinutes - visibleStartMinutes;
-                        const fraction = Math.max(0, Math.min(1, minutesSinceVisibleStart / visibleDurationMinutes));
-                        return fraction * 100;
+                        const leftOffset = (currentMinutes / 1440) * 100;
+                        return leftOffset;
+
                       }
                     })()}%`
                   }}
