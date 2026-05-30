@@ -1,59 +1,76 @@
 import { NextResponse } from 'next/server';
 
-function normalizeImpact(v: any): 'HIGH' | 'MEDIUM' | 'LOW' {
-  const s = (v ?? '').toString().toUpperCase();
-  if (!s) return 'LOW';
-  if (s === 'HIGH' || s === 'RED' || s === '3') return 'HIGH';
-  if (s === 'MEDIUM' || s === 'ORANGE' || s === '2') return 'MEDIUM';
+// Tries to extract an array from any API response shape
+function extractArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    for (const key of ['results', 'data', 'events', 'calendar', 'items']) {
+      if (Array.isArray(obj[key])) return obj[key] as unknown[];
+    }
+    // Single object wrapped?
+    if ('id' in obj || 'title' in obj || 'name' in obj) return [obj];
+  }
+  return [];
+}
+
+function normalizeImpact(v: unknown): 'HIGH' | 'MEDIUM' | 'LOW' {
+  const s = String(v ?? '').toUpperCase();
+  if (['HIGH', 'RED', '3', 'HOLIDAY'].includes(s)) return 'HIGH';
+  if (['MEDIUM', 'ORANGE', 'MODERATE', '2'].includes(s)) return 'MEDIUM';
   return 'LOW';
+}
+
+// Always returns today's date in YYYY-MM-DD in UTC
+function todayUTC(): string {
+  return new Date().toISOString().split('T')[0];
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const today = new Date().toISOString().split('T')[0];
-  const from = searchParams.get('from') ?? today;
-  const to = searchParams.get('to') ?? from;
+  const from = searchParams.get('from') ?? todayUTC();
+  const to   = searchParams.get('to')   ?? from;
 
   const apiKey = process.env.JBLANKED_API_KEY ?? '';
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Api-Key ${apiKey}`;
 
-  // JBlanked Free Calendar API
-  // Docs: https://www.jblanked.com/ (free tier available)
+  // Try JBlanked ForexFactory endpoint
   const url = `https://www.jblanked.com/news/api/forex-factory/calendar/range/?from=${from}&to=${to}`;
 
-  const res = await fetch(url, {
-    headers: apiKey ? { Authorization: `Api-Key ${apiKey}` } : {},
-    next: { revalidate: 300 },
-  });
-
-  // Normalize certain provider auth/rate-limit responses into an empty set
-  if (res.status === 401 || res.status === 403 || res.status === 429) {
-    return NextResponse.json([]);
+  let raw: unknown;
+  try {
+    const res = await fetch(url, { headers, next: { revalidate: 300 } });
+    if (!res.ok) {
+      console.error(`[calendar] JBlanked responded ${res.status}`);
+      // Return empty array with status so the UI can show proper error
+      return NextResponse.json([], { status: 200 });
+    }
+    raw = await res.json();
+  } catch (err) {
+    console.error('[calendar] fetch error', err);
+    return NextResponse.json([], { status: 200 });
   }
 
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: 'Calendar fetch failed', status: res.status },
-      { status: 502 },
-    );
+  const items = extractArray(raw);
+
+  if (items.length === 0) {
+    console.warn('[calendar] API returned 0 events for', from, '→', to, 'raw type:', typeof raw);
   }
 
-  const raw = await res.json();
-
-  const items = Array.isArray(raw) ? raw : (raw?.results ?? raw?.data ?? []);
-
-  // If provider returns an object or unexpected structure, do not hard-fail.
-  const normalized = (Array.isArray(items) ? items : []).map((e: any, i: number) => {
-    const dateUtc = e.date ?? e.dateUtc ?? e.datetime ?? e.time ?? null;
+  const normalized = items.map((e: unknown, i: number) => {
+    const ev = e as Record<string, unknown>;
     return {
-      id: e.id ?? e.eventId ?? `evt-${i}`,
-      title: e.name ?? e.title ?? e.event ?? 'Unknown',
-      currency: e.currency ?? e.currencyCode ?? '',
-      country: e.country ?? e.countryCode ?? '',
-      impact: normalizeImpact(e.impact ?? e.volatility),
-      dateUtc: dateUtc ? new Date(dateUtc).toISOString() : new Date().toISOString(),
-      actual: e.actual ?? null,
-      forecast: e.forecast ?? e.consensus ?? null,
-      previous: e.previous ?? null,
+      id:       String(ev.id ?? ev.eventId ?? `evt-${i}`),
+      title:    String(ev.name ?? ev.title ?? ev.event ?? 'Unknown Event'),
+      currency: String(ev.currency ?? ev.currencyCode ?? ''),
+      country:  String(ev.country ?? ev.countryCode ?? ''),
+      impact:   normalizeImpact(ev.impact ?? ev.volatility ?? ev.strength ?? 'LOW'),
+      // Accept any date field name; prefer ISO UTC string
+      dateUtc:  String(ev.date ?? ev.dateUtc ?? ev.datetime ?? ev.time ?? ev.scheduled ?? ''),
+      actual:   ev.actual   != null ? String(ev.actual)   : null,
+      forecast: ev.forecast != null ? String(ev.forecast) : (ev.consensus != null ? String(ev.consensus) : null),
+      previous: ev.previous != null ? String(ev.previous) : null,
     };
   });
 
