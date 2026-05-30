@@ -73,6 +73,7 @@ export default function Calendar() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<string>("Loading...");
+  const [providerStatus, setProviderStatus] = useState<any>(undefined);
   
   // View type state: 'today', 'tomorrow', 'week', 'custom'
   const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('week');
@@ -147,12 +148,14 @@ export default function Calendar() {
       
       const data = await response.json();
       setEvents(data.events || []);
+      setProviderStatus(data.providerStatus);
       setDataSource(data.source || 'API');
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       
       setError("Failed to load economic events");
       setDataSource("Error");
+      setProviderStatus(undefined);
       console.error("Error loading economic events:", err);
       setEvents([]);
     } finally {
@@ -179,6 +182,8 @@ export default function Calendar() {
     const impactMatch = selectedImpacts.length === 0 || selectedImpacts.includes(event.impact);
     return currencyMatch && impactMatch;
   });
+
+
 
   // Group events by time interval (for daily view)
   const getEventsForInterval = (interval: string) => {
@@ -484,7 +489,20 @@ export default function Calendar() {
             </div>
           )}
 
+          {/* Provider Status (debug) */}
+          {providerStatus && (
+            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <div className="flex items-center gap-2 text-amber-300">
+                <AlertTriangle className="h-5 w-5" />
+                <span className="text-sm">
+                  Calendar feed empty (Convex provider returned no events). Check API keys.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Horizontal Timeline Canvas */}
+
           <div className="w-full relative min-h-[calc(100vh-200px)] mx-0 mb-0">
             {/* Spotlight Effect - Dynamic radial gradient following current-time marker */}
             <div 

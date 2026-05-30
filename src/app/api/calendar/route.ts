@@ -48,15 +48,24 @@ export async function GET(request: NextRequest) {
       response = await fetchAction(api.today.fetchToday, {});
     }
 
-    // If response is null or has no events, return minimal fallback data
+    // If response is null or has no events, DO NOT silently return mock events.
+    // Instead, surface the provider status so the UI isn't misleading.
     if (!response || !response.events || response.events.length === 0) {
-      console.warn('No events returned from Convex action, using minimal fallback data');
+      console.warn('No events returned from Convex action');
       return NextResponse.json({
-        events: getMinimalFallbackEvents(viewType, date),
-        source: 'No Data Available - Check API Keys',
+        events: [],
+        source: 'No Data',
+        providerStatus: {
+          status: 'no-data',
+          requestedViewType: viewType,
+          requestedDate: date,
+          startDate,
+          endDate,
+        },
         lastUpdated: new Date().toISOString(),
       });
     }
+
 
     // Transform events to match the UI requirements
     const transformedEvents = (response.events || []).map((event: any) => ({
