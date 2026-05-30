@@ -66,7 +66,7 @@ interface CalendarEvent {
   assets?: string[];
 }
 
-export default function Calendar() {
+export default function CalendarPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
