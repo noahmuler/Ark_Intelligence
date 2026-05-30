@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { 
   Calendar as CalendarIcon, 
@@ -15,6 +15,7 @@ import {
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCalendarEvents, CalendarEvent as ApiCalendarEvent } from "@/hooks/useCalendarEvents";
 
 // Hour markers for the 24h horizontal timeline view (00:00 → 23:00 in 2-hour steps)
 const TIME_INTERVALS = ["00:00","02:00","04:00","06:00","08:00","10:00","12:00","14:00","16:00","18:00","20:00","22:00"];
@@ -66,17 +67,39 @@ interface CalendarEvent {
   assets?: string[];
 }
 
+// Map API event to UI event format
+const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent): CalendarEvent => {
+  const date = new Date(apiEvent.dateUtc);
+  // Convert impact from uppercase to title case for UI consistency
+  const impactMap: Record<string, string> = {
+    'HIGH': 'High',
+    'MEDIUM': 'Medium',
+    'LOW': 'Low',
+  };
+  const impact = impactMap[apiEvent.impact] || apiEvent.impact;
+  
+  return {
+    id: apiEvent.id,
+    title: apiEvent.title,
+    currency: apiEvent.currency,
+    impact: impact,
+    time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    date: apiEvent.dateUtc,
+    actual: apiEvent.actual ?? undefined,
+    forecast: apiEvent.forecast ?? undefined,
+    previous: apiEvent.previous ?? undefined,
+    confidence: "62%",
+    category: "Economic",
+  };
+};
+
 export default function CalendarPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<string>("Loading...");
-  const [providerStatus, setProviderStatus] = useState<any>(undefined);
   
   // View type state: 'today', 'tomorrow', 'week', 'custom'
-  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('week');
+  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
   
   // Filter states
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(CURRENCIES);
@@ -121,58 +144,28 @@ export default function CalendarPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const loadEvents = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      let url = '/api/calendar?';
-      
-      if (viewType === 'today') {
-        url += 'viewType=today';
-      } else if (viewType === 'tomorrow') {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        url += `viewType=day&date=${tomorrow.toISOString().split('T')[0]}`;
-      } else if (viewType === 'week') {
-        url += 'viewType=week';
-      } else if (viewType === 'custom') {
-        url += `viewType=day&date=${selectedDate.toISOString().split('T')[0]}`;
-      }
-      
-      const response = await fetch(url, { signal });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch calendar data');
-      }
-      
-      const data = await response.json();
-      setEvents(data.events || []);
-      setProviderStatus(data.providerStatus);
-      setDataSource(data.source || 'API');
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      
-      setError("Failed to load economic events");
-      setDataSource("Error");
-      setProviderStatus(undefined);
-      console.error("Error loading economic events:", err);
-      setEvents([]);
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [viewType, selectedDate]);
+  // Use the new useCalendarEvents hook
+  const customDateParam = viewType === 'custom' 
+    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` 
+    : undefined;
+  const { data: apiEvents, isLoading, isError } = useCalendarEvents(
+    viewType === 'custom' ? 'today' : viewType,
+    customDateParam
+  );
 
+  // Map API events to UI events
+  const events = (apiEvents || []).map(mapApiEventToUiEvent);
+  const loading = isLoading;
+  const dataSource = isError ? "Error" : isLoading ? "Loading" : "JBlanked API";
+
+  // Set error state based on isError (in useEffect to avoid render-phase update)
   useEffect(() => {
-    if (!mounted) return;
-    
-    const controller = new AbortController();
-    loadEvents(controller.signal);
-    
-    return () => controller.abort();
-  }, [mounted, viewType, selectedDate, loadEvents]);
+    if (isError) {
+      setError("Failed to load economic events");
+    } else {
+      setError(null);
+    }
+  }, [isError]);
 
   if (!mounted) return null;
 
@@ -277,16 +270,38 @@ export default function CalendarPage() {
     return analysis.join(" ");
   };
 
-  // Format current time with user's local system timezone
+  // Format current time with user's local system timezone and GMT offset
   const formatCurrentTime = () => {
-    return currentTime.toLocaleTimeString('en-US', { 
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      hour12: false
     });
+    
+    // Get GMT offset
+    const offset = now.getTimezoneOffset();
+    const totalMinutes = Math.abs(offset);
+    const offsetHours = Math.floor(totalMinutes / 60);
+    const offsetMinutes = totalMinutes % 60;
+    const offsetSign = offset <= 0 ? '+' : '-';
+    const gmtOffset = `GMT${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
+    
+    return `${timeString} ${gmtOffset}`;
   };
   
+  // Calculate timeline position for current time within the daily view.
+  // Uses absolute horizontal percentage offset relative to the full day grid container.
+  const getTimelinePosition = () => {
+    const totalMinutesInDay = 24 * 60;
+    const currentHours = currentTime.getHours();
+    const currentMinutes = currentTime.getMinutes();
+    const currentMinutesElapsed = (currentHours * 60) + currentMinutes;
+    const leftPercent = (currentMinutesElapsed / totalMinutesInDay) * 100;
+    return leftPercent;
+  };
+
   // Calculate spotlight position for current time within the timeline.
   // For weekly view, align with the current day's column and add intra-day fraction.
   // NOTE: We intentionally do NOT key off `selectedDate` to avoid the "wrong day" drift in daily mode.
@@ -324,32 +339,13 @@ export default function CalendarPage() {
                 <div className="text-right">
                   <div className="text-xs text-purple-400">Data Source</div>
                   <div className={`text-sm font-medium ${
-                    dataSource.includes('Real') || dataSource.includes('API') ? 'text-green-400' : 
+                    dataSource.includes('Real') || dataSource.includes('API') || dataSource.includes('JBlanked') ? 'text-green-400' : 
                     dataSource.includes('Mock') ? 'text-amber-400' : 
                     dataSource.includes('Error') ? 'text-red-400' : 'text-purple-400'
                   }`}>
                     {dataSource}
                   </div>
                 </div>
-                <button
-                  onClick={() => loadEvents()}
-                  disabled={loading}
-                  className="group relative flex items-center text-purple-300 hover:text-white text-sm transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg blur opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <div className="relative flex items-center px-3 py-2 rounded-lg bg-purple-900/80 hover:bg-purple-800/80 transition-colors">
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Refresh
-                      </>
-                    )}
-                  </div>
-                </button>
               </div>
             </div>
           </div>
@@ -395,7 +391,7 @@ export default function CalendarPage() {
               <input
                 id="calendar-custom-date"
                 type="date"
-                value={selectedDate.toISOString().split('T')[0]}
+                value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`}
                 onChange={(e) => {
                   const [year, month, day] = e.target.value.split('-').map(Number);
                   setSelectedDate(new Date(year, month - 1, day));
@@ -489,17 +485,6 @@ export default function CalendarPage() {
             </div>
           )}
 
-          {/* Provider Status (debug) */}
-          {providerStatus && (
-            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <div className="flex items-center gap-2 text-amber-300">
-                <AlertTriangle className="h-5 w-5" />
-                <span className="text-sm">
-                  Calendar feed empty (Convex provider returned no events). Check API keys.
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Horizontal Timeline Canvas */}
 
@@ -514,38 +499,22 @@ export default function CalendarPage() {
 
             {/* Timeline Container - Unified Horizontal Scroll */}
             <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory">
-              {/* Live Current-Time Tracker - Now inside scrollable container */}
-              <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none z-30">
-                <div 
-                  className="absolute top-0 bottom-0 w-0.5 bg-purple-400/80 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
-                  style={{
-                    left: `${(() => {
-                      if (viewType === 'week') {
-                        // For weekly view, position fixedly over the current day's column (actual current day)
-                        const weekDays = getWeekDays(selectedDate);
-                        const currentDayIndex = weekDays.findIndex(day => 
-                          day.date.toDateString() === new Date().toDateString()
-                        );
-                        if (currentDayIndex >= 0) {
-                          return ((currentDayIndex + 0.5) / weekDays.length) * 100;
-                        }
-                        return 50; // Default to middle if today not in view
-                      } else {
-                        // For daily view (Today/Tomorrow), position based on current hour with fluid movement
-                        const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-                        const leftOffset = (currentMinutes / 1440) * 100;
-                        return leftOffset;
-
-                      }
-                    })()}%`
-                  }}
-                >
-                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/30">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatCurrentTime()}</span>
+              {/* Live Current-Time Tracker - Only show for daily views */}
+              {viewType !== 'week' && (
+                <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none z-30">
+                  <div 
+                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-500/80 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                    style={{
+                      left: `${getTimelinePosition()}%`
+                    }}
+                  >
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-emerald-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-emerald-400/30">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatCurrentTime()}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {viewType === 'week' ? (
                 // Weekly View - Day Columns

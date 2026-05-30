@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProviderWrapper } from "@/components/theme-provider";
 import { ConvexProviderWrapper } from "@/components/convex-provider";
+import { QueryProvider } from "@/components/query-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,11 +33,13 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} min-h-full flex flex-col font-sans`}>
-        <ConvexProviderWrapper>
-          <ThemeProviderWrapper>
-            {children}
-          </ThemeProviderWrapper>
-        </ConvexProviderWrapper>
+        <QueryProvider>
+          <ConvexProviderWrapper>
+            <ThemeProviderWrapper>
+              {children}
+            </ThemeProviderWrapper>
+          </ConvexProviderWrapper>
+        </QueryProvider>
       </body>
     </html>
   );
