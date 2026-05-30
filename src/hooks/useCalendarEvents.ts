@@ -31,23 +31,25 @@ export function useCalendarEvents(
   let from: string;
   let to: string;
 
-  if (view === 'today') {
+  // If customDate is provided, always use it (overrides view)
+  if (customDate) {
+    from = to = customDate;
+  } else if (view === 'today') {
     from = to = toDateParam(now);
   } else if (view === 'tomorrow') {
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
     from = to = toDateParam(tomorrow);
   } else if (view === 'week') {
-    // Sunday → Saturday
+    // Sunday → Saturday of current week
     const sunday = new Date(now);
     sunday.setDate(now.getDate() - now.getDay());
     const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
+    saturday.setDate(saturday.getDate() + 6);
     from = toDateParam(sunday);
     to = toDateParam(saturday);
   } else {
-    from = toDateParam(new Date(customDate ?? now));
-    to = from;
+    from = to = toDateParam(now);
   }
 
   return useQuery<CalendarEvent[]>({

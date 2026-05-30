@@ -17,6 +17,32 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useCalendarEvents, CalendarEvent as ApiCalendarEvent } from "@/hooks/useCalendarEvents";
 
+// ─── Timezone-aware time helper ────────────────────────────────────────────
+// ALWAYS use this instead of Date.getHours() / Date.getMinutes()
+// Returns { h: number, m: number } in the given IANA timezone
+function localHM(date: Date, tz: string): { h: number; m: number } {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(date);
+  const h = parseInt(parts.find(p => p.type === 'hour')!.value, 10);
+  const m = parseInt(parts.find(p => p.type === 'minute')!.value, 10);
+  return { h: isNaN(h) ? 0 : h, m: isNaN(m) ? 0 : m };
+}
+
+// Returns YYYY-MM-DD in a given timezone (not UTC)
+function localDateString(date: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', {  // en-CA gives YYYY-MM-DD format
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 // Hour markers for the 24h horizontal timeline view (00:00 → 23:00 in 2-hour steps)
 const TIME_INTERVALS = ["00:00","02:00","04:00","06:00","08:00","10:00","12:00","14:00","16:00","18:00","20:00","22:00"];
 
@@ -68,7 +94,7 @@ interface CalendarEvent {
 }
 
 // Map API event to UI event format
-const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent): CalendarEvent => {
+const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent, tz: string): CalendarEvent => {
   const date = new Date(apiEvent.dateUtc);
   // Convert impact from uppercase to title case for UI consistency
   const impactMap: Record<string, string> = {
@@ -83,7 +109,11 @@ const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent): CalendarEvent => {
     title: apiEvent.title,
     currency: apiEvent.currency,
     impact: impact,
-    time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    time: (() => {
+      const d = new Date(apiEvent.dateUtc);
+      const { h, m } = localHM(d, tz);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    })(),
     date: apiEvent.dateUtc,
     actual: apiEvent.actual ?? undefined,
     forecast: apiEvent.forecast ?? undefined,
@@ -99,7 +129,11 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
   
   // View type state: 'today', 'tomorrow', 'week', 'custom'
-  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
+  // Default to weekly view on weekends since ForexFactory has no weekend releases
+  const isWeekend = [0, 6].includes(new Date().getDay());
+  const [viewType, setViewType] = useState<'today' | 'tomorrow' | 'week' | 'custom'>(
+    isWeekend ? 'week' : 'today'
+  );
   
   // Filter states
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(CURRENCIES);
@@ -149,12 +183,14 @@ export default function CalendarPage() {
     ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` 
     : undefined;
   const { data: apiEvents, isLoading, isError } = useCalendarEvents(
-    viewType === 'custom' ? 'today' : viewType,
+    // The hook only accepts 'today' | 'tomorrow' | 'week'; for 'custom' pass 'today'
+    // but override with the customDate param so the hook uses that date
+    (viewType === 'custom' ? 'today' : viewType) as 'today' | 'tomorrow' | 'week',
     customDateParam
   );
 
   // Map API events to UI events
-  const events = (apiEvents || []).map(mapApiEventToUiEvent);
+  const events = (apiEvents || []).map(ev => mapApiEventToUiEvent(ev, timezone));
   const loading = isLoading;
   const dataSource = isError ? "Error" : isLoading ? "Loading" : "JBlanked API";
 
@@ -183,16 +219,19 @@ export default function CalendarPage() {
     const [hour] = interval.split(':').map(Number);
     return filteredEvents.filter(event => {
       const eventDate = new Date(event.date);
-      const eventHour = eventDate.getHours();
+      if (isNaN(eventDate.getTime())) return false;
+      const { h: eventHour } = localHM(eventDate, timezone);
       return eventHour >= hour && eventHour < hour + 2;
     });
   };
 
   // Group events by day (for weekly view)
   const getEventsForDay = (dayDate: Date) => {
+    const dayKey = localDateString(dayDate, timezone);
     return filteredEvents.filter(event => {
       const eventDate = new Date(event.date);
-      return eventDate.toDateString() === dayDate.toDateString();
+      if (isNaN(eventDate.getTime())) return false;
+      return localDateString(eventDate, timezone) === dayKey;
     });
   };
 
@@ -273,44 +312,47 @@ export default function CalendarPage() {
   // Format current time with user's local system timezone and GMT offset
   const formatCurrentTime = () => {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit',
-      hour12: false
-    });
-    
-    // Get GMT offset
-    const offset = now.getTimezoneOffset();
-    const totalMinutes = Math.abs(offset);
-    const offsetHours = Math.floor(totalMinutes / 60);
-    const offsetMinutes = totalMinutes % 60;
-    const offsetSign = offset <= 0 ? '+' : '-';
-    const gmtOffset = `GMT${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
-    
-    return `${timeString} ${gmtOffset}`;
+    // Show time in the selected timezone, not browser OS timezone
+    const { h, m } = localHM(now, timezone);
+    const s = parseInt(
+      new Intl.DateTimeFormat('en-GB', { timeZone: timezone, second: '2-digit', hour12: false })
+        .formatToParts(now)
+        .find(p => p.type === 'second')!.value,
+      10
+    );
+    const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+    // Compute the offset for this timezone at current moment
+    const utcMs = now.getTime();
+    const localMs = new Date(now.toLocaleString('en-US', { timeZone: timezone })).getTime();
+    const diffMin = Math.round((localMs - utcMs) / 60000);
+    const sign = diffMin >= 0 ? '+' : '-';
+    const absDiff = Math.abs(diffMin);
+    const gmtOffset = `GMT${sign}${String(Math.floor(absDiff / 60)).padStart(2, '0')}:${String(absDiff % 60).padStart(2, '0')}`;
+
+    return `${timeStr} ${gmtOffset}`;
   };
   
   // Calculate timeline position for current time within the daily view.
   // Uses absolute horizontal percentage offset relative to the full day grid container.
   const getTimelinePosition = () => {
-    const totalMinutesInDay = 24 * 60;
-    const currentHours = currentTime.getHours();
-    const currentMinutes = currentTime.getMinutes();
-    const currentMinutesElapsed = (currentHours * 60) + currentMinutes;
-    const leftPercent = (currentMinutesElapsed / totalMinutesInDay) * 100;
-    return leftPercent;
+    const { h, m } = localHM(currentTime, timezone);
+    return ((h * 60 + m) / (24 * 60)) * 100;
   };
 
   // Calculate spotlight position for current time within the timeline.
   // For weekly view, align with the current day's column and add intra-day fraction.
   // NOTE: We intentionally do NOT key off `selectedDate` to avoid the "wrong day" drift in daily mode.
   const getSpotlightPosition = () => {
-    const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const { h, m } = localHM(currentTime, timezone);
+    const currentMinutes = h * 60 + m;
 
     if (viewType === 'week') {
       const weekDays = getWeekDays(selectedDate);
-      const currentDayIndex = weekDays.findIndex(day => day.date.toDateString() === new Date().toDateString());
+      const todayKey = localDateString(new Date(), timezone);
+      const currentDayIndex = weekDays.findIndex(
+        day => localDateString(day.date, timezone) === todayKey
+      );
       if (currentDayIndex >= 0) {
         const columnStart = (currentDayIndex / weekDays.length) * 100;
         const intraDayOffset = (currentMinutes / 1440) * (100 / weekDays.length);
@@ -498,24 +540,7 @@ export default function CalendarPage() {
             />
 
             {/* Timeline Container - Unified Horizontal Scroll */}
-            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory">
-              {/* Live Current-Time Tracker - Only show for daily views */}
-              {viewType !== 'week' && (
-                <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none z-30">
-                  <div 
-                    className="absolute top-0 bottom-0 w-0.5 bg-emerald-500/80 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                    style={{
-                      left: `${getTimelinePosition()}%`
-                    }}
-                  >
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-emerald-600/90 backdrop-blur text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap border border-emerald-400/30">
-                      <Clock className="h-3 w-3" />
-                      <span>{formatCurrentTime()}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory" style={{ position: 'relative' }}>
               {viewType === 'week' ? (
                 // Weekly View - Day Columns
                 getWeekDays(selectedDate).map((day, dayIndex) => {
@@ -613,7 +638,30 @@ export default function CalendarPage() {
                 })
               ) : (
                 // Daily View - Hour Columns
-                TIME_INTERVALS.map((interval, intervalIndex) => {
+                <>
+                  {/* ── Current-time indicator ── lives inside the flex row so it scrolls with content */}
+                  {(() => {
+                    const pct = getTimelinePosition(); // 0–100% of the full 24h width
+                    return (
+                      <div
+                        key="time-indicator"
+                        className="absolute top-0 bottom-0 pointer-events-none z-30"
+                        style={{
+                          left: `${pct}%`,
+                          width: 0,
+                        }}
+                      >
+                        {/* Vertical line */}
+                        <div className="absolute top-6 bottom-0 w-px bg-purple-500/90 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
+                        {/* Time bubble — above the line, overflows upward */}
+                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
+                          <Clock className="h-3 w-3 text-purple-300" />
+                          <span>{formatCurrentTime()}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {TIME_INTERVALS.map((interval, intervalIndex) => {
                   const intervalEvents = getEventsForInterval(interval);
                   
                   return (
@@ -705,7 +753,8 @@ export default function CalendarPage() {
                       )}
                     </div>
                   );
-                })
+                })}
+                </>
               )}
             </div>
           </div>

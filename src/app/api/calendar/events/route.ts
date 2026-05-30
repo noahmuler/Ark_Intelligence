@@ -47,6 +47,8 @@ export async function GET(req: Request) {
       return NextResponse.json([], { status: 200 });
     }
     raw = await res.json();
+    // DEBUG: log first 400 chars of raw response to diagnose shape issues
+    console.log('[calendar] raw response preview:', JSON.stringify(raw).slice(0, 400));
   } catch (err) {
     console.error('[calendar] fetch error', err);
     return NextResponse.json([], { status: 200 });
@@ -55,7 +57,8 @@ export async function GET(req: Request) {
   const items = extractArray(raw);
 
   if (items.length === 0) {
-    console.warn('[calendar] API returned 0 events for', from, '→', to, 'raw type:', typeof raw);
+    console.warn('[calendar] API returned 0 events for', from, '→', to);
+    console.warn('[calendar] raw type:', typeof raw, '| keys:', raw && typeof raw === 'object' ? Object.keys(raw as object).join(', ') : 'n/a');
   }
 
   const normalized = items.map((e: unknown, i: number) => {
