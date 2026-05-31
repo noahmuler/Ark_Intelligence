@@ -65,7 +65,18 @@ function normalize(items: unknown[]): unknown[] {
       currency: String(ev.currency ?? ev.currencyCode ?? ev.country ?? ''),
       country:  String(ev.country ?? ev.countryCode ?? ''),
       impact:   normalizeImpact(ev.impact ?? ev.volatility ?? ev.strength ?? ev.importance ?? 'LOW'),
-      dateUtc:  String(ev.date ?? ev.dateUtc ?? ev.datetime ?? ev.time ?? ev.scheduled ?? ''),
+      dateUtc: (() => {
+        const raw = String(ev.date ?? ev.dateUtc ?? ev.datetime ?? ev.time ?? ev.scheduled ?? '');
+        if (!raw) return '';
+        // ForexFactory format: "MM-DD-YYYY HH:MM:SS" (Eastern Time, ~UTC-4 in summer)
+        // Convert to ISO 8601 so new Date() parses reliably everywhere
+        const ffMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}:\d{2}:\d{2})$/);
+        if (ffMatch) {
+          // "MM-DD-YYYY HH:MM:SS" → "YYYY-MM-DDTHH:MM:SS-04:00" (EDT, valid May–Nov)
+          return `${ffMatch[3]}-${ffMatch[1]}-${ffMatch[2]}T${ffMatch[4]}-04:00`;
+        }
+        return raw; // already ISO or other parseable format
+      })(),
       actual:   ev.actual   != null ? String(ev.actual)   : null,
       forecast: ev.forecast != null ? String(ev.forecast) : (ev.consensus  != null ? String(ev.consensus)  : null),
       previous: ev.previous != null ? String(ev.previous) : (ev.revised    != null ? String(ev.revised)    : null),

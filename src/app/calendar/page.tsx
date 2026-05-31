@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { 
   Calendar as CalendarIcon, 
@@ -174,6 +174,11 @@ export default function CalendarPage() {
   // Filter dropdown states
   const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
   const [impactDropdownOpen, setImpactDropdownOpen] = useState(false);
+
+  // Ref for auto-scrolling the timeline to current time
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -203,11 +208,26 @@ export default function CalendarPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-scroll timeline to current time when view switches to daily mode
+  useEffect(() => {
+    if (viewType !== 'today' && viewType !== 'tomorrow') return;
+    const el = timelineRef.current;
+    if (!el) return;
+    // Small delay to ensure the DOM has rendered all columns
+    const id = setTimeout(() => {
+      const pct = getTimelinePosition() / 100;
+      const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
+      el.scrollLeft = Math.max(0, scrollTarget);
+    }, 150);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewType, mounted]);
+
   // Use the new useCalendarEvents hook
   const customDateParam = viewType === 'custom' 
     ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` 
     : undefined;
-  const { data: apiEvents, isLoading, isError } = useCalendarEvents(
+  const { data: apiEvents, isLoading, isError, refetch, dataUpdatedAt } = useCalendarEvents(
     // The hook only accepts 'today' | 'tomorrow' | 'week'; for 'custom' pass 'today'
     // but override with the customDate param so the hook uses that date
     (viewType === 'custom' ? 'today' : viewType) as 'today' | 'tomorrow' | 'week',
@@ -217,7 +237,14 @@ export default function CalendarPage() {
   // Map API events to UI events
   const events = (apiEvents || []).map(ev => mapApiEventToUiEvent(ev, timezone));
   const loading = isLoading;
-  const dataSource = isError ? "Error" : isLoading ? "Loading" : "JBlanked API";
+  const dataSource = isError ? 'Error' : isLoading ? 'Loading…' : 'ForexFactory';
+
+  // Track when data was last successfully fetched
+  useEffect(() => {
+    if (dataUpdatedAt && !isLoading && !isError) {
+      setLastUpdated(new Date(dataUpdatedAt));
+    }
+  }, [dataUpdatedAt, isLoading, isError]);
 
   // Set error state based on isError (in useEffect to avoid render-phase update)
   useEffect(() => {
@@ -433,17 +460,45 @@ export default function CalendarPage() {
                   Live macroeconomic events with AI-powered analysis
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              {/* ── Live data source badge ── */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-purple-950/60 border border-purple-800/40 rounded-lg">
+                {/* Status dot */}
+                <span className="relative flex h-2 w-2 flex-shrink-0">
+                  {isLoading ? (
+                    <span className="animate-spin h-2 w-2 rounded-full border border-purple-400 border-t-transparent" />
+                  ) : isError ? (
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                  ) : (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                    </>
+                  )}
+                </span>
+                {/* Label */}
                 <div className="text-right">
-                  <div className="text-xs text-purple-400">Data Source</div>
-                  <div className={`text-sm font-medium ${
-                    dataSource.includes('Real') || dataSource.includes('API') || dataSource.includes('JBlanked') ? 'text-green-400' : 
-                    dataSource.includes('Mock') ? 'text-amber-400' : 
-                    dataSource.includes('Error') ? 'text-red-400' : 'text-purple-400'
+                  <div className={`text-xs font-semibold leading-tight ${
+                    isError ? 'text-red-400' : isLoading ? 'text-purple-400' : 'text-green-400'
                   }`}>
                     {dataSource}
                   </div>
+                  {lastUpdated && !isLoading && (
+                    <div className="text-[10px] text-purple-500 leading-tight">
+                      {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
                 </div>
+                {/* Refresh button */}
+                <button
+                  onClick={() => refetch()}
+                  title="Refresh calendar data"
+                  className="ml-1 p-1 rounded text-purple-400 hover:text-purple-200 hover:bg-purple-800/40 transition-colors"
+                >
+                  <svg className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -596,7 +651,7 @@ export default function CalendarPage() {
             />
 
             {/* Timeline Container - Unified Horizontal Scroll */}
-            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory" style={{ position: 'relative' }}>
+            <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative snap-x snap-mandatory" style={{ position: 'relative' }} ref={timelineRef}>
               {viewType === 'week' ? (
                 // Weekly View - Day Columns
                 <>
@@ -614,18 +669,19 @@ export default function CalendarPage() {
                     return (
                       <div
                         key="time-indicator-week"
-                        className="absolute bottom-0 pointer-events-none z-30"
-                        style={{
-                          left: `${pct}%`,
-                          // Start below the day-label row (approx 24px)
-                          top: '24px',
-                          width: 0,
-                        }}
+                        className="absolute bottom-0 pointer-events-none"
+                        style={{ left: `${pct}%`, top: '24px', width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line */}
-                        <div className="absolute top-6 bottom-0 w-px bg-purple-500/90 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
-                        {/* Time bubble — sits just inside content area */}
-                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
+                        {/* Vertical line — behind cards */}
+                        <div
+                          className="absolute top-6 bottom-0 w-px bg-purple-500/70"
+                          style={{ zIndex: 1 }}
+                        />
+                        {/* Time bubble */}
+                        <div
+                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40"
+                          style={{ zIndex: 50 }}
+                        >
                           <Clock className="h-3 w-3 text-purple-300" />
                           <span>{formatCurrentTime()}</span>
                         </div>
@@ -732,20 +788,23 @@ export default function CalendarPage() {
                   {/* ── Current-time indicator ── lives inside the flex row so it scrolls with content */}
                   {/* Only show on Today tab, not Tomorrow or Custom */}
                   {viewType === 'today' && (() => {
-                    const pct = getTimelinePosition(); // 0–100% of the full 24h width
+                    const pct = getTimelinePosition();
                     return (
                       <div
                         key="time-indicator"
-                        className="absolute top-0 bottom-0 pointer-events-none z-30"
-                        style={{
-                          left: `${pct}%`,
-                          width: 0,
-                        }}
+                        className="absolute top-0 bottom-0 pointer-events-none"
+                        style={{ left: `${pct}%`, width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line */}
-                        <div className="absolute top-6 bottom-0 w-px bg-purple-500/90 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
-                        {/* Time bubble — above the line, overflows upward */}
-                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
+                        {/* Vertical line — z-[1] so it renders BEHIND event cards */}
+                        <div
+                          className="absolute bottom-0 w-px bg-purple-500/70"
+                          style={{ top: '28px', zIndex: 1 }}
+                        />
+                        {/* Time bubble — above the line, high z so it stays visible */}
+                        <div
+                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40"
+                          style={{ zIndex: 50 }}
+                        >
                           <Clock className="h-3 w-3 text-purple-300" />
                           <span>{formatCurrentTime()}</span>
                         </div>
