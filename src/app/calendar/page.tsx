@@ -322,13 +322,29 @@ export default function CalendarPage() {
     );
     const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
-    // Compute the offset for this timezone at current moment
-    const utcMs = now.getTime();
-    const localMs = new Date(now.toLocaleString('en-US', { timeZone: timezone })).getTime();
-    const diffMin = Math.round((localMs - utcMs) / 60000);
-    const sign = diffMin >= 0 ? '+' : '-';
-    const absDiff = Math.abs(diffMin);
-    const gmtOffset = `GMT${sign}${String(Math.floor(absDiff / 60)).padStart(2, '0')}:${String(absDiff % 60).padStart(2, '0')}`;
+    // Compute the offset for this timezone using Intl.DateTimeFormat
+    // This is more reliable than the previous approach
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now);
+    const timeZonePart = parts.find(p => p.type === 'timeZoneName');
+    let gmtOffset = 'GMT+00:00';
+    if (timeZonePart) {
+      // Parse the offset from the timeZoneName (e.g., "GMT+03:00" or "GMT-05:00")
+      const match = timeZonePart.value.match(/GMT([+-]\d{2}):(\d{2})/);
+      if (match) {
+        gmtOffset = `GMT${match[1]}:${match[2]}`;
+      }
+    }
 
     return `${timeStr} ${gmtOffset}`;
   };
@@ -367,7 +383,6 @@ export default function CalendarPage() {
 
   return (
     <MainLayout>
-      <div className="h-full bg-[#0B0813] flex flex-col -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
           {/* Page Header */}
           <div className="py-4">
             <div className="flex items-center justify-between mb-4">
@@ -543,7 +558,30 @@ export default function CalendarPage() {
             <div className="h-full w-full flex flex-row overflow-x-auto scrollbar-thin relative z-20 snap-x snap-mandatory" style={{ position: 'relative' }}>
               {viewType === 'week' ? (
                 // Weekly View - Day Columns
-                getWeekDays(selectedDate).map((day, dayIndex) => {
+                <>
+                  {/* ── Current-time indicator for Week view ── */}
+                  {(() => {
+                    const pct = getSpotlightPosition(); // 0–100% across the week
+                    return (
+                      <div
+                        key="time-indicator-week"
+                        className="absolute top-0 bottom-0 pointer-events-none z-30"
+                        style={{
+                          left: `${pct}%`,
+                          width: 0,
+                        }}
+                      >
+                        {/* Vertical line */}
+                        <div className="absolute top-6 bottom-0 w-px bg-purple-500/90 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
+                        {/* Time bubble — above the line, overflows upward */}
+                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
+                          <Clock className="h-3 w-3 text-purple-300" />
+                          <span>{formatCurrentTime()}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {getWeekDays(selectedDate).map((day, dayIndex) => {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
@@ -635,12 +673,14 @@ export default function CalendarPage() {
                       )}
                     </div>
                   );
-                })
+                })}
+                </>
               ) : (
                 // Daily View - Hour Columns
                 <>
                   {/* ── Current-time indicator ── lives inside the flex row so it scrolls with content */}
-                  {(() => {
+                  {/* Only show on Today tab, not Tomorrow or Custom */}
+                  {viewType === 'today' && (() => {
                     const pct = getTimelinePosition(); // 0–100% of the full 24h width
                     return (
                       <div
@@ -758,7 +798,6 @@ export default function CalendarPage() {
               )}
             </div>
           </div>
-      </div>
     </MainLayout>
   );
 }
