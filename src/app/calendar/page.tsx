@@ -219,9 +219,13 @@ export default function CalendarPage() {
       // For weekly view, use spotlight position; for daily, use timeline position
       const pct = viewType === 'week' ? getSpotlightPosition() / 100 : getTimelinePosition() / 100;
       // Center the current time in the viewport
+      // Use scrollWidth (total content width) and clientWidth (visible width)
       const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
-      el.scrollLeft = Math.max(0, scrollTarget);
-    }, 300); // Increased delay to ensure DOM is fully rendered
+      // Ensure we don't scroll past the end
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      console.log('[calendar] Auto-scroll debug:', { viewType, pct, scrollTarget, maxScroll, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth });
+      el.scrollLeft = Math.max(0, Math.min(scrollTarget, maxScroll));
+    }, 500); // Increased delay to ensure DOM is fully rendered
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, mounted]);
@@ -267,6 +271,16 @@ export default function CalendarPage() {
     return currencyMatch && impactMatch;
   });
 
+  // Debug logging for Today view (placed after filteredEvents declaration)
+  if (viewType === 'today' && !loading) {
+    console.log('[calendar] Today view debug:', { eventsLength: events.length, filteredLength: filteredEvents.length, timezone });
+    if (events.length > 0) {
+      console.log('[calendar] Today events sample:', events.slice(0, 3).map(e => ({ title: e.title, date: e.date, time: e.time })));
+    } else {
+      console.log('[calendar] No events found for Today view');
+    }
+  }
+
 
 
   // Helper to parse date string (handles both timestamp and ISO formats)
@@ -289,7 +303,8 @@ export default function CalendarPage() {
         return false;
       }
       const { h: eventHour } = localHM(eventDate, timezone);
-      return eventHour >= hour && eventHour < hour + 2;
+      const matches = eventHour >= hour && eventHour < hour + 2;
+      return matches;
     });
   };
 
@@ -426,7 +441,23 @@ export default function CalendarPage() {
   // Uses absolute horizontal percentage offset relative to the full day grid container.
   const getTimelinePosition = () => {
     const { h, m } = localHM(currentTime, timezone);
-    return ((h * 60 + m) / (24 * 60)) * 100;
+    const pct = ((h * 60 + m) / (24 * 60)) * 100;
+    console.log('[calendar] Timeline position calculation:', { h, m, pct, timezone, currentTime: currentTime.toISOString() });
+    return pct;
+  };
+
+  // Get the actual timeline width for debugging
+  const getTimelineWidth = () => {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    return el.scrollWidth;
+  };
+
+  // Get the timeline client width for debugging
+  const getTimelineClientWidth = () => {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    return el.clientWidth;
   };
 
   // Calculate spotlight position for current time within the timeline.
@@ -734,11 +765,7 @@ export default function CalendarPage() {
                                   <span className="px-1.5 py-0.5 text-xs rounded font-bold text-purple-300 border border-purple-500/30">
                                     {event.currency || "USD"}
                                   </span>
-                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${
-                                    event.impact === "High" ? "text-purple-200 border-purple-400/50" :
-                                    event.impact === "Medium" ? "text-purple-300 border-purple-500/40" :
-                                    "text-purple-400 border-purple-600/30"
-                                  }`}>
+                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${getImpactBadgeColor(event.impact)}`}>
                                     {event.impact}
                                   </span>
                                 </div>
@@ -805,11 +832,16 @@ export default function CalendarPage() {
                   {/* Only show on Today tab, not Tomorrow or Custom */}
                   {viewType === 'today' && (() => {
                     const pct = getTimelinePosition();
+                    const timelineWidth = getTimelineWidth();
+                    const timelineClientWidth = getTimelineClientWidth();
+                    console.log('[calendar] Time indicator render:', { pct, left: `${pct}%`, timelineWidth, timelineClientWidth, pixelPosition: (pct / 100) * timelineWidth });
+                    // Calculate pixel position instead of using percentage to account for container margins
+                    const pixelPosition = (pct / 100) * timelineWidth;
                     return (
                       <div
                         key="time-indicator"
                         className="absolute top-0 bottom-0 pointer-events-none"
-                        style={{ left: `${pct}%`, width: 0, zIndex: 2 }}
+                        style={{ left: `${pixelPosition}px`, width: 0, zIndex: 2 }}
                       >
                         {/* Vertical line — z-[1] so it renders BEHIND event cards */}
                         <div
@@ -860,11 +892,7 @@ export default function CalendarPage() {
                                   <span className="px-1.5 py-0.5 text-xs rounded font-bold text-purple-300 border border-purple-500/30">
                                     {event.currency || "USD"}
                                   </span>
-                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${
-                                    event.impact === "High" ? "text-purple-200 border-purple-400/50" :
-                                    event.impact === "Medium" ? "text-purple-300 border-purple-500/40" :
-                                    "text-purple-400 border-purple-600/30"
-                                  }`}>
+                                  <span className={`px-1.5 py-0.5 text-xs rounded font-semibold border ${getImpactBadgeColor(event.impact)}`}>
                                     {event.impact}
                                   </span>
                                 </div>
