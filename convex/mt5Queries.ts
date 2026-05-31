@@ -85,7 +85,8 @@ export const getTradingMetrics = query({
     const totalDeposits = deposits.reduce((sum, t) => sum + t.profit, 0);
     const totalWithdrawals = Math.abs(withdrawals.reduce((sum, t) => sum + t.profit, 0));
     const tradingPnL = actualTrades.reduce((sum, t) => sum + t.profit, 0);
-    const currentBalance = Math.max(0, totalDeposits - totalWithdrawals + tradingPnL);
+    const initialBalance = totalDeposits > 0 ? totalDeposits : 10000;
+    const currentBalance = Math.max(0, initialBalance - totalWithdrawals + tradingPnL);
 
     // Calculate basic metrics (only on actual trades)
     const winningTrades = actualTrades.filter((t) => t.profit > 0);
@@ -170,7 +171,7 @@ export const getTradingMetrics = query({
     }
 
     // Max drawdown as % of peak equity reached (starting balance + peak PnL)
-    const startingBalance = currentBalance - tradingPnL;
+    const startingBalance = initialBalance;
     const peakEquity = startingBalance + peak;
     const maxDrawdownPercent = peakEquity > 0 ? (maxDrawdownAbs / peakEquity) * 100 : 0;
 

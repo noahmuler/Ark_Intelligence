@@ -15,20 +15,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var theme = localStorage.getItem('ark-theme') || 'dark';
-                  document.documentElement.classList.add(theme);
-                } catch (e) {
-                  document.documentElement.classList.add('dark');
-                }
-              })();
-            `,
+            __html: `(function(){
+  try{
+    var stored=localStorage.getItem('ark-theme');
+    var theme=stored&&(stored==='dark'||stored==='light')?stored:'dark';
+    document.documentElement.classList.remove('light','dark');
+    document.documentElement.classList.add(theme);
+  }catch(e){
+    document.documentElement.classList.add('dark');
+  }
+})();`,
           }}
         />
       </head>

@@ -182,6 +182,13 @@ export const importTradesFromCSV = action({
   },
   handler: async (ctx, args) => {
     try {
+      // Helper: parse a numeric CSV column, defaulting to 0 for empty/NaN values
+      const safeNum = (val: string | undefined, fallback = 0): number => {
+        if (!val || val.trim() === '') return fallback;
+        const n = parseFloat(val.trim());
+        return isNaN(n) ? fallback : n;
+      };
+
       const lines = args.csvData.split('\n');
       const trades: Trade[] = [];
       let skippedLines = 0;
@@ -227,11 +234,11 @@ export const importTradesFromCSV = action({
           symbol = columns[6];
           openPrice = parseFloat(columns[7]);
           closePrice = parseFloat(columns[8]);
-          const stopLossVal = parseFloat(columns[9] || '0');
-          const takeProfitVal = parseFloat(columns[10] || '0');
-          commission = parseFloat(columns[11] || '0');
-          swap = parseFloat(columns[12] || '0');
-          profit = parseFloat(columns[13] || '0');
+          const stopLossVal = safeNum(columns[9]);
+          const takeProfitVal = safeNum(columns[10]);
+          commission = safeNum(columns[11]);
+          swap = safeNum(columns[12]);
+          profit = safeNum(columns[13]);
           const equity = columns[14];
           const marginLevel = columns[15];
           

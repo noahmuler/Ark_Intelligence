@@ -137,10 +137,9 @@ export default function DeepAnalytics() {
 
   // Monthly PnL chart data
   const monthlyPnLData = useMemo(() => {
-    if (!allTrades) return [];
+    if (!actualTrades || actualTrades.length === 0) return [];
     const monthMap = new Map<number, { month: string; profit: number; loss: number }>();
-    allTrades.forEach((trade) => {
-      if (trade.isDeposit) return;
+    actualTrades.forEach((trade) => {
       const date      = new Date(trade.closeTime);
       const monthKey  = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
       const timestamp = new Date(date.getFullYear(), date.getMonth(), 1).getTime();
@@ -153,14 +152,13 @@ export default function DeepAnalytics() {
       .sort(([a], [b]) => a - b)
       .slice(-12)
       .map(([, d]) => d);
-  }, [allTrades]);
+  }, [actualTrades]);
 
   // Monthly order-count chart data
   const totalOrderData = useMemo(() => {
-    if (!allTrades) return [];
+    if (!actualTrades || actualTrades.length === 0) return [];
     const monthMap = new Map<number, { month: string; profitable: number; unprofitable: number }>();
-    allTrades.forEach((trade) => {
-      if (trade.isDeposit) return;
+    actualTrades.forEach((trade) => {
       const date      = new Date(trade.closeTime);
       const monthKey  = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
       const timestamp = new Date(date.getFullYear(), date.getMonth(), 1).getTime();
@@ -173,7 +171,7 @@ export default function DeepAnalytics() {
       .sort(([a], [b]) => a - b)
       .slice(-12)
       .map(([, d]) => d);
-  }, [allTrades]);
+  }, [actualTrades]);
 
   // Session performance helper
   const getSessionPerformance = useMemo(() => {

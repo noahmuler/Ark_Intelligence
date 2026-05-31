@@ -16,6 +16,7 @@ export function ThemeProviderWrapper({ children }: { children: React.ReactNode }
       disableTransitionOnChange
       storageKey="ark-theme"
       themes={['dark', 'light']}
+      forcedTheme="dark"
     >
       {children}
     </ThemeProvider>
