@@ -210,15 +210,18 @@ export default function CalendarPage() {
 
   // Auto-scroll timeline to current time when view switches to daily mode
   useEffect(() => {
-    if (viewType !== 'today' && viewType !== 'tomorrow') return;
+    // Only auto-scroll for Today and This Week views, NOT Tomorrow
+    if (viewType !== 'today' && viewType !== 'week') return;
     const el = timelineRef.current;
     if (!el) return;
     // Small delay to ensure the DOM has rendered all columns
     const id = setTimeout(() => {
-      const pct = getTimelinePosition() / 100;
+      // For weekly view, use spotlight position; for daily, use timeline position
+      const pct = viewType === 'week' ? getSpotlightPosition() / 100 : getTimelinePosition() / 100;
+      // Center the current time in the viewport
       const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
       el.scrollLeft = Math.max(0, scrollTarget);
-    }, 150);
+    }, 300); // Increased delay to ensure DOM is fully rendered
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, mounted]);
@@ -281,7 +284,10 @@ export default function CalendarPage() {
     const [hour] = interval.split(':').map(Number);
     return filteredEvents.filter(event => {
       const eventDate = parseEventDate(event.date);
-      if (isNaN(eventDate.getTime())) return false;
+      if (isNaN(eventDate.getTime())) {
+        console.warn('[calendar] Invalid date for interval filtering:', event.date);
+        return false;
+      }
       const { h: eventHour } = localHM(eventDate, timezone);
       return eventHour >= hour && eventHour < hour + 2;
     });
@@ -337,10 +343,10 @@ export default function CalendarPage() {
 
   const getImpactBadgeColor = (impact: string) => {
     switch (impact) {
-      case "High": return "text-purple-300 border-purple-400/50";
-      case "Medium": return "text-purple-400 border-purple-500/40";
-      case "Low": return "text-purple-500 border-purple-600/30";
-      default: return "text-purple-400 border-purple-500/40";
+      case "High": return "text-red-300 border-red-400/50 bg-red-500/10";
+      case "Medium": return "text-yellow-300 border-yellow-400/50 bg-yellow-500/10";
+      case "Low": return "text-purple-300 border-purple-400/50 bg-purple-500/10";
+      default: return "text-purple-400 border-purple-500/40 bg-purple-500/10";
     }
   };
 
@@ -461,40 +467,47 @@ export default function CalendarPage() {
                 </p>
               </div>
               {/* ── Live data source badge ── */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-purple-950/60 border border-purple-800/40 rounded-lg">
-                {/* Status dot */}
-                <span className="relative flex h-2 w-2 flex-shrink-0">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-purple-950/80 to-purple-900/60 border border-purple-700/50 rounded-xl shadow-lg backdrop-blur-md">
+                {/* Status dot with glow effect */}
+                <div className="relative flex h-3 w-3 flex-shrink-0">
                   {isLoading ? (
-                    <span className="animate-spin h-2 w-2 rounded-full border border-purple-400 border-t-transparent" />
+                    <div className="relative inline-flex h-3 w-3">
+                      <div className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></div>
+                      <div className="relative inline-flex rounded-full h-3 w-3 bg-purple-500 border border-purple-400"></div>
+                    </div>
                   ) : isError ? (
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                    <div className="relative inline-flex h-3 w-3">
+                      <div className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></div>
+                      <div className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                    </div>
                   ) : (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                    </>
+                    <div className="relative inline-flex h-3 w-3">
+                      <div className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></div>
+                      <div className="relative inline-flex rounded-full h-3 w-3 bg-green-500 border border-green-400 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                    </div>
                   )}
-                </span>
+                </div>
                 {/* Label */}
                 <div className="text-right">
-                  <div className={`text-xs font-semibold leading-tight ${
-                    isError ? 'text-red-400' : isLoading ? 'text-purple-400' : 'text-green-400'
+                  <div className={`text-xs font-bold leading-tight tracking-wide ${
+                    isError ? 'text-red-400' : isLoading ? 'text-purple-300' : 'text-green-400'
                   }`}>
                     {dataSource}
                   </div>
                   {lastUpdated && !isLoading && (
-                    <div className="text-[10px] text-purple-500 leading-tight">
-                      {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div className="text-[9px] text-purple-400/80 leading-tight font-medium">
+                      Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
                 </div>
-                {/* Refresh button */}
+                {/* Refresh button with enhanced styling */}
                 <button
                   onClick={() => refetch()}
                   title="Refresh calendar data"
-                  className="ml-1 p-1 rounded text-purple-400 hover:text-purple-200 hover:bg-purple-800/40 transition-colors"
+                  className={`ml-2 p-2 rounded-lg bg-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-700/60 transition-all duration-200 border border-purple-600/30 hover:border-purple-500/50 hover:shadow-[0_0_12px_rgba(168,85,247,0.4)] ${isLoading ? 'animate-spin' : ''}`}
+                  disabled={isLoading}
                 >
-                  <svg className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
@@ -708,7 +721,10 @@ export default function CalendarPage() {
                             transition={{ delay: dayIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative"
                           >
-                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300">
+                            <div className="group relative bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300 overflow-hidden">
+                              {/* Glowing effect */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
+                              <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                               {/* Card Header */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-xs font-mono text-purple-300/80">
@@ -831,7 +847,10 @@ export default function CalendarPage() {
                             transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative"
                           >
-                            <div className="bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300">
+                            <div className="group relative bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300 overflow-hidden">
+                              {/* Glowing effect */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
+                              <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                               {/* Card Header */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-xs font-mono text-purple-300/80">
