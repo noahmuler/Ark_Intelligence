@@ -95,7 +95,24 @@ interface CalendarEvent {
 
 // Map API event to UI event format
 const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent, tz: string): CalendarEvent => {
-  const date = new Date(apiEvent.dateUtc);
+  // Handle different date formats from API
+  // ForexFactory returns timestamp in milliseconds, JBlanked returns ISO string
+  let date: Date;
+  const dateStr = apiEvent.dateUtc;
+
+  // Try parsing as timestamp (milliseconds)
+  if (/^\d+$/.test(dateStr)) {
+    date = new Date(parseInt(dateStr, 10));
+  } else {
+    // Try parsing as ISO string or other date format
+    date = new Date(dateStr);
+  }
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('[calendar] Invalid date for event:', apiEvent.title, dateStr);
+  }
+
   // Convert impact from uppercase to title case for UI consistency
   const impactMap: Record<string, string> = {
     'HIGH': 'High',
@@ -103,18 +120,26 @@ const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent, tz: string): CalendarE
     'LOW': 'Low',
   };
   const impact = impactMap[apiEvent.impact] || apiEvent.impact;
-  
+
   return {
     id: apiEvent.id,
     title: apiEvent.title,
     currency: apiEvent.currency,
     impact: impact,
     time: (() => {
-      const d = new Date(apiEvent.dateUtc);
+      const d = new Date(dateStr);
+      // Try parsing as timestamp (milliseconds)
+      if (/^\d+$/.test(dateStr)) {
+        d.setTime(parseInt(dateStr, 10));
+      }
+      if (isNaN(d.getTime())) {
+        console.warn('[calendar] Invalid date for time parsing:', apiEvent.title, dateStr);
+        return '00:00'; // Fallback time for invalid dates
+      }
       const { h, m } = localHM(d, tz);
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     })(),
-    date: apiEvent.dateUtc,
+    date: dateStr,
     actual: apiEvent.actual ?? undefined,
     forecast: apiEvent.forecast ?? undefined,
     previous: apiEvent.previous ?? undefined,
@@ -214,11 +239,21 @@ export default function CalendarPage() {
 
 
 
+  // Helper to parse date string (handles both timestamp and ISO formats)
+  const parseEventDate = (dateStr: string): Date => {
+    // Try parsing as timestamp (milliseconds)
+    if (/^\d+$/.test(dateStr)) {
+      return new Date(parseInt(dateStr, 10));
+    }
+    // Try parsing as ISO string or other date format
+    return new Date(dateStr);
+  };
+
   // Group events by time interval (for daily view)
   const getEventsForInterval = (interval: string) => {
     const [hour] = interval.split(':').map(Number);
     return filteredEvents.filter(event => {
-      const eventDate = new Date(event.date);
+      const eventDate = parseEventDate(event.date);
       if (isNaN(eventDate.getTime())) return false;
       const { h: eventHour } = localHM(eventDate, timezone);
       return eventHour >= hour && eventHour < hour + 2;
@@ -229,7 +264,7 @@ export default function CalendarPage() {
   const getEventsForDay = (dayDate: Date) => {
     const dayKey = localDateString(dayDate, timezone);
     return filteredEvents.filter(event => {
-      const eventDate = new Date(event.date);
+      const eventDate = parseEventDate(event.date);
       if (isNaN(eventDate.getTime())) return false;
       return localDateString(eventDate, timezone) === dayKey;
     });
@@ -337,12 +372,17 @@ export default function CalendarPage() {
     });
     const parts = formatter.formatToParts(now);
     const timeZonePart = parts.find(p => p.type === 'timeZoneName');
-    let gmtOffset = 'GMT+00:00';
+    let gmtOffset = 'GMT+0';
     if (timeZonePart) {
-      // Parse the offset from the timeZoneName (e.g., "GMT+03:00" or "GMT-05:00")
-      const match = timeZonePart.value.match(/GMT([+-]\d{2}):(\d{2})/);
+      // Parse offset hours and minutes; display as GMT+3 not GMT+03:00
+      const match = timeZonePart.value.match(/GMT([+-])(\d{2}):(\d{2})/);
       if (match) {
-        gmtOffset = `GMT${match[1]}:${match[2]}`;
+        const sign = match[1];
+        const hours = parseInt(match[2], 10);   // strip leading zero: "03" → 3
+        const mins  = parseInt(match[3], 10);
+        gmtOffset = mins > 0
+          ? `GMT${sign}${hours}:${String(mins).padStart(2, '0')}`  // e.g. GMT+5:30
+          : `GMT${sign}${hours}`;                                    // e.g. GMT+3
       }
     }
 
@@ -383,6 +423,7 @@ export default function CalendarPage() {
 
   return (
     <MainLayout>
+      <div className="flex flex-col min-h-screen">
           {/* Page Header */}
           <div className="py-4">
             <div className="flex items-center justify-between mb-4">
@@ -545,7 +586,7 @@ export default function CalendarPage() {
 
           {/* Horizontal Timeline Canvas */}
 
-          <div className="w-full relative min-h-[calc(100vh-200px)] mx-0 mb-0">
+          <div className="relative min-h-[calc(100vh-220px)] mb-0 -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
             {/* Spotlight Effect - Dynamic radial gradient following current-time marker */}
             <div 
               className="absolute inset-0 pointer-events-none z-0 transition-all duration-1000 ease-in-out"
@@ -560,21 +601,31 @@ export default function CalendarPage() {
                 // Weekly View - Day Columns
                 <>
                   {/* ── Current-time indicator for Week view ── */}
+                  {/* Only show if today falls within the displayed week */}
                   {(() => {
-                    const pct = getSpotlightPosition(); // 0–100% across the week
+                    const weekDays = getWeekDays(selectedDate);
+                    const todayKey = localDateString(new Date(), timezone);
+                    const todayInWeek = weekDays.some(
+                      d => localDateString(d.date, timezone) === todayKey
+                    );
+                    if (!todayInWeek) return null;
+
+                    const pct = getSpotlightPosition();
                     return (
                       <div
                         key="time-indicator-week"
-                        className="absolute top-0 bottom-0 pointer-events-none z-30"
+                        className="absolute bottom-0 pointer-events-none z-30"
                         style={{
                           left: `${pct}%`,
+                          // Start below the day-label row (approx 24px)
+                          top: '24px',
                           width: 0,
                         }}
                       >
                         {/* Vertical line */}
                         <div className="absolute top-6 bottom-0 w-px bg-purple-500/90 shadow-[0_0_6px_rgba(168,85,247,0.7)]" />
-                        {/* Time bubble — above the line, overflows upward */}
-                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
+                        {/* Time bubble — sits just inside content area */}
+                        <div className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40 z-40">
                           <Clock className="h-3 w-3 text-purple-300" />
                           <span>{formatCurrentTime()}</span>
                         </div>
@@ -798,6 +849,7 @@ export default function CalendarPage() {
               )}
             </div>
           </div>
+      </div>
     </MainLayout>
   );
 }
