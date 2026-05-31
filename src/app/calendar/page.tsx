@@ -210,22 +210,24 @@ export default function CalendarPage() {
 
   // Auto-scroll timeline to current time when view switches to daily mode
   useEffect(() => {
-    // Only auto-scroll for Today and This Week views, NOT Tomorrow
-    if (viewType !== 'today' && viewType !== 'week') return;
     const el = timelineRef.current;
     if (!el) return;
-    // Small delay to ensure the DOM has rendered all columns
+
     const id = setTimeout(() => {
-      // For weekly view, use spotlight position; for daily, use timeline position
+      if (viewType === 'tomorrow') {
+        // Tomorrow has no current-time indicator — always start at 00:00
+        el.scrollLeft = 0;
+        return;
+      }
+      if (viewType !== 'today' && viewType !== 'week') return;
+
+      // Today: center on current time in the 24h strip
+      // Week: center on current day column
       const pct = viewType === 'week' ? getSpotlightPosition() / 100 : getTimelinePosition() / 100;
-      // Center the current time in the viewport
-      // Use scrollWidth (total content width) and clientWidth (visible width)
       const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
-      // Ensure we don't scroll past the end
       const maxScroll = el.scrollWidth - el.clientWidth;
-      console.log('[calendar] Auto-scroll debug:', { viewType, pct, scrollTarget, maxScroll, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth });
       el.scrollLeft = Math.max(0, Math.min(scrollTarget, maxScroll));
-    }, 500); // Increased delay to ensure DOM is fully rendered
+    }, 500);
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, mounted]);
@@ -271,18 +273,6 @@ export default function CalendarPage() {
     return currencyMatch && impactMatch;
   });
 
-  // Debug logging for Today view (placed after filteredEvents declaration)
-  if (viewType === 'today' && !loading) {
-    console.log('[calendar] Today view debug:', { eventsLength: events.length, filteredLength: filteredEvents.length, timezone });
-    if (events.length > 0) {
-      console.log('[calendar] Today events sample:', events.slice(0, 3).map(e => ({ title: e.title, date: e.date, time: e.time })));
-    } else {
-      console.log('[calendar] No events found for Today view');
-    }
-  }
-
-
-
   // Helper to parse date string (handles both timestamp and ISO formats)
   const parseEventDate = (dateStr: string): Date => {
     // Try parsing as timestamp (milliseconds)
@@ -307,6 +297,13 @@ export default function CalendarPage() {
       return matches;
     });
   };
+
+  // ─── Weekend / empty state for daily view ────────────────────────────────────
+  const isWeekendDay = [0, 6].includes(new Date().getDay());
+  const totalDailyEvents = TIME_INTERVALS.reduce(
+    (sum, interval) => sum + getEventsForInterval(interval).length, 0
+  );
+  const showWeekendEmptyState = viewType === 'today' && totalDailyEvents === 0 && !loading;
 
   // Group events by day (for weekly view)
   const getEventsForDay = (dayDate: Date) => {
@@ -349,19 +346,19 @@ export default function CalendarPage() {
   // Helper functions for styling
   const getImpactColor = (impact: string) => {
     switch (impact) {
-      case "High": return "border-purple-500/50 hover:border-purple-400";
-      case "Medium": return "border-purple-600/40 hover:border-purple-500/50";
-      case "Low": return "border-purple-700/30 hover:border-purple-600/40";
-      default: return "border-purple-600/40 hover:border-purple-500/50";
+      case "High":   return "border-red-500/40 hover:border-red-400/70";
+      case "Medium": return "border-amber-500/30 hover:border-amber-400/60";
+      case "Low":    return "border-purple-700/30 hover:border-purple-600/40";
+      default:       return "border-purple-600/40 hover:border-purple-500/50";
     }
   };
 
   const getImpactBadgeColor = (impact: string) => {
     switch (impact) {
-      case "High": return "text-red-300 border-red-400/50 bg-red-500/10";
-      case "Medium": return "text-yellow-300 border-yellow-400/50 bg-yellow-500/10";
-      case "Low": return "text-purple-300 border-purple-400/50 bg-purple-500/10";
-      default: return "text-purple-400 border-purple-500/40 bg-purple-500/10";
+      case "High":   return "text-red-300 bg-red-500/15 border-red-500/50";
+      case "Medium": return "text-amber-300 bg-amber-500/15 border-amber-500/50";
+      case "Low":    return "text-purple-400 bg-purple-500/10 border-purple-600/30";
+      default:       return "text-purple-400 bg-purple-500/10 border-purple-600/30";
     }
   };
 
@@ -442,23 +439,9 @@ export default function CalendarPage() {
   const getTimelinePosition = () => {
     const { h, m } = localHM(currentTime, timezone);
     const pct = ((h * 60 + m) / (24 * 60)) * 100;
-    console.log('[calendar] Timeline position calculation:', { h, m, pct, timezone, currentTime: currentTime.toISOString() });
     return pct;
   };
 
-  // Get the actual timeline width for debugging
-  const getTimelineWidth = () => {
-    const el = timelineRef.current;
-    if (!el) return 0;
-    return el.scrollWidth;
-  };
-
-  // Get the timeline client width for debugging
-  const getTimelineClientWidth = () => {
-    const el = timelineRef.current;
-    if (!el) return 0;
-    return el.clientWidth;
-  };
 
   // Calculate spotlight position for current time within the timeline.
   // For weekly view, align with the current day's column and add intra-day fraction.
@@ -716,15 +699,25 @@ export default function CalendarPage() {
                         className="absolute bottom-0 pointer-events-none"
                         style={{ left: `${pct}%`, top: '24px', width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line — behind cards */}
+                        {/* Vertical line — zIndex:1, BEHIND cards (z-[3]) */}
                         <div
-                          className="absolute top-6 bottom-0 w-px bg-purple-500/70"
-                          style={{ zIndex: 1 }}
+                          className="absolute top-8 bottom-0 w-[1.5px]"
+                          style={{
+                            zIndex: 1,
+                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.95) 0%, rgba(168,85,247,0.4) 60%, transparent 100%)',
+                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.3)',
+                          }}
                         />
-                        {/* Time bubble */}
+                        {/* Time bubble — zIndex:50, ABOVE cards */}
                         <div
-                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40"
-                          style={{ zIndex: 50 }}
+                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 text-white text-[11px] font-mono px-2.5 py-1 rounded-full whitespace-nowrap"
+                          style={{
+                            zIndex: 50,
+                            background: 'linear-gradient(135deg, rgba(109,40,217,0.98) 0%, rgba(88,28,135,0.98) 100%)',
+                            border: '1px solid rgba(192,132,252,0.5)',
+                            boxShadow: '0 0 0 3px rgba(109,40,217,0.25), 0 4px 14px rgba(109,40,217,0.5)',
+                            backdropFilter: 'blur(8px)',
+                          }}
                         >
                           <Clock className="h-3 w-3 text-purple-300" />
                           <span>{formatCurrentTime()}</span>
@@ -750,9 +743,9 @@ export default function CalendarPage() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: dayIndex * 0.05 + eventIndex * 0.03 }}
-                            className="group relative"
+                            className="group relative z-[3]"
                           >
-                            <div className="group relative bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300 overflow-hidden">
+                            <div className={`group relative bg-[#120E24]/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
                               {/* Glowing effect */}
                               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                               <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -831,27 +824,33 @@ export default function CalendarPage() {
                   {/* ── Current-time indicator ── lives inside the flex row so it scrolls with content */}
                   {/* Only show on Today tab, not Tomorrow or Custom */}
                   {viewType === 'today' && (() => {
-                    const pct = getTimelinePosition();
-                    const timelineWidth = getTimelineWidth();
-                    const timelineClientWidth = getTimelineClientWidth();
-                    console.log('[calendar] Time indicator render:', { pct, left: `${pct}%`, timelineWidth, timelineClientWidth, pixelPosition: (pct / 100) * timelineWidth });
-                    // Calculate pixel position instead of using percentage to account for container margins
-                    const pixelPosition = (pct / 100) * timelineWidth;
+                    const pct = getTimelinePosition(); // 0–100% of full 24h width
                     return (
                       <div
                         key="time-indicator"
                         className="absolute top-0 bottom-0 pointer-events-none"
-                        style={{ left: `${pixelPosition}px`, width: 0, zIndex: 2 }}
+                        style={{ left: `${pct}%`, width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line — z-[1] so it renders BEHIND event cards */}
+                        {/* Vertical line — zIndex:1 → BEHIND cards (z-[3]) */}
                         <div
-                          className="absolute bottom-0 w-px bg-purple-500/70"
-                          style={{ top: '28px', zIndex: 1 }}
+                          className="absolute bottom-0 w-[1.5px]"
+                          style={{
+                            top: '36px',
+                            zIndex: 1,
+                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.9) 0%, rgba(168,85,247,0.4) 60%, transparent 100%)',
+                            boxShadow: '0 0 6px 1px rgba(168,85,247,0.35)',
+                          }}
                         />
-                        {/* Time bubble — above the line, high z so it stays visible */}
+                        {/* Time bubble — zIndex:50 → ABOVE everything */}
                         <div
-                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 bg-purple-700/95 backdrop-blur text-white text-xs font-mono px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap border border-purple-400/40"
-                          style={{ zIndex: 50 }}
+                          className="absolute top-[6px] -translate-x-1/2 flex items-center gap-1.5 text-white text-xs font-mono px-3 py-1.5 rounded-full whitespace-nowrap"
+                          style={{
+                            zIndex: 50,
+                            background: 'linear-gradient(135deg, rgba(109,40,217,0.98) 0%, rgba(88,28,135,0.98) 100%)',
+                            border: '1px solid rgba(192,132,252,0.5)',
+                            boxShadow: '0 0 0 3px rgba(109,40,217,0.25), 0 4px 16px rgba(109,40,217,0.5)',
+                            backdropFilter: 'blur(8px)',
+                          }}
                         >
                           <Clock className="h-3 w-3 text-purple-300" />
                           <span>{formatCurrentTime()}</span>
@@ -877,9 +876,9 @@ export default function CalendarPage() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
-                            className="group relative"
+                            className="group relative z-[3]"
                           >
-                            <div className="group relative bg-[#120E24]/80 backdrop-blur-md border border-purple-900/40 rounded-lg p-3 shadow-lg hover:border-purple-500/60 transition-all duration-300 overflow-hidden">
+                            <div className={`group relative bg-[#120E24]/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
                               {/* Glowing effect */}
                               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                               <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -951,6 +950,28 @@ export default function CalendarPage() {
                     </div>
                   );
                 })}
+                {/* ── Weekend / empty state overlay ── */}
+                {showWeekendEmptyState && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
+                    <div className="pointer-events-auto flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-purple-950/80 border border-purple-800/40 backdrop-blur-md shadow-xl max-w-sm text-center">
+                      <div className="text-3xl">📅</div>
+                      <p className="text-white font-semibold text-sm">
+                        {isWeekendDay ? 'No events today — markets are closed on weekends' : 'No events scheduled for today'}
+                      </p>
+                      <p className="text-purple-400 text-xs leading-relaxed">
+                        {isWeekendDay
+                          ? 'Economic data releases resume Monday. Check This Week for upcoming events.'
+                          : 'No economic releases are scheduled. Check back later or view This Week.'}
+                      </p>
+                      <button
+                        onClick={() => setViewType('week')}
+                        className="pointer-events-auto mt-1 px-4 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-colors"
+                      >
+                        View This Week →
+                      </button>
+                    </div>
+                  </div>
+                )}
                 </>
               )}
             </div>
