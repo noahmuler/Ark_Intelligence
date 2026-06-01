@@ -215,22 +215,42 @@ export default function CalendarPage() {
 
     const id = setTimeout(() => {
       if (viewType === 'tomorrow') {
-        // Tomorrow has no current-time indicator — always start at 00:00
+        // Tomorrow: scroll to start (00:00)
         el.scrollLeft = 0;
         return;
       }
-      if (viewType !== 'today' && viewType !== 'week') return;
 
-      // Today: center on current time in the 24h strip
-      // Week: center on current day column
-      const pct = viewType === 'week' ? getSpotlightPosition() / 100 : getTimelinePosition() / 100;
-      const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      el.scrollLeft = Math.max(0, Math.min(scrollTarget, maxScroll));
+      if (viewType === 'week') {
+        // Week: scroll so TODAY's column is the SECOND column from left (gives context)
+        // Each column is ~400px at xl. Find today's column index.
+        const now = new Date();
+        const todayKey = localDateString(now, timezone);
+        const weekDays = getWeekDays(now);
+        const todayIndex = weekDays.findIndex(
+          d => localDateString(d.date, timezone) === todayKey
+        );
+        if (todayIndex >= 0) {
+          // Approximate column width from scrollWidth / 7
+          const colWidth = el.scrollWidth / 7;
+          // Put today's column at the left edge with one column of context before it
+          const scrollTarget = Math.max(0, (todayIndex - 0.5) * colWidth);
+          el.scrollLeft = Math.min(scrollTarget, el.scrollWidth - el.clientWidth);
+        }
+        return;
+      }
+
+      if (viewType === 'today') {
+        // Today: center on current time
+        const pct = getTimelinePosition() / 100;
+        const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        el.scrollLeft = Math.max(0, Math.min(scrollTarget, maxScroll));
+        return;
+      }
     }, 500);
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewType, mounted]);
+  }, [viewType, mounted, timezone]);
 
   // Use the new useCalendarEvents hook
   const customDateParam = viewType === 'custom'
@@ -313,11 +333,19 @@ export default function CalendarPage() {
   };
 
   // ─── Weekend / empty state for daily view ────────────────────────────────────
+  // Get "today" and "tomorrow" in local timezone to avoid UTC midnight issues
+  const getTodayLocal = () => {
+    const now = new Date();
+    // Create a date object representing midnight in the user's timezone
+    const localStr = localDateString(now, timezone); // YYYY-MM-DD
+    const [y, mo, da] = localStr.split('-').map(Number);
+    return new Date(y, mo - 1, da);
+  };
   const targetDate = viewType === 'tomorrow' ? (() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  })() : new Date();
+    const t = getTodayLocal();
+    t.setDate(t.getDate() + 1);
+    return t;
+  })() : getTodayLocal();
   const isWeekendDay = [0, 6].includes(targetDate.getDay());
   const targetDateKey = localDateString(targetDate, timezone);
 
@@ -706,7 +734,8 @@ export default function CalendarPage() {
                   {/* ── Current-time indicator for Week view ── */}
                   {/* Only show if today falls within the displayed week */}
                   {(() => {
-                    const weekDays = getWeekDays(selectedDate);
+                    // Always use new Date() — not selectedDate — to match the rendered columns
+                    const weekDays = getWeekDays(new Date());
                     const todayKey = localDateString(new Date(), timezone);
                     const todayInWeek = weekDays.some(
                       d => localDateString(d.date, timezone) === todayKey
@@ -720,28 +749,45 @@ export default function CalendarPage() {
                         className="absolute bottom-0 pointer-events-none"
                         style={{ left: `${pct}%`, top: '24px', width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line — zIndex:1, BEHIND cards (z-[3]) */}
+                        {/* Vertical line — rendered behind cards but with strong glow */}
                         <div
-                          className="absolute top-16 bottom-0 w-[2px]"
+                          className="absolute bottom-0"
                           style={{
+                            top: '48px',
+                            width: '3px',
+                            left: '-1.5px', // center on the anchor point
                             zIndex: 1,
-                            background: 'linear-gradient(to bottom, rgba(168,85,247,1) 0%, rgba(168,85,247,0.6) 70%, transparent 100%)',
-                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.5)',
+                            background: 'linear-gradient(to bottom, rgba(192,132,252,1) 0%, rgba(168,85,247,0.85) 50%, rgba(139,92,246,0.3) 85%, transparent 100%)',
+                            boxShadow: '0 0 12px 4px rgba(168,85,247,0.6), 0 0 24px 8px rgba(109,40,217,0.3)',
+                            borderRadius: '2px',
                           }}
                         />
-                        {/* Time bubble — zIndex:50, ABOVE cards */}
+                        {/* Wide glow halo behind the line for maximum visibility */}
                         <div
-                          className="absolute top-0 -translate-x-1/2 flex items-center gap-1.5 text-white text-[11px] font-mono px-2.5 py-1 rounded-full whitespace-nowrap"
+                          className="absolute bottom-0"
                           style={{
+                            top: '48px',
+                            width: '20px',
+                            left: '-10px',
+                            zIndex: 0,
+                            background: 'linear-gradient(to bottom, rgba(139,92,246,0.25) 0%, rgba(139,92,246,0.1) 60%, transparent 100%)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                        {/* Time bubble — sits above the column label row */}
+                        <div
+                          className="absolute -translate-x-1/2 flex items-center gap-2 text-white text-xs font-mono px-3 py-1.5 rounded-full whitespace-nowrap"
+                          style={{
+                            top: '2px',
                             zIndex: 50,
-                            background: 'linear-gradient(135deg, rgba(109,40,217,0.98) 0%, rgba(88,28,135,0.98) 100%)',
-                            border: '1px solid rgba(192,132,252,0.5)',
-                            boxShadow: '0 0 0 3px rgba(109,40,217,0.25), 0 4px 14px rgba(109,40,217,0.5)',
-                            backdropFilter: 'blur(8px)',
+                            background: 'linear-gradient(135deg, rgba(109,40,217,1) 0%, rgba(88,28,135,1) 100%)',
+                            border: '1.5px solid rgba(216,180,254,0.7)',
+                            boxShadow: '0 0 0 4px rgba(109,40,217,0.3), 0 0 20px 6px rgba(109,40,217,0.6)',
+                            backdropFilter: 'blur(12px)',
                           }}
                         >
-                          <Clock className="h-3 w-3 text-purple-300" />
-                          <span>{formatCurrentTime()}</span>
+                          <Clock className="h-3.5 w-3.5 text-purple-200" />
+                          <span className="font-semibold tracking-wide">{formatCurrentTime()}</span>
                         </div>
                       </div>
                     );
@@ -852,14 +898,29 @@ export default function CalendarPage() {
                         className="absolute top-0 bottom-0 pointer-events-none"
                         style={{ left: `${pct}%`, width: 0, zIndex: 2 }}
                       >
-                        {/* Vertical line — zIndex:1 → BEHIND cards (z-[3]) */}
+                        {/* Vertical line — behind cards, high glow for visibility */}
                         <div
-                          className="absolute bottom-0 w-[2px]"
+                          className="absolute bottom-0"
                           style={{
-                            top: '50px',
+                            top: '44px',
+                            width: '3px',
+                            left: '-1.5px',
                             zIndex: 1,
-                            background: 'linear-gradient(to bottom, rgba(168,85,247,1) 0%, rgba(168,85,247,0.6) 70%, transparent 100%)',
-                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.5)',
+                            background: 'linear-gradient(to bottom, rgba(192,132,252,1) 0%, rgba(168,85,247,0.85) 50%, rgba(139,92,246,0.3) 85%, transparent 100%)',
+                            boxShadow: '0 0 12px 4px rgba(168,85,247,0.6), 0 0 24px 8px rgba(109,40,217,0.3)',
+                            borderRadius: '2px',
+                          }}
+                        />
+                        {/* Glow halo */}
+                        <div
+                          className="absolute bottom-0"
+                          style={{
+                            top: '44px',
+                            width: '24px',
+                            left: '-12px',
+                            zIndex: 0,
+                            background: 'linear-gradient(to bottom, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)',
+                            pointerEvents: 'none',
                           }}
                         />
                         {/* Time bubble — zIndex:50 → ABOVE everything */}
@@ -977,13 +1038,16 @@ export default function CalendarPage() {
                     <div className="pointer-events-auto flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-purple-950/80 border border-purple-800/40 backdrop-blur-md shadow-xl max-w-sm text-center">
                       <div className="text-3xl">📅</div>
                       <p className="text-white font-semibold text-sm">
-                        {isWeekendDay
-                          ? `No events ${viewType === 'tomorrow' ? 'tomorrow' : 'today'} — markets are closed on weekends`
-                          : `No events scheduled for ${viewType === 'tomorrow' ? 'tomorrow' : 'today'}`
-                        }
+                        {viewType === 'tomorrow'
+                          ? 'No events scheduled for tomorrow'
+                          : isWeekendDay
+                          ? 'No events today — markets are closed on weekends'
+                          : 'No events scheduled for today'}
                       </p>
                       <p className="text-purple-400 text-xs leading-relaxed">
-                        {isWeekendDay
+                        {viewType === 'tomorrow'
+                          ? 'No economic releases are scheduled for tomorrow. Check This Week for the full picture.'
+                          : isWeekendDay
                           ? 'Economic data releases resume Monday. Check This Week for upcoming events.'
                           : 'No economic releases are scheduled. Check back later or view This Week.'}
                       </p>

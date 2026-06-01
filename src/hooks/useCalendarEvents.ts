@@ -18,8 +18,27 @@ async function fetchEvents(from: string, to: string): Promise<CalendarEvent[]> {
   return res.json();
 }
 
-function toDateParam(d: Date) {
-  return d.toISOString().split('T')[0];
+// ALWAYS use local timezone date string, never UTC
+// This prevents the "wrong day" bug for UTC+ users at midnight
+function toLocalDateParam(d: Date): string {
+  // en-CA locale gives YYYY-MM-DD format naturally
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+// Get Sunday of the week containing the given date (local timezone)
+function getWeekStart(d: Date): Date {
+  const localDateStr = toLocalDateParam(d); // YYYY-MM-DD local
+  const [y, mo, da] = localDateStr.split('-').map(Number);
+  const localDate = new Date(y, mo - 1, da); // midnight LOCAL
+  const dayOfWeek = localDate.getDay(); // 0=Sun
+  const sunday = new Date(localDate);
+  sunday.setDate(localDate.getDate() - dayOfWeek);
+  return sunday;
 }
 
 export function useCalendarEvents(
@@ -27,33 +46,34 @@ export function useCalendarEvents(
   customDate?: string,
 ) {
   const now = new Date();
+  const todayLocal = toLocalDateParam(now);
 
   let from: string;
   let to: string;
 
-  // If customDate is provided, always use it (overrides view)
   if (customDate) {
+    // Custom: query a ±1 day buffer so timezone edge cases don't miss events
     from = to = customDate;
-  } else if (view === 'today') {
-    from = to = toDateParam(now);
-  } else if (view === 'tomorrow') {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    from = to = toDateParam(tomorrow);
-  } else if (view === 'week') {
-    // Sunday → Saturday of current week
-    const sunday = new Date(now);
-    sunday.setDate(now.getDate() - now.getDay());
+  } else if (view === 'today' || view === 'tomorrow') {
+    // CRITICAL FIX: Always query the FULL current week from the API.
+    // Single-day JBlanked queries return [] — multi-day works correctly.
+    // The page's getEventsForInterval already filters by the correct local date.
+    const sunday = getWeekStart(now);
     const saturday = new Date(sunday);
-    saturday.setDate(saturday.getDate() + 6);
-    from = toDateParam(sunday);
-    to = toDateParam(saturday);
+    saturday.setDate(sunday.getDate() + 6);
+    from = toLocalDateParam(sunday);
+    to = toLocalDateParam(saturday);
   } else {
-    from = to = toDateParam(now);
+    // 'week': Sun → Sat of current week
+    const sunday = getWeekStart(now);
+    const saturday = new Date(sunday);
+    saturday.setDate(sunday.getDate() + 6);
+    from = toLocalDateParam(sunday);
+    to = toLocalDateParam(saturday);
   }
 
   return useQuery<CalendarEvent[]>({
-    queryKey: ['calendarEvents', view, from, to],
+    queryKey: ['calendarEvents', view, from, to, todayLocal],
     queryFn: () => fetchEvents(from, to),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,

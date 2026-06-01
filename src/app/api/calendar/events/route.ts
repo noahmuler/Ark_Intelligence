@@ -34,6 +34,17 @@ async function fetchJBlanked(from: string, to: string, apiKey: string) {
   return await res.json();
 }
 
+// Parse ForexFactory "MM-DD-YYYY HH:MM:SS" format into a UTC timestamp
+// FF dates are in Eastern Time (EDT = UTC-4 in summer, EST = UTC-5 in winter)
+function parseFfDate(raw: string): number {
+  // "06-01-2026 02:50:00" → treat as EDT (UTC-4, valid Apr–Nov)
+  const m = raw.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return NaN;
+  // Construct ISO string with EDT offset
+  const iso = `${m[3]}-${m[1]}-${m[2]}T${m[4]}:${m[5]}:${m[6]}-04:00`;
+  return new Date(iso).getTime();
+}
+
 // ─── Source 2: ForexFactory public JSON (no key, rate-limited) ───────────────
 // ForexFactory publishes a weekly JSON feed at a stable CDN URL.
 // It covers the current week only; we filter by date range after fetching.
@@ -46,12 +57,19 @@ async function fetchForexFactory(from: string, to: string) {
   });
   if (!res.ok) throw new Error(`ForexFactory ${res.status}`);
   const data = await res.json();
-  // Filter to requested date range
-  const fromMs = new Date(from + 'T00:00:00Z').getTime();
-  const toMs   = new Date(to   + 'T23:59:59Z').getTime();
+
+  // Use YYYY-MM-DD 00:00:00 UTC as the range boundaries
+  // Add a 2-day buffer on each side to capture timezone-shifted events
+  const fromMs = new Date(from + 'T00:00:00Z').getTime() - 2 * 24 * 3600 * 1000;
+  const toMs   = new Date(to   + 'T23:59:59Z').getTime() + 2 * 24 * 3600 * 1000;
+
   return (Array.isArray(data) ? data : []).filter((ev: Record<string, unknown>) => {
-    const d = new Date(String(ev.date ?? '')).getTime();
-    return d >= fromMs && d <= toMs;
+    const raw = String(ev.date ?? '');
+    // Try FF-specific parser first, then fall back to native Date
+    const t = parseFfDate(raw);
+    if (!isNaN(t)) return t >= fromMs && t <= toMs;
+    const t2 = new Date(raw).getTime();
+    return !isNaN(t2) && t2 >= fromMs && t2 <= toMs;
   });
 }
 
