@@ -233,8 +233,8 @@ export default function CalendarPage() {
   }, [viewType, mounted]);
 
   // Use the new useCalendarEvents hook
-  const customDateParam = viewType === 'custom' 
-    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` 
+  const customDateParam = viewType === 'custom'
+    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
     : undefined;
   const { data: apiEvents, isLoading, isError, refetch, dataUpdatedAt } = useCalendarEvents(
     // The hook only accepts 'today' | 'tomorrow' | 'week'; for 'custom' pass 'today'
@@ -268,6 +268,10 @@ export default function CalendarPage() {
 
   // Filter events based on selected currencies and impacts
   const filteredEvents = events.filter(event => {
+    // Filter out events with empty or invalid dates
+    if (!event.date || event.date.trim() === '') {
+      return false;
+    }
     const currencyMatch = selectedCurrencies.length === 0 || selectedCurrencies.includes(event.currency || "USD");
     const impactMatch = selectedImpacts.length === 0 || selectedImpacts.includes(event.impact);
     return currencyMatch && impactMatch;
@@ -284,14 +288,24 @@ export default function CalendarPage() {
   };
 
   // Group events by time interval (for daily view)
-  const getEventsForInterval = (interval: string) => {
+  const getEventsForInterval = (interval: string, targetDate?: Date) => {
     const [hour] = interval.split(':').map(Number);
+    // Use targetDate if provided (for Tomorrow view), otherwise use today
+    const dateToFilter = targetDate || new Date();
+    // Use local timezone date string for consistency with hour filtering
+    const targetDateKey = localDateString(dateToFilter, timezone);
     return filteredEvents.filter(event => {
       const eventDate = parseEventDate(event.date);
       if (isNaN(eventDate.getTime())) {
         console.warn('[calendar] Invalid date for interval filtering:', event.date);
         return false;
       }
+      // Filter by date first - use local timezone for consistency
+      const eventDateKey = localDateString(eventDate, timezone);
+      if (eventDateKey !== targetDateKey) {
+        return false;
+      }
+      // Then filter by hour using the user's timezone
       const { h: eventHour } = localHM(eventDate, timezone);
       const matches = eventHour >= hour && eventHour < hour + 2;
       return matches;
@@ -299,11 +313,18 @@ export default function CalendarPage() {
   };
 
   // ─── Weekend / empty state for daily view ────────────────────────────────────
-  const isWeekendDay = [0, 6].includes(new Date().getDay());
+  const targetDate = viewType === 'tomorrow' ? (() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  })() : new Date();
+  const isWeekendDay = [0, 6].includes(targetDate.getDay());
+  const targetDateKey = localDateString(targetDate, timezone);
+
   const totalDailyEvents = TIME_INTERVALS.reduce(
-    (sum, interval) => sum + getEventsForInterval(interval).length, 0
+    (sum, interval) => sum + getEventsForInterval(interval, targetDate).length, 0
   );
-  const showWeekendEmptyState = viewType === 'today' && totalDailyEvents === 0 && !loading;
+  const showWeekendEmptyState = (viewType === 'today' || viewType === 'tomorrow') && totalDailyEvents === 0 && !loading;
 
   // Group events by day (for weekly view)
   const getEventsForDay = (dayDate: Date) => {
@@ -445,13 +466,13 @@ export default function CalendarPage() {
 
   // Calculate spotlight position for current time within the timeline.
   // For weekly view, align with the current day's column and add intra-day fraction.
-  // NOTE: We intentionally do NOT key off `selectedDate` to avoid the "wrong day" drift in daily mode.
   const getSpotlightPosition = () => {
     const { h, m } = localHM(currentTime, timezone);
     const currentMinutes = h * 60 + m;
 
     if (viewType === 'week') {
-      const weekDays = getWeekDays(selectedDate);
+      // Use current date (not selectedDate) to ensure indicator shows correct day
+      const weekDays = getWeekDays(new Date());
       const todayKey = localDateString(new Date(), timezone);
       const currentDayIndex = weekDays.findIndex(
         day => localDateString(day.date, timezone) === todayKey
@@ -701,11 +722,11 @@ export default function CalendarPage() {
                       >
                         {/* Vertical line — zIndex:1, BEHIND cards (z-[3]) */}
                         <div
-                          className="absolute top-8 bottom-0 w-[1.5px]"
+                          className="absolute top-16 bottom-0 w-[2px]"
                           style={{
                             zIndex: 1,
-                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.95) 0%, rgba(168,85,247,0.4) 60%, transparent 100%)',
-                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.3)',
+                            background: 'linear-gradient(to bottom, rgba(168,85,247,1) 0%, rgba(168,85,247,0.6) 70%, transparent 100%)',
+                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.5)',
                           }}
                         />
                         {/* Time bubble — zIndex:50, ABOVE cards */}
@@ -725,7 +746,7 @@ export default function CalendarPage() {
                       </div>
                     );
                   })()}
-                  {getWeekDays(selectedDate).map((day, dayIndex) => {
+                  {getWeekDays(new Date()).map((day, dayIndex) => {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
@@ -833,12 +854,12 @@ export default function CalendarPage() {
                       >
                         {/* Vertical line — zIndex:1 → BEHIND cards (z-[3]) */}
                         <div
-                          className="absolute bottom-0 w-[1.5px]"
+                          className="absolute bottom-0 w-[2px]"
                           style={{
-                            top: '36px',
+                            top: '50px',
                             zIndex: 1,
-                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.9) 0%, rgba(168,85,247,0.4) 60%, transparent 100%)',
-                            boxShadow: '0 0 6px 1px rgba(168,85,247,0.35)',
+                            background: 'linear-gradient(to bottom, rgba(168,85,247,1) 0%, rgba(168,85,247,0.6) 70%, transparent 100%)',
+                            boxShadow: '0 0 8px 2px rgba(168,85,247,0.5)',
                           }}
                         />
                         {/* Time bubble — zIndex:50 → ABOVE everything */}
@@ -859,7 +880,7 @@ export default function CalendarPage() {
                     );
                   })()}
                   {TIME_INTERVALS.map((interval, intervalIndex) => {
-                  const intervalEvents = getEventsForInterval(interval);
+                  const intervalEvents = getEventsForInterval(interval, targetDate);
                   
                   return (
                     <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20 snap-start">
@@ -956,7 +977,10 @@ export default function CalendarPage() {
                     <div className="pointer-events-auto flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-purple-950/80 border border-purple-800/40 backdrop-blur-md shadow-xl max-w-sm text-center">
                       <div className="text-3xl">📅</div>
                       <p className="text-white font-semibold text-sm">
-                        {isWeekendDay ? 'No events today — markets are closed on weekends' : 'No events scheduled for today'}
+                        {isWeekendDay
+                          ? `No events ${viewType === 'tomorrow' ? 'tomorrow' : 'today'} — markets are closed on weekends`
+                          : `No events scheduled for ${viewType === 'tomorrow' ? 'tomorrow' : 'today'}`
+                        }
                       </p>
                       <p className="text-purple-400 text-xs leading-relaxed">
                         {isWeekendDay
