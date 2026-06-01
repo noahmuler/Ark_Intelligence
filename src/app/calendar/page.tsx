@@ -178,6 +178,11 @@ export default function CalendarPage() {
   // Ref for auto-scrolling the timeline to current time
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Pixel position of the time indicator — recomputed whenever time, view, or container size changes
+  // This MUST be in pixels, not %, because left:% inside overflow-x-auto uses clientWidth not scrollWidth
+  const [indicatorDailyPx, setIndicatorDailyPx] = useState(0);
+  const [indicatorWeekPx, setIndicatorWeekPx] = useState(0);
+
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Close dropdowns when clicking outside
@@ -221,8 +226,6 @@ export default function CalendarPage() {
       }
 
       if (viewType === 'week') {
-        // Week: scroll so TODAY's column is the SECOND column from left (gives context)
-        // Each column is ~400px at xl. Find today's column index.
         const now = new Date();
         const todayKey = localDateString(now, timezone);
         const weekDays = getWeekDays(now);
@@ -230,27 +233,64 @@ export default function CalendarPage() {
           d => localDateString(d.date, timezone) === todayKey
         );
         if (todayIndex >= 0) {
-          // Approximate column width from scrollWidth / 7
           const colWidth = el.scrollWidth / 7;
-          // Put today's column at the left edge with one column of context before it
-          const scrollTarget = Math.max(0, (todayIndex - 0.5) * colWidth);
+          // Show Sun + today's column: scroll to (todayIndex-1) columns from left
+          const scrollTarget = Math.max(0, (todayIndex - 1) * colWidth);
           el.scrollLeft = Math.min(scrollTarget, el.scrollWidth - el.clientWidth);
         }
         return;
       }
 
       if (viewType === 'today') {
-        // Today: center on current time
-        const pct = getTimelinePosition() / 100;
-        const scrollTarget = pct * el.scrollWidth - el.clientWidth / 2;
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        el.scrollLeft = Math.max(0, Math.min(scrollTarget, maxScroll));
+        // Use indicatorDailyPx if already computed, otherwise compute inline
+        const { h, m } = localHM(new Date(), timezone);
+        const px = ((h * 60 + m) / (24 * 60)) * el.scrollWidth;
+        const scrollTarget = px - el.clientWidth / 2;
+        el.scrollLeft = Math.max(0, Math.min(scrollTarget, el.scrollWidth - el.clientWidth));
         return;
       }
     }, 500);
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, mounted, timezone]);
+
+  // Keep indicator pixel positions synced with time + container size
+  // This runs every second (driven by currentTime) and also on resize
+  useEffect(() => {
+    const compute = () => {
+      const el = timelineRef.current;
+      if (!el) return;
+      const sw = el.scrollWidth;
+      if (sw === 0) return;
+
+      // Daily: pct of full 24h day
+      const { h: dh, m: dm } = localHM(currentTime, timezone);
+      const dailyPct = ((dh * 60 + dm) / (24 * 60));
+      setIndicatorDailyPx(dailyPct * sw);
+
+      // Week: pct of 7-column layout
+      const weekDays = getWeekDays(new Date());
+      const todayKey = localDateString(new Date(), timezone);
+      const todayIdx = weekDays.findIndex(d => localDateString(d.date, timezone) === todayKey);
+      if (todayIdx >= 0) {
+        const { h: wh, m: wm } = localHM(currentTime, timezone);
+        const colFraction = (wh * 60 + wm) / (24 * 60);
+        // Each column = sw/7 wide; today's column starts at todayIdx * (sw/7)
+        const weekPct = (todayIdx + colFraction) / 7;
+        setIndicatorWeekPx(weekPct * sw);
+      }
+    };
+
+    compute();
+
+    // Also recompute on container resize (columns may relayout)
+    const el = timelineRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  // currentTime changes every second → this runs every second automatically
+  }, [currentTime, timezone, viewType]);
 
   // Use the new useCalendarEvents hook
   const customDateParam = viewType === 'custom'
@@ -719,10 +759,18 @@ export default function CalendarPage() {
 
           <div className="relative min-h-[calc(100vh-220px)] mb-0 -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-12 2xl:-mx-16">
             {/* Spotlight Effect - Dynamic radial gradient following current-time marker */}
-            <div 
+            <div
               className="absolute inset-0 pointer-events-none z-0 transition-all duration-1000 ease-in-out"
               style={{
-                background: `radial-gradient(circle at ${getSpotlightPosition()}% 50%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)`
+                background: (() => {
+                  const el = timelineRef.current;
+                  if (!el || el.scrollWidth === 0) return 'none';
+                  const px = viewType === 'week' ? indicatorWeekPx : indicatorDailyPx;
+                  // Convert pixel position to % of the gradient element's own width
+                  // The gradient div is inset-0 so its width = el.scrollWidth
+                  const gradPct = (px / el.scrollWidth) * 100;
+                  return `radial-gradient(circle at ${gradPct}% 50%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)`;
+                })()
               }}
             />
 
@@ -734,20 +782,18 @@ export default function CalendarPage() {
                   {/* ── Current-time indicator for Week view ── */}
                   {/* Only show if today falls within the displayed week */}
                   {(() => {
-                    // Always use new Date() — not selectedDate — to match the rendered columns
                     const weekDays = getWeekDays(new Date());
                     const todayKey = localDateString(new Date(), timezone);
                     const todayInWeek = weekDays.some(
                       d => localDateString(d.date, timezone) === todayKey
                     );
-                    if (!todayInWeek) return null;
+                    if (!todayInWeek || indicatorWeekPx === 0) return null;
 
-                    const pct = getSpotlightPosition();
                     return (
                       <div
                         key="time-indicator-week"
                         className="absolute bottom-0 pointer-events-none"
-                        style={{ left: `${pct}%`, top: '24px', width: 0, zIndex: 2 }}
+                        style={{ left: `${indicatorWeekPx}px`, top: '24px', width: 0, zIndex: 2 }}
                       >
                         {/* Vertical line — rendered behind cards but with strong glow */}
                         <div
@@ -796,7 +842,7 @@ export default function CalendarPage() {
                   const dayEvents = getEventsForDay(day.date);
                   
                   return (
-                    <div key={day.label} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20 snap-start">
+                    <div key={day.label} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[520px] flex flex-col gap-4 px-2 pt-2 border-r border-purple-950/20 snap-start">
                       {/* Day Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {day.label}
@@ -890,13 +936,12 @@ export default function CalendarPage() {
                 <>
                   {/* ── Current-time indicator ── lives inside the flex row so it scrolls with content */}
                   {/* Only show on Today tab, not Tomorrow or Custom */}
-                  {viewType === 'today' && (() => {
-                    const pct = getTimelinePosition(); // 0–100% of full 24h width
+                  {viewType === 'today' && indicatorDailyPx > 0 && (() => {
                     return (
                       <div
                         key="time-indicator"
                         className="absolute top-0 bottom-0 pointer-events-none"
-                        style={{ left: `${pct}%`, width: 0, zIndex: 2 }}
+                        style={{ left: `${indicatorDailyPx}px`, width: 0, zIndex: 2 }}
                       >
                         {/* Vertical line — behind cards, high glow for visibility */}
                         <div
@@ -944,7 +989,7 @@ export default function CalendarPage() {
                   const intervalEvents = getEventsForInterval(interval, targetDate);
                   
                   return (
-                    <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[450px] flex flex-col gap-2 px-2 border-r border-purple-950/20 snap-start">
+                    <div key={interval} className="flex-shrink-0 w-[280px] sm:w-[320px] lg:w-[360px] xl:w-[400px] 2xl:w-[440px] min-h-[520px] flex flex-col gap-4 px-2 pt-2 border-r border-purple-950/20 snap-start">
                       {/* Hour Label at Top */}
                       <div className="text-xs text-purple-400/60 font-medium">
                         {interval}
