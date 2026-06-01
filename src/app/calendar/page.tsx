@@ -160,11 +160,34 @@ export default function CalendarPage() {
     isWeekend ? 'week' : 'today'
   );
   
-  // Filter states
-  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(CURRENCIES);
-  const [selectedImpacts, setSelectedImpacts] = useState<string[]>(["High", "Medium", "Low"]);
-  const [timezone, setTimezone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  
+  // Filter states - persisted to localStorage
+  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('calendar-currencies');
+      return saved ? JSON.parse(saved) : CURRENCIES;
+    }
+    return CURRENCIES;
+  });
+  const [selectedImpacts, setSelectedImpacts] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('calendar-impacts');
+      return saved ? JSON.parse(saved) : ["High", "Medium", "Low"];
+    }
+    return ["High", "Medium", "Low"];
+  });
+  const [timezone, setTimezone] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('calendar-timezone');
+      return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  });
+
+  // Save timezone to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('calendar-timezone', timezone);
+  }, [timezone]);
+
   // Live time tracker
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   
@@ -417,19 +440,23 @@ export default function CalendarPage() {
   };
 
   const toggleCurrency = (currency: string) => {
-    setSelectedCurrencies(prev => 
-      prev.includes(currency) 
+    setSelectedCurrencies(prev => {
+      const next = prev.includes(currency)
         ? prev.filter(c => c !== currency)
-        : [...prev, currency]
-    );
+        : [...prev, currency];
+      localStorage.setItem('calendar-currencies', JSON.stringify(next));
+      return next;
+    });
   };
 
   const toggleImpact = (impact: string) => {
-    setSelectedImpacts(prev => 
-      prev.includes(impact) 
+    setSelectedImpacts(prev => {
+      const next = prev.includes(impact)
         ? prev.filter(i => i !== impact)
-        : [...prev, impact]
-    );
+        : [...prev, impact];
+      localStorage.setItem('calendar-impacts', JSON.stringify(next));
+      return next;
+    });
   };
 
   // Helper functions for styling
@@ -824,7 +851,7 @@ export default function CalendarPage() {
                         <div
                           className="absolute -translate-x-1/2 flex items-center gap-2 text-white text-xs font-mono px-3 py-1.5 rounded-full whitespace-nowrap"
                           style={{
-                            top: '2px',
+                            top: '-20px',
                             zIndex: 50,
                             background: 'linear-gradient(135deg, rgba(109,40,217,1) 0%, rgba(88,28,135,1) 100%)',
                             border: '1.5px solid rgba(216,180,254,0.7)',
