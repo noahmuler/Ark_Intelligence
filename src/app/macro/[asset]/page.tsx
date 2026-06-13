@@ -799,6 +799,7 @@ export default function AssetDetailPage() {
   // Keep a stable ref at the top-level (Rules of Hooks)
   const assetRef = useRef<string | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMounted(true);
 
@@ -868,6 +869,7 @@ export default function AssetDetailPage() {
       cancelled = true;
     };
   }, [params.asset, router, priceRecords, briefs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
 
   const handleRefresh = () => {

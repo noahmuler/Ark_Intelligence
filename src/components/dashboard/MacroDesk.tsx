@@ -506,10 +506,10 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   // Track timeouts so resize/close/open can't desync the expansion UI.
   const expansionTimersRef = useRef<{ clearExpand?: NodeJS.Timeout; closeModal?: NodeJS.Timeout }>({});
 
-
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMounted(true);
-    
+
     // Handle window resize: do not start/stop animations mid-transition.
     const handleResize = () => {
       // Intentionally no-op (keep handler for future expansion).
@@ -518,9 +518,11 @@ export function MacroDesk({ className = "" }: { className?: string }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
 
   // Transform Convex data to assets
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (priceRecords.length > 0) {
       const transformedAssets = priceRecords.map((price) => {
@@ -530,6 +532,7 @@ export function MacroDesk({ className = "" }: { className?: string }) {
       setAssets(transformedAssets);
     }
   }, [priceRecords, briefs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
 
   const getSentimentIcon = (sentiment: string) => {

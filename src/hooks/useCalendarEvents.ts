@@ -41,24 +41,36 @@ function getWeekStart(d: Date): Date {
   return sunday;
 }
 
+function addLocalDays(dateParam: string, days: number): string {
+  const [y, mo, da] = dateParam.split('-').map(Number);
+  const date = new Date(y, mo - 1, da);
+  date.setDate(date.getDate() + days);
+  return toLocalDateParam(date);
+}
+
 export function useCalendarEvents(
   view: 'today' | 'tomorrow' | 'week',
   customDate?: string,
 ) {
   const now = new Date();
   const todayLocal = toLocalDateParam(now);
+  const tomorrowLocal = addLocalDays(todayLocal, 1);
 
   let from: string;
   let to: string;
 
   if (customDate) {
     // Custom: query a ±1 day buffer so timezone edge cases don't miss events
-    from = to = customDate;
+    from = addLocalDays(customDate, -1);
+    to = addLocalDays(customDate, 1);
   } else if (view === 'today' || view === 'tomorrow') {
     // CRITICAL FIX: Always query the FULL current week from the API.
     // Single-day JBlanked queries return [] — multi-day works correctly.
     // The page's getEventsForInterval already filters by the correct local date.
-    const sunday = getWeekStart(now);
+    const targetParam = view === 'tomorrow' ? tomorrowLocal : todayLocal;
+    const [y, mo, da] = targetParam.split('-').map(Number);
+    const targetDate = new Date(y, mo - 1, da);
+    const sunday = getWeekStart(targetDate);
     const saturday = new Date(sunday);
     saturday.setDate(sunday.getDate() + 6);
     from = toLocalDateParam(sunday);
@@ -73,7 +85,7 @@ export function useCalendarEvents(
   }
 
   return useQuery<CalendarEvent[]>({
-    queryKey: ['calendarEvents', view, from, to, todayLocal],
+    queryKey: ['calendarEvents', view, from, to, todayLocal, customDate ?? null],
     queryFn: () => fetchEvents(from, to),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,

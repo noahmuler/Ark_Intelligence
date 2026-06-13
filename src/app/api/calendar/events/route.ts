@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { fetchFinnhubEconomicCalendar } from '@/services/finnhubEconomicCalendar';
+import { fetchTwelveDataEconomicCalendar } from '@/services/twelvedataEconomicCalendar';
 
 // ─── Shape normalizer ─────────────────────────────────────────────────────────
 function extractArray(raw: unknown): unknown[] {
@@ -29,7 +31,7 @@ async function fetchJBlanked(from: string, to: string, apiKey: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Api-Key ${apiKey}`;
   const url = `https://www.jblanked.com/news/api/forex-factory/calendar/range/?from=${from}&to=${to}`;
-  const res = await fetch(url, { headers, next: { revalidate: 300 } });
+  const res = await fetch(url, { headers, cache: 'no-store' });
   if (!res.ok) throw new Error(`JBlanked ${res.status}`);
   return await res.json();
 }
@@ -49,12 +51,18 @@ function parseFfDate(raw: string): number {
 // ForexFactory publishes a weekly JSON feed at a stable CDN URL.
 // It covers the current week only; we filter by date range after fetching.
 async function fetchForexFactory(from: string, to: string) {
-  // ForexFactory JSON — this week's calendar, publicly available
   const url = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    next: { revalidate: 3600 },
-  });
+  const fetchOpts = {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArkIntelligence/1.0)' },
+    cache: 'no-store' as const,
+  };
+  let res = await fetch(url, fetchOpts);
+  // Retry once on 429 (rate limit) with a 2-second back-off
+  if (res.status === 429) {
+    console.warn('[calendar] ForexFactory 429 — retrying after 2s');
+    await new Promise(r => setTimeout(r, 2000));
+    res = await fetch(url, fetchOpts);
+  }
   if (!res.ok) throw new Error(`ForexFactory ${res.status}`);
   const data = await res.json();
 
@@ -73,18 +81,76 @@ async function fetchForexFactory(from: string, to: string) {
   });
 }
 
+function rangeToDates(from: string, to: string): { startDate: Date; endDate: Date } {
+  const startDate = new Date(`${from}T00:00:00Z`);
+  const endDate = new Date(`${to}T23:59:59Z`);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw new Error(`Invalid calendar range ${from} to ${to}`);
+  }
+  return { startDate, endDate };
+}
+
+async function fetchFinnhubFallback(from: string, to: string) {
+  const { startDate, endDate } = rangeToDates(from, to);
+  const result = await fetchFinnhubEconomicCalendar(startDate, endDate);
+  return result.events;
+}
+
+async function fetchTwelveDataFallback(from: string, to: string) {
+  const { startDate, endDate } = rangeToDates(from, to);
+  const result = await fetchTwelveDataEconomicCalendar(startDate, endDate);
+  return result.events;
+}
+
+// ─── Value cleaning helper ────────────────────────────────────────────────────
+// Converts raw API values to a clean string or null.
+// Ensures empty strings, dashes, and sentinel values don't leak as real data.
+function cleanValue(val: unknown): string | null {
+  if (val == null) return null;
+  const s = String(val).trim();
+  if (s === '' || s === '-' || s === '—' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
+    return null;
+  }
+  return s;
+}
+
 // ─── Normalizer: converts any source shape → our CalendarEvent shape ──────────
 function normalize(items: unknown[]): unknown[] {
   return items.map((e: unknown, i: number) => {
     const ev = e as Record<string, unknown>;
+    // Generate a unique ID using a combination of title, currency, and date to avoid duplicates
+    const title = String(ev.name ?? ev.Name ?? ev.title ?? ev.Title ?? ev.event ?? ev.event_name ?? 'Unknown Event');
+    const currency = String(ev.currency ?? ev.Currency ?? ev.currencyCode ?? ev.country ?? '');
+    const date = String(ev.date ?? ev.Date ?? ev.dateUtc ?? ev.datetime ?? ev.time ?? ev.scheduled ?? '');
+    const uniqueId = `${title}-${currency}-${date}-${i}`;
+
+    // JBlanked uses "Data Not Loaded" as Outcome for events that haven't been
+    // released yet. In that case, Actual is a placeholder 0, not real data.
+    const outcomeStr = String(ev.Outcome ?? ev.outcome ?? '').toLowerCase();
+    const hasOutcome = ev.Outcome !== undefined || ev.outcome !== undefined;
+    // Only treat as not loaded if outcome field exists and indicates data is not loaded
+    const isJBlankedNotLoaded = hasOutcome && (outcomeStr === 'data not loaded' || outcomeStr === 'not loaded' || outcomeStr === 'pending');
+
+    // Extract and clean actual/forecast/previous
+    const rawActual   = ev.actual ?? ev.Actual;
+    const rawForecast = ev.forecast ?? ev.Forecast ?? ev.consensus ?? ev.estimate;
+    const rawPrevious = ev.previous ?? ev.Previous ?? ev.revised ?? ev.prev;
+
+    // For JBlanked data: only trust Actual when Outcome indicates the data is loaded
+    // If there's no outcome field (e.g., ForexFactory), always trust the actual value
+    const actual   = isJBlankedNotLoaded ? null : cleanValue(rawActual);
+    // Forecast and Previous are known before release, so always use them
+    const forecast = cleanValue(rawForecast);
+    const previous = cleanValue(rawPrevious);
+
     return {
-      id:       String(ev.id ?? ev.eventId ?? `evt-${i}`),
-      title:    String(ev.name ?? ev.title ?? ev.event ?? ev.event_name ?? 'Unknown Event'),
-      currency: String(ev.currency ?? ev.currencyCode ?? ev.country ?? ''),
-      country:  String(ev.country ?? ev.countryCode ?? ''),
-      impact:   normalizeImpact(ev.impact ?? ev.volatility ?? ev.strength ?? ev.importance ?? 'LOW'),
+      id:       String(ev.id ?? ev.eventId ?? ev.Event_ID ?? uniqueId),
+      title:    title,
+      currency: currency,
+      country:  String(ev.country ?? ev.Country ?? ev.countryCode ?? ''),
+      impact:   normalizeImpact(ev.impact ?? ev.Impact ?? ev.volatility ?? ev.strength ?? ev.importance ?? 'LOW'),
       dateUtc: (() => {
-        const raw = String(ev.date ?? ev.dateUtc ?? ev.datetime ?? ev.time ?? ev.scheduled ?? '');
+        const raw = date;
         if (!raw) return '';
         // ForexFactory format: "MM-DD-YYYY HH:MM:SS" (Eastern Time, ~UTC-4 in summer)
         // Convert to ISO 8601 so new Date() parses reliably everywhere
@@ -93,11 +159,17 @@ function normalize(items: unknown[]): unknown[] {
           // "MM-DD-YYYY HH:MM:SS" → "YYYY-MM-DDTHH:MM:SS-04:00" (EDT, valid May–Nov)
           return `${ffMatch[3]}-${ffMatch[1]}-${ffMatch[2]}T${ffMatch[4]}-04:00`;
         }
+        // JBlanked format: "YYYY.MM.DD HH:MM:SS"
+        const jblankedMatch = raw.match(/^(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
+        if (jblankedMatch) {
+          // "YYYY.MM.DD HH:MM:SS" → "YYYY-MM-DDTHH:MM:SSZ" (treat as UTC)
+          return `${jblankedMatch[1]}-${jblankedMatch[2]}-${jblankedMatch[3]}T${jblankedMatch[4]}Z`;
+        }
         return raw; // already ISO or other parseable format
       })(),
-      actual:   ev.actual   != null ? String(ev.actual)   : null,
-      forecast: ev.forecast != null ? String(ev.forecast) : (ev.consensus  != null ? String(ev.consensus)  : null),
-      previous: ev.previous != null ? String(ev.previous) : (ev.revised    != null ? String(ev.revised)    : null),
+      actual,
+      forecast,
+      previous,
     };
   });
 }
@@ -114,6 +186,8 @@ export async function GET(req: Request) {
   const sources = [
     ...(apiKey ? [() => fetchJBlanked(from, to, apiKey)] : []),
     () => fetchForexFactory(from, to),
+    () => fetchFinnhubFallback(from, to),
+    () => fetchTwelveDataFallback(from, to),
   ];
 
   for (const source of sources) {
@@ -132,7 +206,6 @@ export async function GET(req: Request) {
 
   // All sources failed or returned empty
   console.error('[calendar] all sources failed for', from, '→', to);
-  // Return empty — do NOT return mock data
+  // Return empty array - no mock data
   return NextResponse.json([]);
 }
-

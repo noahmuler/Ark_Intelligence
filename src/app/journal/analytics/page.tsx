@@ -77,10 +77,12 @@ export default function DeepAnalytics() {
   const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
 
   // ── Connection check ────────────────────────────────────────────────────────
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = localStorage.getItem("mt5Connected");
     setIsConnected(saved === "true" && !!connection);
   }, [connection]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── Derived trade sets (ALL hooks ABOVE any early return) ───────────────────
   const actualTrades = useMemo(

@@ -215,7 +215,7 @@ export async function fetchFinnhubEconomicCalendar(
     const end = endDate.toISOString().split('T')[0];
 
     const response = await fetch(
-      `${API_BASE_URL}/economic-calendar?from=${start}&to=${end}&token=${API_KEY}`,
+      `${API_BASE_URL}/calendar/economic?from=${start}&to=${end}&token=${API_KEY}`,
       {
         method: 'GET',
         headers: {
@@ -232,17 +232,18 @@ export async function fetchFinnhubEconomicCalendar(
     
     // Transform Finnhub data to our format
     const events: FinnhubEconomicEvent[] = (data.economicCalendar || []).map((event: any) => {
-      const title = event.name || event.event || 'Economic Event';
+      const title = event.event || event.name || 'Economic Event';
       const country = event.country || 'Unknown';
       const category = mapCategory(title, country);
       const assets = determineAssets(country, category, title);
-      const eventDate = new Date(event.time * 1000); // Finnhub uses Unix timestamp
+      // Finnhub returns ISO date strings (e.g. "2026-06-12 12:30:00"), not Unix timestamps
+      const eventDate = new Date(event.time);
       
       return {
         id: event.id || `${event.time}-${title}`,
         title,
         date: eventDate.toISOString(),
-        time: eventDate.toLocaleTimeString('en-US', { 
+        time: isNaN(eventDate.getTime()) ? '' : eventDate.toLocaleTimeString('en-US', { 
           hour: 'numeric', 
           minute: '2-digit',
           hour12: true 
@@ -253,10 +254,11 @@ export async function fetchFinnhubEconomicCalendar(
         assets,
         relatedReports: generateRelatedReports(category, title),
         country,
-        currency: determineCurrency(country),
-        forecast: event.estimate ? event.estimate.toString() : undefined,
-        actual: event.actual ? event.actual.toString() : undefined,
-        previous: event.prevEstimate ? event.prevEstimate.toString() : undefined
+        currency: event.currency || determineCurrency(country),
+        // Use != null to correctly handle numeric 0 as a valid value
+        forecast: event.estimate != null ? event.estimate.toString() : undefined,
+        actual: event.actual != null ? event.actual.toString() : undefined,
+        previous: event.prev != null ? event.prev.toString() : undefined
       };
     });
 

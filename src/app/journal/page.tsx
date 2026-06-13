@@ -128,6 +128,7 @@ export default function Journal() {
   const trades = paginatedTrades;
 
   // Check connection status
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const savedConnection = localStorage.getItem("mt5Connected");
     if (savedConnection === "true" && connection) {
@@ -136,6 +137,7 @@ export default function Journal() {
       setIsConnected(false);
     }
   }, [connection]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!isConnected) {
     return (

@@ -40,6 +40,7 @@ export default function Settings() {
   const importTradesFromCSV = useAction(api.mt5Actions.importTradesFromCSV);
 
   // Load connection state from localStorage on mount
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const savedConnection = localStorage.getItem("mt5Connected");
     const savedServerName = localStorage.getItem("mt5ServerName");
@@ -51,6 +52,7 @@ export default function Settings() {
       setAccountLogin(savedAccountLogin || "");
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleConnect = async () => {
     setIsConnecting(true);

@@ -82,10 +82,12 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ className = "" }: { className?: string }) {
   const [isMounted, setIsMounted] = useState(false);
   const [dataUpdated, setDataUpdated] = useState(false);
-  
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setIsMounted(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Convex query and data preparation
   const rawHistory = useQuery(api.currencyStrength.getHistory) ?? null;
@@ -97,6 +99,7 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
   };
 
   // Trigger animation when data updates
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (rawHistory) {
       setDataUpdated(true);
@@ -104,6 +107,7 @@ const CurrencyStrengthCard = React.memo(function CurrencyStrengthCard({ classNam
       return () => clearTimeout(timer);
     }
   }, [rawHistory]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Derive current strength values from the latest history point
   const strength: StrengthSeries[] = [

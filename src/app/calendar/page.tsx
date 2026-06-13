@@ -1,18 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
+import {
+  Clock,
   AlertTriangle,
-  TrendingUp,
-  Filter,
-  ChevronRight,
   ChevronDown,
-  Loader2,
-  Sparkles,
-  X
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCalendarEvents, CalendarEvent as ApiCalendarEvent } from "@/hooks/useCalendarEvents";
@@ -69,14 +63,6 @@ const getWeekDays = (startDate: Date) => {
 // Currency options for filtering
 const CURRENCIES = ["EUR", "USD", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY"];
 
-// Timezone options
-const TIMEZONES = [
-  { label: "Europe/London", value: "Europe/London" },
-  { label: "America/New_York", value: "America/New_York" },
-  { label: "Asia/Tokyo", value: "Asia/Tokyo" },
-  { label: "Australia/Sydney", value: "Australia/Sydney" },
-];
-
 interface CalendarEvent {
   id: string;
   time: string;
@@ -93,20 +79,25 @@ interface CalendarEvent {
   assets?: string[];
 }
 
+const parseApiDate = (dateStr: string): Date => {
+  if (/^\d+$/.test(dateStr)) {
+    return new Date(parseInt(dateStr, 10));
+  }
+  return new Date(dateStr);
+};
+
+const normalizeCurrency = (currency: string | null | undefined): string => {
+  return (currency || "USD").trim().toUpperCase();
+};
+
 // Map API event to UI event format
 const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent, tz: string): CalendarEvent => {
   // Handle different date formats from API
   // ForexFactory returns timestamp in milliseconds, JBlanked returns ISO string
-  let date: Date;
   const dateStr = apiEvent.dateUtc;
 
   // Try parsing as timestamp (milliseconds)
-  if (/^\d+$/.test(dateStr)) {
-    date = new Date(parseInt(dateStr, 10));
-  } else {
-    // Try parsing as ISO string or other date format
-    date = new Date(dateStr);
-  }
+  const date = parseApiDate(dateStr);
 
   // Check if date is valid
   if (isNaN(date.getTime())) {
@@ -124,14 +115,10 @@ const mapApiEventToUiEvent = (apiEvent: ApiCalendarEvent, tz: string): CalendarE
   return {
     id: apiEvent.id,
     title: apiEvent.title,
-    currency: apiEvent.currency,
+    currency: normalizeCurrency(apiEvent.currency),
     impact: impact,
     time: (() => {
-      const d = new Date(dateStr);
-      // Try parsing as timestamp (milliseconds)
-      if (/^\d+$/.test(dateStr)) {
-        d.setTime(parseInt(dateStr, 10));
-      }
+      const d = parseApiDate(dateStr);
       if (isNaN(d.getTime())) {
         console.warn('[calendar] Invalid date for time parsing:', apiEvent.title, dateStr);
         return '00:00'; // Fallback time for invalid dates
@@ -175,7 +162,7 @@ export default function CalendarPage() {
     }
     return ["High", "Medium", "Low"];
   });
-  const [timezone, setTimezone] = useState<string>(() => {
+  const [timezone] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('calendar-timezone');
       return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -205,6 +192,7 @@ export default function CalendarPage() {
   // This MUST be in pixels, not %, because left:% inside overflow-x-auto uses clientWidth not scrollWidth
   const [indicatorDailyPx, setIndicatorDailyPx] = useState(0);
   const [indicatorWeekPx, setIndicatorWeekPx] = useState(0);
+  const [gradientBackground, setGradientBackground] = useState('none');
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
@@ -224,9 +212,11 @@ export default function CalendarPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [currencyDropdownOpen, impactDropdownOpen]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMounted(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Live time update - uses user's local system time
   useEffect(() => {
@@ -274,7 +264,6 @@ export default function CalendarPage() {
       }
     }, 500);
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, mounted, timezone]);
 
   // Keep indicator pixel positions synced with time + container size
@@ -332,13 +321,16 @@ export default function CalendarPage() {
   const dataSource = isError ? 'Error' : isLoading ? 'Loading…' : 'ForexFactory';
 
   // Track when data was last successfully fetched
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (dataUpdatedAt && !isLoading && !isError) {
       setLastUpdated(new Date(dataUpdatedAt));
     }
   }, [dataUpdatedAt, isLoading, isError]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Set error state based on isError (in useEffect to avoid render-phase update)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isError) {
       setError("Failed to load economic events");
@@ -346,6 +338,19 @@ export default function CalendarPage() {
       setError(null);
     }
   }, [isError]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Compute gradient background based on timeline ref and indicator position
+  useEffect(() => {
+    const el = timelineRef.current;
+    if (!el || el.scrollWidth === 0) {
+      setGradientBackground('none');
+      return;
+    }
+    const px = viewType === 'week' ? indicatorWeekPx : indicatorDailyPx;
+    const gradPct = (px / el.scrollWidth) * 100;
+    setGradientBackground(`radial-gradient(circle at ${gradPct}% 50%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)`);
+  }, [viewType, indicatorWeekPx, indicatorDailyPx]);
 
   if (!mounted) return null;
 
@@ -355,20 +360,13 @@ export default function CalendarPage() {
     if (!event.date || event.date.trim() === '') {
       return false;
     }
-    const currencyMatch = selectedCurrencies.length === 0 || selectedCurrencies.includes(event.currency || "USD");
+    const currencyMatch = selectedCurrencies.length === 0 || selectedCurrencies.includes(normalizeCurrency(event.currency));
     const impactMatch = selectedImpacts.length === 0 || selectedImpacts.includes(event.impact);
     return currencyMatch && impactMatch;
   });
 
   // Helper to parse date string (handles both timestamp and ISO formats)
-  const parseEventDate = (dateStr: string): Date => {
-    // Try parsing as timestamp (milliseconds)
-    if (/^\d+$/.test(dateStr)) {
-      return new Date(parseInt(dateStr, 10));
-    }
-    // Try parsing as ISO string or other date format
-    return new Date(dateStr);
-  };
+  const parseEventDate = parseApiDate;
 
   // Group events by time interval (for daily view)
   const getEventsForInterval = (interval: string, targetDate?: Date) => {
@@ -410,7 +408,6 @@ export default function CalendarPage() {
     return t;
   })() : getTodayLocal();
   const isWeekendDay = [0, 6].includes(targetDate.getDay());
-  const targetDateKey = localDateString(targetDate, timezone);
 
   const totalDailyEvents = TIME_INTERVALS.reduce(
     (sum, interval) => sum + getEventsForInterval(interval, targetDate).length, 0
@@ -549,40 +546,6 @@ export default function CalendarPage() {
 
     return `${timeStr} ${gmtOffset}`;
   };
-  
-  // Calculate timeline position for current time within the daily view.
-  // Uses absolute horizontal percentage offset relative to the full day grid container.
-  const getTimelinePosition = () => {
-    const { h, m } = localHM(currentTime, timezone);
-    const pct = ((h * 60 + m) / (24 * 60)) * 100;
-    return pct;
-  };
-
-
-  // Calculate spotlight position for current time within the timeline.
-  // For weekly view, align with the current day's column and add intra-day fraction.
-  const getSpotlightPosition = () => {
-    const { h, m } = localHM(currentTime, timezone);
-    const currentMinutes = h * 60 + m;
-
-    if (viewType === 'week') {
-      // Use current date (not selectedDate) to ensure indicator shows correct day
-      const weekDays = getWeekDays(new Date());
-      const todayKey = localDateString(new Date(), timezone);
-      const currentDayIndex = weekDays.findIndex(
-        day => localDateString(day.date, timezone) === todayKey
-      );
-      if (currentDayIndex >= 0) {
-        const columnStart = (currentDayIndex / weekDays.length) * 100;
-        const intraDayOffset = (currentMinutes / 1440) * (100 / weekDays.length);
-        return columnStart + intraDayOffset;
-      }
-      return 50;
-    }
-
-    return (currentMinutes / 1440) * 100;
-  };
-
 
   return (
     <MainLayout>
@@ -788,17 +751,7 @@ export default function CalendarPage() {
             {/* Spotlight Effect - Dynamic radial gradient following current-time marker */}
             <div
               className="absolute inset-0 pointer-events-none z-0 transition-all duration-1000 ease-in-out"
-              style={{
-                background: (() => {
-                  const el = timelineRef.current;
-                  if (!el || el.scrollWidth === 0) return 'none';
-                  const px = viewType === 'week' ? indicatorWeekPx : indicatorDailyPx;
-                  // Convert pixel position to % of the gradient element's own width
-                  // The gradient div is inset-0 so its width = el.scrollWidth
-                  const gradPct = (px / el.scrollWidth) * 100;
-                  return `radial-gradient(circle at ${gradPct}% 50%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)`;
-                })()
-              }}
+              style={{ background: gradientBackground }}
             />
 
             {/* Timeline Container - Unified Horizontal Scroll */}
