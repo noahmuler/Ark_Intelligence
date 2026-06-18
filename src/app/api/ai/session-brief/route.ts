@@ -14,10 +14,10 @@ async function fetchMarketContext() {
       fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/news/macro?category=macro&limit=5`),
     ]);
 
-    const prices = pricesRes.ok ? await pricesRes.json() : {};
+    const pricesPayload = pricesRes.ok ? await pricesRes.json() : {};
     const newsData = newsRes.ok ? await newsRes.json() : { articles: [] };
 
-    return { prices, headlines: newsData.articles || [] };
+    return { prices: pricesPayload.prices || {}, headlines: newsData.articles || [] };
   } catch (error) {
     console.error('Error fetching market context:', error);
     return { prices: {}, headlines: [] };
@@ -30,21 +30,13 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
-      // Return mock data if OpenAI key is not available
-      const mockSessionBrief = {
-        mainDriver: "Yield-Driven USD Strength",
-        bias: "Neutral",
-        analysis: "US 10Y yields climbing to 4.32% are supporting USD strength. Gold and Silver showing resilience but facing headwinds from higher rates. Watch for DXY breakout above 105.50 for confirmation.",
-        keyLevels: {
-          support: ["$2,320.00", "$2,305.50", "$2,290.00"],
-          resistance: ["$2,355.00", "$2,370.00", "$2,385.00"]
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'OPENAI_API_KEY not configured. Add it to .env.local to enable AI briefs.',
         },
-        tacticalBias: "Neutral",
-        confidence: 72,
-        timestamp: new Date().toISOString(),
-      };
-
-      return NextResponse.json({ success: true, data: mockSessionBrief });
+        { status: 503 }
+      );
     }
 
     // Fetch real market context
@@ -118,19 +110,8 @@ Return JSON with this structure:
 }
 
 export async function GET() {
-  return NextResponse.json({ 
-    success: true, 
-    data: {
-      mainDriver: "Yield-Driven USD Strength",
-      bias: "Neutral",
-      analysis: "US 10Y yields climbing to 4.32% are supporting USD strength. Gold and Silver showing resilience but facing headwinds from higher rates. Watch for DXY breakout above 105.50 for confirmation.",
-      keyLevels: {
-        support: ["$2,320.00", "$2,305.50", "$2,290.00"],
-        resistance: ["$2,355.00", "$2,370.00", "$2,385.00"]
-      },
-      tacticalBias: "Neutral",
-      confidence: 72,
-      timestamp: new Date().toISOString(),
-    }
-  });
+  return NextResponse.json(
+    { success: false, error: 'Use POST to generate a live AI session brief.' },
+    { status: 405 }
+  );
 }

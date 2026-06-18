@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { useMarketPrices } from "@/hooks/useMarketPrices";
 
 type Sentiment = "Bullish" | "Bearish" | "Neutral";
 
@@ -14,62 +13,73 @@ type AssetCard = {
   deltaPercentText: string;
   sentiment: Sentiment;
   confidence: number;
-  aiOneSentence: string;
+  description: string;
   priceChanged: boolean;
 };
 
-// Mapping of symbols to display names
-const ASSET_NAME_MAP: Record<string, string> = {
-  XAU: "Gold / US Dollar",
-  BTC: "Bitcoin / US Dollar",
-  OIL: "Crude Oil",
-  DXY: "US Dollar Index",
-  NQ: "Nasdaq 100 Futures",
-  ES: "S&P 500 Futures",
+type MarketPrice = {
+  price: number;
+  change?: number;
+  changePercent?: number;
+};
+
+const ASSET_DISPLAY: Record<string, { name: string; description: string }> = {
+  DXY: { name: "US Dollar Index", description: "Measures USD strength against a basket of major currencies." },
+  VIX: { name: "CBOE Volatility Index", description: "Equity volatility gauge. Rising VIX signals broader risk stress." },
+  XAUUSD: { name: "Gold / USD", description: "Safe-haven metal. Sensitive to real rates and dollar strength." },
+  XAGUSD: { name: "Silver / USD", description: "Industrial and monetary metal with higher beta than gold." },
+  BTCUSD: { name: "Bitcoin / USD", description: "Dominant cryptocurrency. Often trades as high-beta risk exposure." },
+  ETHUSD: { name: "Ethereum / USD", description: "Smart contract asset. Usually tracks BTC with higher beta." },
+  US10Y: { name: "US 10Y Yield", description: "Benchmark yield. Rising yields often support USD and pressure gold." },
+  EURUSD: { name: "EUR / USD", description: "Most liquid forex pair and a major inverse DXY input." },
+  GBPUSD: { name: "GBP / USD", description: "Sterling-dollar pair driven by UK rates, growth, and USD regime." },
+  USDJPY: { name: "USD / JPY", description: "Tracks US-Japan yield differential and safe-haven flows." },
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
-  // Live data from Convex
-  const priceRecords = useQuery(api.prices.getAll) ?? [];
-  const briefs = useQuery(api.asset_briefs.getAll) ?? [];
+  const { data: marketData } = useMarketPrices();
 
   // Track previous prices to detect changes
   const previousPricesRef = useRef<Map<string, number>>(new Map());
 
   // Build asset cards from live data
   const ASSETS: AssetCard[] = useMemo(() => {
-    // Define the desired order
-    const desiredOrder = ["XAU", "OIL", "BTC", "DXY", "NQ", "ES"];
-    
-    // Create a map of symbol to price record
-    const priceMap = new Map(priceRecords.map(p => [p.symbol, p]));
-    
-    // Build assets in the desired order
+    if (!marketData?.prices) return [];
+
+    const desiredOrder = ["XAUUSD", "DXY", "BTCUSD", "US10Y", "EURUSD", "XAGUSD"];
+    const prices = marketData.prices as Record<string, MarketPrice>;
+
     return desiredOrder.map((symbol) => {
-      const p = priceMap.get(symbol);
+      const p = prices[symbol];
       if (!p) return null;
-      
-      const name = ASSET_NAME_MAP[p.symbol] ?? p.symbol;
-      const priceText = `$${p.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const delta = p.change24h ?? 0;
+
+      const display = ASSET_DISPLAY[symbol];
+      const name = display?.name ?? symbol;
+      const priceText = `${symbol === "US10Y" ? "" : "$"}${p.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const delta = p.changePercent ?? 0;
       const deltaPercentText = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}%`;
       const sentiment: Sentiment = delta > 0 ? "Bullish" : delta < 0 ? "Bearish" : "Neutral";
       const confidence = Math.min(100, Math.max(0, Math.round(Math.abs(delta) * 10)));
-      const briefObj = briefs.find((b) => b.symbol === p.symbol);
-      const aiOneSentence = briefObj?.brief ?? "Data sourced live from Convex backend.";
-      
+
       // Detect if price changed
       const previousPrice = previousPricesRef.current.get(symbol);
       const priceChanged = previousPrice !== undefined && previousPrice !== p.price;
-      
-      // Update previous price
       previousPricesRef.current.set(symbol, p.price);
-      
-      return { symbol: p.symbol, name, priceText, deltaPercentText, sentiment, confidence, aiOneSentence, priceChanged };
+
+      return {
+        symbol,
+        name,
+        priceText,
+        deltaPercentText,
+        sentiment,
+        confidence,
+        description: display?.description ?? "",
+        priceChanged,
+      };
     }).filter((asset): asset is AssetCard => asset !== null);
-  }, [priceRecords, briefs]);
+  }, [marketData]);
 
   // Mounting state for skeleton loading (prevents layout shift)
   const [isMounted, setIsMounted] = useState(false);
@@ -109,7 +119,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
             <div className="flex items-center gap-1.5 bg-purple-900/30 px-2 py-0.5 rounded-full border border-purple-500/10">
               <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
               <span className="text-[10px] font-bold text-purple-300/80 tracking-wider uppercase">
-                {priceRecords.length ? `${priceRecords.length} assets` : "Loading..."}
+                {ASSETS.length ? `${ASSETS.length} assets` : "Loading..."}
               </span>
             </div>
           </div>
@@ -149,7 +159,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
                     </div>
                     <div className="mt-4 pt-3 border-t border-purple-900/20">
                       <div className="text-[10px] font-bold text-purple-300/50 mb-1 uppercase tracking-wider">AI Intelligence</div>
-                      <p className="text-xs text-white/80 leading-relaxed font-medium">{p.aiOneSentence}</p>
+                      <p className="text-xs text-white/80 leading-relaxed font-medium">{p.description}</p>
                     </div>
                   </div>
                 </div>

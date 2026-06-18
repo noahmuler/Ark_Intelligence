@@ -3,8 +3,7 @@
 import React, { useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useMarketPrices } from "@/hooks/useMarketPrices";
 
 type Quote = {
   symbol: string;
@@ -48,44 +47,47 @@ const TickerItem = React.memo(function TickerItem({ quote }: { quote: Quote }) {
   );
 });
 
-// Mapping of Convex symbols to ticker display symbols
-const SYMBOL_MAP: Record<string, { symbol: string; name: string }> = {
-  XAU: { symbol: "XAUUSD", name: "Gold / USD" },
-  BTC: { symbol: "BTCUSD", name: "Bitcoin / USD" },
-  OIL: { symbol: "WTIUSD", name: "Crude Oil" },
-  DXY: { symbol: "DXY", name: "US Dollar Index" },
-  NQ: { symbol: "NQ", name: "Nasdaq 100 Fut" },
-  ES: { symbol: "ES", name: "S&P 500 Fut" },
+type MarketPrice = {
+  price: number;
+  changePercent?: number;
+};
+
+const DISPLAY_NAMES: Record<string, string> = {
+  DXY: "US Dollar Index",
+  VIX: "CBOE Volatility Index",
+  XAUUSD: "Gold / USD",
+  XAGUSD: "Silver / USD",
+  EURUSD: "EUR / USD",
+  GBPUSD: "GBP / USD",
+  USDJPY: "USD / JPY",
+  BTCUSD: "Bitcoin / USD",
+  ETHUSD: "Ethereum / USD",
+  US10Y: "US 10Y Yield",
 };
 
 const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { className?: string }) {
-  // Fetch real data from Convex
-  const priceRecords = useQuery(api.actions.getAllPrices) ?? [];
+  const { data: marketData, isLoading } = useMarketPrices();
 
   // Track previous prices to detect changes
   const previousPricesRef = useRef<Map<string, number>>(new Map());
 
-  // Map Convex data to ticker format
   const quotes: Quote[] = React.useMemo(() => {
-    return priceRecords.map((record) => {
-      const mapping = SYMBOL_MAP[record.symbol];
-      
-      // Detect if price changed
-      const previousPrice = previousPricesRef.current.get(record.symbol);
-      const priceChanged = previousPrice !== undefined && previousPrice !== record.price;
-      
-      // Update previous price
-      previousPricesRef.current.set(record.symbol, record.price);
-      
+    if (!marketData?.prices) return [];
+
+    return Object.entries(marketData.prices as Record<string, MarketPrice>).map(([key, item]) => {
+      const previousPrice = previousPricesRef.current.get(key);
+      const priceChanged = previousPrice !== undefined && previousPrice !== item.price;
+      previousPricesRef.current.set(key, item.price);
+
       return {
-        symbol: mapping?.symbol || record.symbol,
-        name: mapping?.name,
-        price: record.price,
-        percentChange: record.change24h,
+        symbol: key,
+        name: DISPLAY_NAMES[key] ?? key,
+        price: item.price,
+        percentChange: item.changePercent ?? 0,
         priceChanged,
       };
     });
-  }, [priceRecords]);
+  }, [marketData]);
 
   return (
     <Card className={`overflow-hidden rounded-xl border border-white/10 bg-purple-950/30 backdrop-blur-[12px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out ${className}`}>
@@ -129,6 +131,9 @@ const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { 
           </div>
         </div>
 
+        {isLoading && quotes.length === 0 ? (
+          <div className="h-24 rounded-xl border border-white/5 bg-purple-900/30 animate-pulse" />
+        ) : (
         <div className="relative overflow-hidden rounded-xl border border-white/5 bg-purple-950/20 p-2">
           <div className="marquee-container">
             <div className="marquee-track">
@@ -148,6 +153,7 @@ const TickerTapeCard = React.memo(function TickerTapeCard({ className = "" }: { 
             </div>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   );

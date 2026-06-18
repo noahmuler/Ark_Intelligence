@@ -1,72 +1,144 @@
 import { NextResponse } from 'next/server';
 
-const SYMBOLS = {
-  // Finnhub forex symbols
-  DXY:    'OANDA:DXY',        // US Dollar Index via OANDA feed
-  XAUUSD: 'OANDA:XAU_USD',   // Gold
-  XAGUSD: 'OANDA:XAG_USD',   // Silver
+type PriceRecord = {
+  name: string;
+  symbol: string;
+  price: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  prevClose: number;
+  change: number;
+  changePercent: number;
+  timestamp: number;
+};
+
+type YahooQuote = {
+  regularMarketPrice?: number;
+  regularMarketPreviousClose?: number;
+  regularMarketOpen?: number;
+  regularMarketDayHigh?: number;
+  regularMarketDayLow?: number;
+};
+
+const FINNHUB_SYMBOLS: Record<string, string> = {
+  XAUUSD: 'OANDA:XAU_USD',
+  XAGUSD: 'OANDA:XAG_USD',
   EURUSD: 'OANDA:EUR_USD',
   GBPUSD: 'OANDA:GBP_USD',
   USDJPY: 'OANDA:USD_JPY',
-  // Crypto — Finnhub uses BINANCE prefix
   BTCUSD: 'BINANCE:BTCUSDT',
   ETHUSD: 'BINANCE:ETHUSDT',
-  // US10Y — use FRED or Finnhub bond endpoint
 };
+
+function buildYahooPrice(name: string, symbol: string, quote: YahooQuote): PriceRecord | null {
+  const price = quote.regularMarketPrice ?? 0;
+  if (price <= 0) return null;
+
+  const prevClose = quote.regularMarketPreviousClose ?? price;
+  return {
+    name,
+    symbol,
+    price,
+    open: quote.regularMarketOpen ?? price,
+    high: quote.regularMarketDayHigh ?? price,
+    low: quote.regularMarketDayLow ?? price,
+    prevClose,
+    change: price - prevClose,
+    changePercent: prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0,
+    timestamp: Math.floor(Date.now() / 1000),
+  };
+}
 
 export async function GET() {
   const apiKey = process.env.FINNHUB_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'No API key' }, { status: 500 });
+  if (!apiKey) {
+    return NextResponse.json({ error: 'FINNHUB_API_KEY missing' }, { status: 500 });
+  }
 
-  const entries = Object.entries(SYMBOLS);
-  
-  const results = await Promise.allSettled(
-    entries.map(async ([name, symbol]) => {
+  const entries = Object.entries(FINNHUB_SYMBOLS);
+
+  const [finnhubResults, yahooResults, us10yData] = await Promise.allSettled([
+    Promise.allSettled(
+      entries.map(async ([name, symbol]) => {
+        const res = await fetch(
+          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`,
+          { next: { revalidate: 10 } }
+        );
+        const data = await res.json();
+        if (!data.c || data.c === 0) throw new Error(`No data for ${symbol}`);
+
+        const prevClose = data.pc ?? data.c;
+        return {
+          name,
+          symbol,
+          price: data.c,
+          open: data.o,
+          high: data.h,
+          low: data.l,
+          prevClose,
+          change: data.c - prevClose,
+          changePercent: prevClose > 0 ? ((data.c - prevClose) / prevClose) * 100 : 0,
+          timestamp: data.t,
+        } satisfies PriceRecord;
+      })
+    ),
+    (async () => {
+      const { default: yahooFinance } = await import('yahoo-finance2');
+      const [dxyQuote, vixQuote] = await Promise.allSettled([
+        yahooFinance.quote('DX-Y.NYB') as Promise<YahooQuote>,
+        yahooFinance.quote('^VIX') as Promise<YahooQuote>,
+      ]);
+
+      return {
+        DXY: dxyQuote.status === 'fulfilled' ? buildYahooPrice('DXY', 'DX-Y.NYB', dxyQuote.value) : null,
+        VIX: vixQuote.status === 'fulfilled' ? buildYahooPrice('VIX', '^VIX', vixQuote.value) : null,
+      };
+    })(),
+    (async () => {
+      const fredKey = process.env.FRED_API_KEY;
+      if (!fredKey) return null;
+
       const res = await fetch(
-        `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`,
-        { next: { revalidate: 10 } } // 10-second server cache
+        `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${fredKey}&file_type=json&limit=2&sort_order=desc`,
+        { next: { revalidate: 3600 } }
       );
       const data = await res.json();
-      // Finnhub quote: { c: current, h: high, l: low, o: open, pc: prev_close, t: timestamp }
+      const obs = data.observations;
+      const current = parseFloat(obs?.[0]?.value);
+      const prev = parseFloat(obs?.[1]?.value);
+      if (!Number.isFinite(current)) return null;
+
+      const prevClose = Number.isFinite(prev) ? prev : current;
       return {
-        name,
-        symbol,
-        price: data.c,
-        open: data.o,
-        high: data.h,
-        low: data.l,
-        prevClose: data.pc,
-        change: data.c - data.pc,
-        changePercent: ((data.c - data.pc) / data.pc) * 100,
-        timestamp: data.t,
-      };
-    })
-  );
+        name: 'US10Y',
+        symbol: 'DGS10',
+        price: current,
+        prevClose,
+        change: current - prevClose,
+        changePercent: prevClose > 0 ? ((current - prevClose) / prevClose) * 100 : 0,
+        timestamp: new Date(obs?.[0]?.date).getTime() / 1000,
+      } satisfies PriceRecord;
+    })(),
+  ]);
 
-  const prices: Record<string, object> = {};
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') {
-      prices[entries[i][0]] = r.value;
-    }
-  });
+  const prices: Record<string, PriceRecord> = {};
 
-  // US10Y — fetch from FRED
-  try {
-    const fredRes = await fetch(
-      `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${process.env.FRED_API_KEY}&file_type=json&limit=1&sort_order=desc`,
-      { next: { revalidate: 3600 } }
-    );
-    const fredData = await fredRes.json();
-    const obs = fredData.observations?.[0];
-    prices['US10Y'] = {
-      name: 'US10Y',
-      price: parseFloat(obs?.value),
-      change: 0,
-      changePercent: 0,
-      timestamp: new Date(obs?.date).getTime() / 1000,
-    };
-  } catch (e) {
-    console.error('[ARK] FRED fetch failed', e);
+  if (finnhubResults.status === 'fulfilled') {
+    finnhubResults.value.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        prices[entries[index][0]] = result.value;
+      }
+    });
+  }
+
+  if (yahooResults.status === 'fulfilled') {
+    if (yahooResults.value.DXY) prices.DXY = yahooResults.value.DXY;
+    if (yahooResults.value.VIX) prices.VIX = yahooResults.value.VIX;
+  }
+
+  if (us10yData.status === 'fulfilled' && us10yData.value) {
+    prices.US10Y = us10yData.value;
   }
 
   return NextResponse.json({ prices, fetchedAt: Date.now() });

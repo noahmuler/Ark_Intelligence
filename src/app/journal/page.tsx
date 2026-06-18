@@ -82,6 +82,7 @@ export default function Journal() {
   const [symbolFilter, setSymbolFilter] = useState('');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedPeriod, setSelectedPeriod] = useState<'all' | '30d' | '7d'>('all');
   const itemsPerPage = 10;
 
   // Fetch data from Convex
@@ -89,6 +90,54 @@ export default function Journal() {
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
   const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
   const equityCurve = useQuery(api.mt5Queries.getEquityCurve, { userId: "user-1" });
+
+  const periodFilteredTrades = useMemo(() => {
+    if (!allTrades || selectedPeriod === 'all') return allTrades ?? [];
+    const now = Date.now();
+    const cutoff = selectedPeriod === '30d'
+      ? now - 30 * 24 * 60 * 60 * 1000
+      : now - 7 * 24 * 60 * 60 * 1000;
+    return allTrades.filter((trade) => trade.closeTime >= cutoff);
+  }, [allTrades, selectedPeriod]);
+
+  const pnlDistributionData = useMemo(() => ([
+    { name: '< -$500', value: periodFilteredTrades.filter(t => t.profit < -500).length },
+    { name: '-$500 to -$200', value: periodFilteredTrades.filter(t => t.profit >= -500 && t.profit < -200).length },
+    { name: '-$200 to $0', value: periodFilteredTrades.filter(t => t.profit >= -200 && t.profit < 0).length },
+    { name: '$0 to $200', value: periodFilteredTrades.filter(t => t.profit >= 0 && t.profit < 200).length },
+    { name: '$200 to $500', value: periodFilteredTrades.filter(t => t.profit >= 200 && t.profit < 500).length },
+    { name: '>$500', value: periodFilteredTrades.filter(t => t.profit >= 500).length },
+  ]), [periodFilteredTrades]);
+
+  const rMultipleData = useMemo(() => {
+    const buckets: Record<string, number> = {
+      '< -2R': 0,
+      '-2R to -1R': 0,
+      '-1R to 0': 0,
+      '0 to +1R': 0,
+      '+1R to +2R': 0,
+      '+2R to +3R': 0,
+      '> +3R': 0,
+    };
+
+    const actualTrades = periodFilteredTrades.filter(t => t.type === 'BUY' || t.type === 'SELL');
+    for (const trade of actualTrades) {
+      if (!trade.stopLoss || !trade.openPrice || trade.stopLoss === 0) continue;
+      const risk = Math.abs(trade.openPrice - trade.stopLoss) * trade.lots;
+      if (risk === 0) continue;
+      const rMultiple = trade.profit / risk;
+
+      if (rMultiple < -2) buckets['< -2R']++;
+      else if (rMultiple < -1) buckets['-2R to -1R']++;
+      else if (rMultiple < 0) buckets['-1R to 0']++;
+      else if (rMultiple < 1) buckets['0 to +1R']++;
+      else if (rMultiple < 2) buckets['+1R to +2R']++;
+      else if (rMultiple < 3) buckets['+2R to +3R']++;
+      else buckets['> +3R']++;
+    }
+
+    return Object.entries(buckets).map(([name, value]) => ({ name, value }));
+  }, [periodFilteredTrades]);
 
   // Calculate max/min and offset for dual-color split gradient in Recharts AreaChart
   const { maxVal, minVal } = useMemo(() => {
