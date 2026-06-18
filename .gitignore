@@ -42,6 +42,7 @@ next-env.d.ts
 
 #dev
 /AI_prompts.txt
+.windsurfrules
 
 # Development log (exclude from version control)
 DEVELOPMENT.md
@@ -54,3 +55,4 @@ convex_prompt.md
 ui_prompt.md
 01_01_2007-24_05_2026.csv
 blackbox_calendar_prompt.md
+ark_intelligence_windsurf_prompt.md

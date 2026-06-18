@@ -5,6 +5,7 @@ import {
   EdgeFactorData, 
   ApiResponse 
 } from "@/types";
+import { calcEdgeFactor } from "@/lib/edgeFactor";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -98,7 +99,7 @@ export async function generateSessionBrief(
   }
 }
 
-// Edge Factor Calculation
+// Edge Factor Calculation (Legacy - for backward compatibility)
 export function calculateEdgeFactor(
   macroScore: number,
   technicalScore: number,
@@ -117,6 +118,33 @@ export function calculateEdgeFactor(
     macroScore,
     technicalScore,
     sentimentScore,
+    lastUpdated: new Date().toISOString(),
+  };
+}
+
+// Edge Factor Calculation with Real Market Inputs
+export function calculateEdgeFactorFromRealInputs(
+  dxyTrend: 'up' | 'down' | 'flat',
+  goldMomentum: number,
+  vixLevel: number,
+  yieldCurveSlope: number,
+  newssentiment: number,
+  breadth: 'expanding' | 'contracting'
+): EdgeFactorData {
+  const result = calcEdgeFactor({
+    dxyTrend,
+    goldMomentum,
+    vixLevel,
+    yieldCurveSlope,
+    newssentiment,
+    breadth,
+  });
+
+  return {
+    overallScore: result.total,
+    macroScore: result.macro,
+    technicalScore: result.technical,
+    sentimentScore: result.sentiment,
     lastUpdated: new Date().toISOString(),
   };
 }

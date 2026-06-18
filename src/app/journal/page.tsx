@@ -5,8 +5,10 @@ import { MainLayout } from "@/components/dashboard/MainLayout";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { BookOpen, ArrowRight, TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { BookOpen, ArrowRight, TrendingUp, TrendingDown, DollarSign, Target, ChevronLeft, ChevronRight, PieChart } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, RadialBarChart, RadialBar } from "recharts";
+import { motion } from "framer-motion";
+import { calcJournalStats, calcRollingStats, calcPnl, Trade as JournalTrade } from "@/lib/journalCalculations";
 
 // Animated Counter Component
 function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1500 }: { value: number; prefix?: string; suffix?: string; duration?: number }) {
@@ -211,6 +213,23 @@ export default function Journal() {
             </button>
           </div>
 
+          {/* Rolling Metrics Selector */}
+          <div className="mb-6 flex items-center gap-2">
+            <span className="text-sm text-purple-400">Time Period:</span>
+            {['all', '30d', '7d'].map((period) => (
+              <button
+                key={period}
+                className={`px-3 py-1 text-sm rounded border transition-colors ${
+                  period === 'all'
+                    ? 'bg-purple-600/30 border-purple-500/60 text-white'
+                    : 'bg-purple-900/30 border-purple-800/40 text-purple-400 hover:bg-purple-800/40'
+                }`}
+              >
+                {period === 'all' ? 'All Time' : period === '30d' ? '30 Days' : '7 Days'}
+              </button>
+            ))}
+          </div>
+
           {/* KPI Cards - Responsive Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Row 1 */}
@@ -358,7 +377,12 @@ export default function Journal() {
           </div>
 
           {/* Equity Curve Chart */}
-          <div className="mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
@@ -411,7 +435,149 @@ export default function Journal() {
                 </div>
               </div>
             </div>
+          </motion.div>
+
+          {/* New Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Win Rate Donut */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <div className="group relative">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+                <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                  <h3 className="text-xl font-semibold text-white mb-6">Win Rate</h3>
+                  <div className="h-64 flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={[
+                            { name: 'Wins', value: metrics?.totalTrades ? Math.round((metrics?.winRate ?? 0) / 100 * metrics.totalTrades) : 0 },
+                            { name: 'Losses', value: metrics?.totalTrades ? metrics.totalTrades - Math.round((metrics?.winRate ?? 0) / 100 * metrics.totalTrades) : 0 },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          isAnimationActive={true}
+                          animationDuration={800}
+                        >
+                          <Cell fill="#10b981" />
+                          <Cell fill="#ef4444" />
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(88, 28, 135, 0.9)',
+                            border: '1px solid #7c3aed',
+                            borderRadius: '8px',
+                            color: '#fff'
+                          }}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-center">
+                        <span className="text-3xl font-bold text-white">{metrics?.winRate ?? 0}%</span>
+                        <span className="block text-xs text-purple-400">Win Rate</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* P&L Distribution Histogram */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className="group relative">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+                <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                  <h3 className="text-xl font-semibold text-white mb-6">P&L Distribution</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { name: '< -$500', value: allTrades?.filter(t => t.profit < -500).length ?? 0 },
+                        { name: '-$500 to -$200', value: allTrades?.filter(t => t.profit >= -500 && t.profit < -200).length ?? 0 },
+                        { name: '-$200 to $0', value: allTrades?.filter(t => t.profit >= -200 && t.profit < 0).length ?? 0 },
+                        { name: '$0 to $200', value: allTrades?.filter(t => t.profit >= 0 && t.profit < 200).length ?? 0 },
+                        { name: '$200 to $500', value: allTrades?.filter(t => t.profit >= 200 && t.profit < 500).length ?? 0 },
+                        { name: '>$500', value: allTrades?.filter(t => t.profit >= 500).length ?? 0 },
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
+                        <XAxis dataKey="name" stroke="#a78bfa" tick={{ fontSize: 10 }} />
+                        <YAxis stroke="#a78bfa" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(88, 28, 135, 0.9)',
+                            border: '1px solid #7c3aed',
+                            borderRadius: '8px',
+                            color: '#fff'
+                          }}
+                        />
+                        <Bar dataKey="value" isAnimationActive={true} animationDuration={800}>
+                          {[0, 1, 2].map((index) => (
+                            <Cell key={`cell-${index}`} fill="#ef4444" />
+                          ))}
+                          {[3, 4, 5].map((index) => (
+                            <Cell key={`cell-${index}`} fill="#10b981" />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
+
+          {/* R-Multiple Distribution */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mb-8"
+          >
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <h3 className="text-xl font-semibold text-white mb-6">R-Multiple Distribution</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { name: '-3R', value: 0 },
+                      { name: '-2R', value: 0 },
+                      { name: '-1R', value: 0 },
+                      { name: '0', value: 0 },
+                      { name: '+1R', value: 0 },
+                      { name: '+2R', value: 0 },
+                      { name: '+3R', value: 0 },
+                      { name: '+4R+', value: 0 },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
+                      <XAxis dataKey="name" stroke="#a78bfa" />
+                      <YAxis stroke="#a78bfa" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(88, 28, 135, 0.9)',
+                          border: '1px solid #7c3aed',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                      />
+                      <Bar dataKey="value" fill="#8b5cf6" isAnimationActive={true} animationDuration={800} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </motion.div>
 
           {/* PnL Calendar */}
           <div className="mb-8">

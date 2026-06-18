@@ -21,9 +21,9 @@ interface MarketChartProps {
 
 export const MarketChart = React.memo(function MarketChart({ symbol, name, className = "", disabledChart = false }: MarketChartProps) {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [currentPrice, setCurrentPrice] = useState<number>(symbol === "DXY" ? 105.82 : 2748.32);
-  const [priceChange, setPriceChange] = useState<number>(symbol === "DXY" ? 0.42 : 0.85);
-  const [priceChangePercent, setPriceChangePercent] = useState<number>(symbol === "DXY" ? 0.4 : 0.03);
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [priceChange, setPriceChange] = useState<number | null>(null);
+  const [priceChangePercent, setPriceChangePercent] = useState<number | null>(null);
   const [timeframe, setTimeframe] = useState<string>('1h');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -187,26 +187,26 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
     ctx.setLineDash([]);
 
     // Draw price line
-    ctx.strokeStyle = priceChange >= 0 ? '#10b981' : '#ef4444';
+    ctx.strokeStyle = priceChange !== null && priceChange >= 0 ? '#10b981' : '#ef4444';
     ctx.lineWidth = 2;
     ctx.beginPath();
 
     chartData.forEach((point, index) => {
       const x = padding + (chartWidth / (chartData.length - 1)) * index;
       const y = padding + ((maxPrice - point.price) / priceRange) * chartHeight;
-      
+
       if (index === 0) {
         ctx.moveTo(x, y);
       } else {
         ctx.lineTo(x, y);
       }
     });
-    
+
     ctx.stroke();
 
     // Draw gradient fill under the line
     const gradient = ctx.createLinearGradient(0, padding, 0, rect.height - padding);
-    if (priceChange >= 0) {
+    if (priceChange !== null && priceChange >= 0) {
       gradient.addColorStop(0, 'rgba(16, 185, 129, 0.1)');
       gradient.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
     } else {
@@ -264,7 +264,7 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full blur opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
               <span className="relative px-3 py-1.5 bg-emerald-500/10 text-emerald-300 text-xs font-bold rounded-full border border-emerald-500/20">
-                {priceChange >= 0 ? 'BULLISH' : 'BEARISH'}
+                {priceChange !== null && priceChange >= 0 ? 'BULLISH' : 'BEARISH'}
               </span>
             </div>
           </div>
@@ -292,16 +292,18 @@ export const MarketChart = React.memo(function MarketChart({ symbol, name, class
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-xl sm:text-2xl font-bold text-white tracking-wide">
-            ${currentPrice.toFixed(2)}
+            {currentPrice !== null ? `$${currentPrice.toFixed(2)}` : 'Loading...'}
           </div>
-          <div className={`flex items-center space-x-2 ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {priceChange >= 0 ? (
+          <div className={`flex items-center space-x-2 ${priceChange !== null && priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {priceChange !== null && priceChange >= 0 ? (
               <TrendingUp className="h-3 w-3" />
             ) : (
               <TrendingDown className="h-3 w-3" />
             )}
             <span className="font-semibold text-sm tracking-wide">
-              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+              {priceChange !== null && priceChangePercent !== null
+                ? `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`
+                : 'Loading...'}
             </span>
           </div>
         </div>

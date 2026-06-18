@@ -114,19 +114,65 @@ src/
 FINNHUB_API_KEY=your_finnhub_api_key
 POLYGON_API_KEY=your_polygon_api_key
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+TWELVEDATA_API_KEY=your_twelvedata_api_key
+COIN_GECKO_API_KEY=your_coin_gecko_api_key
 
-# AI/ML APIs
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
+# Economic Calendar & Macro Reports
+FRED_API_KEY=your_fred_api_key
+TRADING_ECONOMICS_API_KEY=your_trading_economics_api_key
+RAPIDAPI_KEY=your_rapidapi_api_key
+JBLANKED_API_KEY=your_jblanked_api_key
 
 # News APIs
 NEWS_API_KEY=your_news_api_key
 RSS_FEED_URL=https://feeds.finance.yahoo.com/rss/2.0/headline
 
+# AI/ML APIs
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
+
 # Application Settings
 NODE_ENV=development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
+
+# Convex Deployment
+CONVEX_DEPLOYMENT=your_convex_deployment
+NEXT_PUBLIC_CONVEX_URL=your_convex_url
+NEXT_PUBLIC_CONVEX_SITE_URL=your_convex_site_url
 ```
+
+## API Setup Instructions
+
+### Required APIs for Full Functionality
+
+1. **Finnhub** (Prices, Forex, Crypto)
+   - Register at: https://finnhub.io
+   - Free tier: 60 calls/min
+   - Required for: Real-time asset prices (DXY, XAUUSD, XAGUSD, etc.)
+
+2. **FRED** (Economic Data)
+   - Register at: https://fred.stlouisfed.org/docs/api/api_key.html
+   - Completely free
+   - Required for: Economic reports (CPI, GDP, Employment, etc.)
+
+3. **NewsAPI** (News Feed)
+   - Register at: https://newsapi.org
+   - Free tier: 100 requests/day (dev only)
+   - Required for: Macro news feed with deduplication
+
+4. **OpenAI** (AI Session Brief)
+   - Register at: https://platform.openai.com
+   - Required for: AI-generated market briefs with real context
+   - Optional: Falls back to mock data if not provided
+
+### Optional APIs
+
+- **Polygon.io** (Stocks, Options) - Free tier available
+- **Alpha Vantage** (Alternative data source)
+- **Trading Economics** (Additional economic data)
+- **CoinGecko** (Crypto data)
 
 ## Development
 

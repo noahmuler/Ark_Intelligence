@@ -215,52 +215,6 @@ async function fetchEconomicIndicator(indicator: string): Promise<any> {
 }
 
 /**
- * Create mock indicator data when API fails
- */
-function createMockIndicatorData(indicator: string): any {
-  const mockData: { [key: string]: any } = {
-    'REAL_GDP': {
-      name: 'Real Gross Domestic Product',
-      value: '2.5',
-      unit: 'percent',
-      previous: '2.3'
-    },
-    'CPI': {
-      name: 'Consumer Price Index',
-      value: '3.2',
-      unit: 'percent',
-      previous: '3.1'
-    },
-    'UNEMPLOYMENT': {
-      name: 'Unemployment Rate',
-      value: '3.8',
-      unit: 'percent',
-      previous: '3.9'
-    },
-    'FEDERAL_FUNDS_RATE': {
-      name: 'Federal Funds Rate',
-      value: '5.25',
-      unit: 'percent',
-      previous: '5.00'
-    },
-    'RETAIL_SALES': {
-      name: 'Retail Sales',
-      value: '0.5',
-      unit: 'percent',
-      previous: '0.3'
-    },
-    'DURABLE_GOODS': {
-      name: 'Durable Goods Orders',
-      value: '2.1',
-      unit: 'percent',
-      previous: '1.8'
-    }
-  };
-  
-  return mockData[indicator] || {};
-}
-
-/**
  * Fetch economic calendar data from Alpha Vantage indicators
  */
 export async function fetchAlphaVantageEconomicCalendar(
