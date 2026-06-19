@@ -1,11 +1,4 @@
-import { 
-  TickerData, 
-  NewsItem, 
-  SessionBrief, 
-  EdgeFactorData, 
-  ApiResponse 
-} from "@/types";
-import { calcEdgeFactor } from "@/lib/edgeFactor";
+import { TickerData, NewsItem, SessionBrief, ApiResponse } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -97,56 +90,6 @@ export async function generateSessionBrief(
     console.error("Error generating session brief:", error);
     return { success: false, error: "Failed to generate session brief" };
   }
-}
-
-// Edge Factor Calculation (Legacy - for backward compatibility)
-export function calculateEdgeFactor(
-  macroScore: number,
-  technicalScore: number,
-  sentimentScore: number
-): EdgeFactorData {
-  const weights = { macro: 0.33, technical: 0.33, sentiment: 0.34 };
-  
-  const overallScore = Math.round(
-    macroScore * weights.macro + 
-    technicalScore * weights.technical + 
-    sentimentScore * weights.sentiment
-  );
-
-  return {
-    overallScore,
-    macroScore,
-    technicalScore,
-    sentimentScore,
-    lastUpdated: new Date().toISOString(),
-  };
-}
-
-// Edge Factor Calculation with Real Market Inputs
-export function calculateEdgeFactorFromRealInputs(
-  dxyTrend: 'up' | 'down' | 'flat',
-  goldMomentum: number,
-  vixLevel: number,
-  yieldCurveSlope: number,
-  newssentiment: number,
-  breadth: 'expanding' | 'contracting'
-): EdgeFactorData {
-  const result = calcEdgeFactor({
-    dxyTrend,
-    goldMomentum,
-    vixLevel,
-    yieldCurveSlope,
-    newssentiment,
-    breadth,
-  });
-
-  return {
-    overallScore: result.total,
-    macroScore: result.macro,
-    technicalScore: result.technical,
-    sentimentScore: result.sentiment,
-    lastUpdated: new Date().toISOString(),
-  };
 }
 
 // WebSocket connection for real-time data

@@ -275,7 +275,7 @@ export default function Journal() {
                     : 'bg-purple-900/30 border-purple-800/40 text-purple-400 hover:bg-purple-800/40'
                 }`}
               >
-                {period === selectedPeriod ? 'All Time' : period === '30d' ? '30 Days' : '7 Days'}
+                {period === 'all' ? 'All Time' : period === '30d' ? '30 Days' : '7 Days'}
               </button>
             ))}
           </div>
@@ -461,10 +461,10 @@ export default function Journal() {
                       <YAxis stroke="#a78bfa" domain={['auto', 'auto']} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(88, 28, 135, 0.9)',
-                          border: '1px solid #7c3aed',
+                          backgroundColor: 'var(--tooltip-bg)',
+                          border: '1px solid var(--tooltip-border)',
                           borderRadius: '8px',
-                          color: '#fff'
+                          color: 'var(--tooltip-fg)'
                         }}
                         labelFormatter={(value) => new Date(value as number).toLocaleString()}
                         formatter={(value: unknown) => [`$${typeof value === 'number' ? value.toFixed(2) : '0.00'}`, 'Equity']}
@@ -521,10 +521,10 @@ export default function Journal() {
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'rgba(88, 28, 135, 0.9)',
-                            border: '1px solid #7c3aed',
+                            backgroundColor: 'var(--tooltip-bg)',
+                            border: '1px solid var(--tooltip-border)',
                             borderRadius: '8px',
-                            color: '#fff'
+                            color: 'var(--tooltip-fg)'
                           }}
                         />
                       </RechartsPieChart>
@@ -558,10 +558,10 @@ export default function Journal() {
                         <YAxis stroke="#a78bfa" />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'rgba(88, 28, 135, 0.9)',
-                            border: '1px solid #7c3aed',
+                            backgroundColor: 'var(--tooltip-bg)',
+                            border: '1px solid var(--tooltip-border)',
                             borderRadius: '8px',
-                            color: '#fff'
+                            color: 'var(--tooltip-fg)'
                           }}
                         />
                         <Bar dataKey="value" isAnimationActive={true} animationDuration={800}>
@@ -599,13 +599,17 @@ export default function Journal() {
                       <YAxis stroke="#a78bfa" />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(88, 28, 135, 0.9)',
-                          border: '1px solid #7c3aed',
+                          backgroundColor: 'var(--tooltip-bg)',
+                          border: '1px solid var(--tooltip-border)',
                           borderRadius: '8px',
-                          color: '#fff'
+                          color: 'var(--tooltip-fg)'
                         }}
                       />
-                      <Bar dataKey="value" fill="#8b5cf6" isAnimationActive={true} animationDuration={800} />
+                      <Bar dataKey="value" isAnimationActive={true} animationDuration={800}>
+                        {rMultipleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.name.startsWith('-') || entry.name.startsWith('<') ? '#ef4444' : '#10b981'} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -716,7 +720,7 @@ export default function Journal() {
                         return <div key={i} className="p-3"></div>;
                       }
 
-                      const dayPnL = allTrades?.reduce((sum, t) => {
+                      const dayPnL = periodFilteredTrades?.reduce((sum, t) => {
                         if (t.isDeposit) return sum; // Skip deposits (isDeposit = true)
                         if (t.type === 'WITHDRAWAL') return sum; // Skip withdrawals
                         const tradeDate = new Date(t.closeTime);
@@ -762,7 +766,7 @@ export default function Journal() {
                     }
 
                     return weekDays.map((date, i) => {
-                      const dayPnL = allTrades?.reduce((sum, t) => {
+                      const dayPnL = periodFilteredTrades?.reduce((sum, t) => {
                         if (t.isDeposit) return sum; // Skip deposits (isDeposit = true)
                         if (t.type === 'WITHDRAWAL') return sum; // Skip withdrawals
                         const tradeDate = new Date(t.closeTime);

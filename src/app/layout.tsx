@@ -1,5 +1,4 @@
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { ThemeProviderWrapper } from "@/components/theme-provider";
 import { ConvexProviderWrapper } from "@/components/convex-provider";
@@ -16,22 +15,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <Script
+        <script
           id="theme-init"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){
-  try{
-    var stored=localStorage.getItem('ark-theme');
-    var theme=stored&&(stored==='dark'||stored==='light')?stored:'dark';
-    document.documentElement.classList.remove('light','dark');
-    document.documentElement.classList.add(theme);
-  }catch(e){
-    document.documentElement.classList.add('dark');
-  }
-})();`,
+            __html: `(function(){var t=localStorage.getItem('ark-theme');var d=true;if(t==='light')d=false;else if(t!=='dark')d=window.matchMedia('(prefers-color-scheme: dark)').matches;var s=document.documentElement;s.classList.add(d?'dark':'light');s.style.colorScheme=d?'dark':'light';var c=document.createElement('style');c.textContent='html,body{background-color:'+(d?'#0f0f23':'#f8fafc')+'!important;color:'+(d?'#ffffff':'#0f172a')+'!important}';document.head.appendChild(c)})();`,
           }}
         />
       </head>

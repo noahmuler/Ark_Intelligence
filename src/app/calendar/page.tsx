@@ -470,8 +470,8 @@ export default function CalendarPage() {
     switch (impact) {
       case "High":   return "text-red-300 bg-red-500/15 border-red-500/50";
       case "Medium": return "text-amber-300 bg-amber-500/15 border-amber-500/50";
-      case "Low":    return "text-purple-400 bg-purple-500/10 border-purple-600/30";
-      default:       return "text-purple-400 bg-purple-500/10 border-purple-600/30";
+      case "Low":    return "text-purple-300 bg-purple-500/10 border-purple-600/30";
+      default:       return "text-purple-300 bg-purple-500/10 border-purple-600/30";
     }
   };
 
@@ -677,7 +677,7 @@ export default function CalendarPage() {
                   <ChevronDown className={`h-3 w-3 transition-transform ${currencyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {currencyDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 bg-[#120E24]/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
+                  <div className="absolute top-full left-0 mt-2 bg-purple-900/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
                     {CURRENCIES.map(currency => (
                       <label key={currency} className="flex items-center gap-2 px-2 py-1.5 hover:bg-purple-800/30 rounded cursor-pointer">
                         <input
@@ -686,7 +686,7 @@ export default function CalendarPage() {
                           onChange={() => toggleCurrency(currency)}
                           className="w-4 h-4 rounded border-purple-500/50 bg-purple-900/50 text-purple-500 focus:ring-purple-500/50 focus:ring-offset-0"
                         />
-                        <span className="text-sm text-purple-200">{currency}</span>
+                        <span className="text-sm text-purple-300">{currency}</span>
                       </label>
                     ))}
                   </div>
@@ -704,7 +704,7 @@ export default function CalendarPage() {
                   <ChevronDown className={`h-3 w-3 transition-transform ${impactDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {impactDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 bg-[#120E24]/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
+                  <div className="absolute top-full left-0 mt-2 bg-purple-900/95 backdrop-blur-md border border-purple-900/40 rounded-lg shadow-xl z-50 p-2 min-w-[200px]">
                     {["High", "Medium", "Low"].map(impact => (
                       <label key={impact} className="flex items-center gap-2 px-2 py-1.5 hover:bg-purple-800/30 rounded cursor-pointer">
                         <input
@@ -713,7 +713,7 @@ export default function CalendarPage() {
                           onChange={() => toggleImpact(impact)}
                           className="w-4 h-4 rounded border-purple-500/50 bg-purple-900/50 text-purple-500 focus:ring-purple-500/50 focus:ring-offset-0"
                         />
-                        <span className="text-sm text-purple-200">{impact}</span>
+                        <span className="text-sm text-purple-300">{impact}</span>
                       </label>
                     ))}
                   </div>
@@ -838,7 +838,7 @@ export default function CalendarPage() {
                             transition={{ delay: dayIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative z-[3]"
                           >
-                            <div className={`group relative bg-[#120E24]/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
+                            <div className={`group relative bg-purple-950/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
                               {/* Glowing effect */}
                               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                               <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -858,7 +858,7 @@ export default function CalendarPage() {
                               </div>
 
                               {/* Card Title */}
-                              <h3 className="text-sm font-bold text-white mb-2 leading-tight">
+                              <h3 className="text-sm font-bold text-purple-100 mb-2 leading-tight">
                                 {event.title}
                               </h3>
 
@@ -903,7 +903,7 @@ export default function CalendarPage() {
                           </motion.div>
                         ))
                       ) : (
-                        <div className="text-center py-8 text-purple-500/50 text-sm">
+                        <div className="text-center py-8 text-purple-400/50 text-sm">
                           No events
                         </div>
                       )}
@@ -985,7 +985,7 @@ export default function CalendarPage() {
                             transition={{ delay: intervalIndex * 0.05 + eventIndex * 0.03 }}
                             className="group relative z-[3]"
                           >
-                            <div className={`group relative bg-[#120E24]/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
+                            <div className={`group relative bg-purple-950/80 backdrop-blur-md border rounded-lg p-3 shadow-lg transition-all duration-300 ${getImpactColor(event.impact)}`}>
                               {/* Glowing effect */}
                               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                               <div className="absolute inset-0 bg-gradient-to-b from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -1005,7 +1005,7 @@ export default function CalendarPage() {
                               </div>
 
                               {/* Card Title */}
-                              <h3 className="text-sm font-bold text-white mb-2 leading-tight">
+                              <h3 className="text-sm font-bold text-purple-100 mb-2 leading-tight">
                                 {event.title}
                               </h3>
 
@@ -1050,7 +1050,7 @@ export default function CalendarPage() {
                           </motion.div>
                         ))
                       ) : (
-                        <div className="text-center py-8 text-purple-500/50 text-sm">
+                        <div className="text-center py-8 text-purple-400/50 text-sm">
                           No events
                         </div>
                       )}
@@ -1062,14 +1062,14 @@ export default function CalendarPage() {
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
                     <div className="pointer-events-auto flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-purple-950/80 border border-purple-800/40 backdrop-blur-md shadow-xl max-w-sm text-center">
                       <div className="text-3xl">📅</div>
-                      <p className="text-white font-semibold text-sm">
+                      <p className="text-purple-100 font-semibold text-sm">
                         {viewType === 'tomorrow'
                           ? 'No events scheduled for tomorrow'
                           : isWeekendDay
                           ? 'No events today — markets are closed on weekends'
                           : 'No events scheduled for today'}
                       </p>
-                      <p className="text-purple-400 text-xs leading-relaxed">
+                      <p className="text-purple-300 text-xs leading-relaxed">
                         {viewType === 'tomorrow'
                           ? 'No economic releases are scheduled for tomorrow. Check This Week for the full picture.'
                           : isWeekendDay
@@ -1078,7 +1078,7 @@ export default function CalendarPage() {
                       </p>
                       <button
                         onClick={() => setViewType('week')}
-                        className="pointer-events-auto mt-1 px-4 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-colors"
+                        className="pointer-events-auto mt-1 px-4 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-purple-100 text-xs font-semibold transition-colors"
                       >
                         View This Week →
                       </button>

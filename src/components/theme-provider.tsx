@@ -1,24 +1,22 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }
 
 export function ThemeProviderWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider 
-      attribute="class" 
-      defaultTheme="dark" 
-      enableSystem={false} 
-      disableTransitionOnChange
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem={false}
+      disableTransitionOnChange={true}
       storageKey="ark-theme"
-      themes={['dark', 'light']}
-      forcedTheme="dark"
+      themes={["dark", "light"]}
     >
       {children}
     </ThemeProvider>
-  )
+  );
 }

@@ -12,7 +12,7 @@ interface ReportData {
   name: string;
   category: string;
   impact: string;
-  releaseDate: string;
+  releaseDate: string | null;
   actual: number | null;
   previous: number | null;
   isReleased: boolean;
@@ -25,6 +25,9 @@ interface ReportsResponse {
   released: ReportData[];
   upcoming: ReportData[];
   fetchedAt: number;
+  error?: string;
+  details?: string;
+  help?: string;
 }
 
 export default function Reports() {
@@ -35,10 +38,14 @@ export default function Reports() {
     queryKey: ['reports'],
     queryFn: async () => {
       const res = await fetch('/api/reports');
-      if (!res.ok) throw new Error('Failed to fetch reports');
-      return res.json();
+      const json = await res.json();
+      if (!res.ok) {
+        const parts = [json.error, json.details, json.help].filter(Boolean);
+        throw new Error(parts.join(' | ') || `Failed to fetch reports: ${res.status}`);
+      }
+      return json as ReportsResponse;
     },
-    refetchInterval: 300_000, // 5 minutes
+    refetchInterval: 300_000,
     staleTime: 60_000,
   });
 
@@ -74,7 +81,8 @@ export default function Reports() {
     return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
@@ -109,25 +117,13 @@ export default function Reports() {
             </button>
           </div>
 
+          {/* API Error */}
           {isError && (
             <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3 text-red-400">
               <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold mb-2">Failed to load reports</p>
-                {error instanceof Error && error.message.includes('FRED_API_KEY') ? (
-                  <div className="text-sm">
-                    <p className="mb-2">The FRED API key is missing from your environment.</p>
-                    <ol className="list-decimal list-inside space-y-1 text-red-300">
-                      <li>Get a free API key at <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-red-200">https://fred.stlouisfed.org/docs/api/api_key.html</a></li>
-                      <li>Add it to your <code className="bg-red-900/30 px-1 py-0.5 rounded">.env.local</code> file:</li>
-                    </ol>
-                    <pre className="mt-2 bg-red-900/30 p-2 rounded text-xs overflow-x-auto">
-FRED_API_KEY=your_fred_api_key_here
-                    </pre>
-                  </div>
-                ) : (
-                  <p className="text-sm">{error instanceof Error ? error.message : 'Failed to load reports'}</p>
-                )}
+                <p className="text-sm">{error instanceof Error ? error.message : 'Failed to load reports'}</p>
               </div>
             </div>
           )}
@@ -239,8 +235,8 @@ FRED_API_KEY=your_fred_api_key_here
                             <XAxis dataKey="name" hide />
                             <YAxis hide domain={['auto', 'auto']} />
                             <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e1b4b', border: '1px solid #581c87', borderRadius: '8px' }}
-                              itemStyle={{ color: '#e9d5ff' }}
+                              contentStyle={{ backgroundColor: 'var(--tooltip-bg)', border: '1px solid var(--tooltip-border)', borderRadius: '8px' }}
+                              itemStyle={{ color: 'var(--tooltip-fg)' }}
                             />
                             <Line 
                               type="monotone" 

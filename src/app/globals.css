@@ -1,31 +1,39 @@
 @import "tailwindcss";
 
+/* ─── Dark is the default (no class on html) ─── */
 :root {
-  --background: #0f0f23; /* Purple-950 - Very deep purple */
-  --foreground: #ffffff; /* White */
-  --card: #1e1b4b; /* Purple-900 */
+  --background: #0f0f23;
+  --foreground: #ffffff;
+  --card: #1e1b4b;
   --card-foreground: #ffffff;
   --popover: #1e1b4b;
   --popover-foreground: #ffffff;
-  --primary: #7c3aed; /* Purple-500 */
+  --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --secondary: #2d1b69; /* Purple-800 */
+  --secondary: #2d1b69;
   --secondary-foreground: #ffffff;
   --muted: #2d1b69;
   --muted-foreground: #a78bfa;
-  --accent: #4c1d95; /* Purple-700 */
+  --accent: #4c1d95;
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: #4c1d95;
   --input: #4c1d95;
   --ring: #7c3aed;
+  --chart-grid: #7c3aed;
+  --chart-axis: #a78bfa;
+  --tooltip-bg: rgba(88, 28, 135, 0.95);
+  --tooltip-border: #7c3aed;
+  --tooltip-fg: #fff;
 }
 
+/* ─── Light mode ─── */
+html.light,
 .light {
-  --background: #ffffff;
+  --background: #f8fafc;
   --foreground: #0f172a;
-  --card: #f8fafc;
+  --card: #ffffff;
   --card-foreground: #0f172a;
   --popover: #ffffff;
   --popover-foreground: #0f172a;
@@ -42,8 +50,15 @@
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #7c3aed;
+  --chart-grid: #cbd5e1;
+  --chart-axis: #64748b;
+  --tooltip-bg: rgba(255, 255, 255, 0.98);
+  --tooltip-border: #e2e8f0;
+  --tooltip-fg: #0f172a;
 }
 
+/* ─── Dark mode (explicit) ─── */
+html.dark,
 .dark {
   --background: #0f0f23;
   --foreground: #ffffff;
@@ -64,6 +79,11 @@
   --border: #4c1d95;
   --input: #4c1d95;
   --ring: #7c3aed;
+  --chart-grid: #7c3aed;
+  --chart-axis: #a78bfa;
+  --tooltip-bg: rgba(88, 28, 135, 0.95);
+  --tooltip-border: #7c3aed;
+  --tooltip-fg: #fff;
 }
 
 body {
@@ -71,631 +91,283 @@ body {
   color: var(--foreground);
   font-family: "Inter", system-ui, sans-serif;
   overflow-x: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Light mode specific adjustments */
-.light .bg-purple-900\/90 {
-  background: rgba(248, 250, 252, 0.95) !important;
+html[data-theme-ready] .bg-purple-950\/40,
+html[data-theme-ready] .bg-purple-900\/90,
+html[data-theme-ready] .bg-purple-900\/80,
+html[data-theme-ready] .bg-purple-900\/70,
+html[data-theme-ready] .bg-purple-900\/60,
+html[data-theme-ready] .bg-purple-900\/50,
+html[data-theme-ready] .bg-purple-900\/40,
+html[data-theme-ready] .bg-purple-900\/30,
+html[data-theme-ready] .bg-purple-900\/20,
+html[data-theme-ready] .bg-purple-800\/50,
+html[data-theme-ready] .bg-purple-800\/40,
+html[data-theme-ready] .bg-purple-800\/30,
+html[data-theme-ready] .bg-purple-950\/80,
+html[data-theme-ready] .backdrop-blur-md,
+html[data-theme-ready] button,
+html[data-theme-ready] input,
+html[data-theme-ready] select,
+html[data-theme-ready] textarea,
+html[data-theme-ready] .rounded-lg,
+html[data-theme-ready] .rounded-2xl,
+html[data-theme-ready] .rounded-xl {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.light .bg-purple-900\/80 {
-  background: rgba(248, 250, 252, 0.85) !important;
+/* ─── Light mode: purple background → neutral card ─── */
+html.light .bg-purple-900\/90,
+html.light .bg-purple-900\/80,
+html.light .bg-purple-900\/70,
+html.light .bg-purple-900\/60,
+html.light .bg-purple-900\/50,
+html.light .bg-purple-900\/40,
+html.light .bg-purple-900\/30,
+html.light .bg-purple-900\/20,
+html.light .bg-purple-800\/90,
+html.light .bg-purple-800\/80,
+html.light .bg-purple-800\/70,
+html.light .bg-purple-800\/60,
+html.light .bg-purple-800\/50,
+html.light .bg-purple-800\/40,
+html.light .bg-purple-800\/30,
+html.light .bg-purple-800\/20,
+html.light .bg-purple-950\/40,
+html.light .bg-purple-950\/30 {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
 }
 
-.light .bg-purple-800\/30 {
-  background: rgba(241, 245, 249, 0.5) !important;
+/* ─── Light mode: solid purple backgrounds ─── */
+html.light .bg-purple-900,
+html.light .bg-purple-800,
+html.light .bg-purple-700 {
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
 }
 
-.light .bg-purple-800\/50 {
-  background: rgba(241, 245, 249, 0.7) !important;
-}
-
-.light .bg-purple-800 {
-  background: #f8fafc !important;
-}
-
-.light .bg-purple-900 {
-  background: #f1f5f9 !important;
-}
-
-.light .bg-purple-700 {
+html.light .bg-purple-600 {
   background: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
-.light .bg-purple-600 {
-  background: #cbd5e1 !important;
+html.light .bg-purple-800,
+html.light .bg-purple-700 {
+  color: var(--card-foreground) !important;
 }
 
-.light .bg-purple-500 {
-  background: #94a3b8 !important;
+/* ─── Light mode: text color mapping ─── */
+html.light .text-white {
+  color: #0f172a !important;
 }
 
-.light .text-purple-300 {
-  color: #64748b !important;
-}
-
-.light .text-purple-400 {
-  color: #475569 !important;
-}
-
-.light .text-purple-500 {
+html.light .text-purple-100,
+html.light .text-purple-200 {
   color: #334155 !important;
 }
 
-.light .text-purple-600 {
-  color: #1e293b !important;
-}
-
-.light .text-purple-700 {
-  color: #0f172a !important;
-}
-
-.light .text-purple-800 {
-  color: #0f172a !important;
-}
-
-.light .text-purple-900 {
-  color: #0f172a !important;
-}
-
-.light .text-white {
-  color: #0f172a !important;
-}
-
-.light .border-purple-800\/50 {
-  border-color: rgba(226, 232, 240, 0.5) !important;
-}
-
-.light .border-purple-700\/50 {
-  border-color: rgba(203, 213, 225, 0.5) !important;
-}
-
-.light .border-purple-800 {
-  border-color: #e2e8f0 !important;
-}
-
-.light .border-purple-700 {
-  border-color: #cbd5e1 !important;
-}
-
-.light .border-purple-600 {
-  border-color: #94a3b8 !important;
-}
-
-.light .border-purple-500 {
-  border-color: #64748b !important;
-}
-
-/* Light mode gradient overrides */
-.light .from-purple-600 {
-  --tw-gradient-from: #7c3aed !important;
-}
-
-.light .to-blue-600 {
-  --tw-gradient-to: #3b82f6 !important;
-}
-
-.light .from-purple-500 {
-  --tw-gradient-from: #8b5cf6 !important;
-}
-
-.light .to-blue-500 {
-  --tw-gradient-to: #3b82f6 !important;
-}
-
-.light .from-purple-700 {
-  --tw-gradient-from: #6d28d9 !important;
-}
-
-.light .to-purple-900 {
-  --tw-gradient-to: #4c1d95 !important;
-}
-
-/* Light mode shadow overrides */
-.light .shadow-2xl {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-.light .shadow-xl {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-}
-
-.light .shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Light mode icon color overrides */
-.light .text-purple-600 {
-  color: #7c3aed !important;
-}
-
-.light .text-purple-500 {
-  color: #8b5cf6 !important;
-}
-
-/* Light mode button overrides */
-.light .bg-gradient-to-r {
-  background: linear-gradient(to right, #7c3aed, #3b82f6) !important;
-}
-
-.light .hover\:from-purple-700:hover {
-  --tw-gradient-from: #6d28d9 !important;
-}
-
-.light .hover\:to-blue-700:hover {
-  --tw-gradient-to: #2563eb !important;
-}
-
-/* Light mode specific component overrides */
-.light .bg-purple-900\/90 {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .bg-purple-900\/80 {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .bg-purple-800\/30 {
-  background: rgba(255, 255, 255, 0.5) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .bg-purple-800\/50 {
-  background: rgba(255, 255, 255, 0.7) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .bg-purple-900\/50 {
-  background: rgba(255, 255, 255, 0.7) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .bg-purple-900\/40 {
-  background: rgba(255, 255, 255, 0.6) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode text readability */
-.light .text-white {
-  color: #0f172a !important;
-}
-
-.light .text-gray-100 {
-  color: #1e293b !important;
-}
-
-.light .text-gray-200 {
-  color: #334155 !important;
-}
-
-.light .text-gray-300 {
+html.light .text-purple-300,
+html.light .text-purple-400 {
   color: #475569 !important;
 }
 
-.light .text-gray-400 {
-  color: #64748b !important;
+html.light .text-purple-500 {
+  color: #334155 !important;
 }
 
-.light .text-gray-500 {
-  color: #64748b !important;
+html.light .text-purple-600,
+html.light .text-purple-700,
+html.light .text-purple-800,
+html.light .text-purple-900,
+html.light .text-purple-950 {
+  color: #0f172a !important;
 }
 
-/* Light mode backdrop blur adjustments */
-.light .backdrop-blur-xl {
+/* ─── Light mode: border color mapping ─── */
+html.light .border-purple-800\/50,
+html.light .border-purple-700\/50,
+html.light .border-purple-800,
+html.light .border-purple-700,
+html.light .border-purple-600,
+html.light .border-purple-500 {
+  border-color: var(--border) !important;
+}
+
+/* ─── Light mode: input fields ─── */
+html.light input,
+html.light select,
+html.light textarea {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* ─── Light mode: table styling ─── */
+html.light table {
+  background: var(--card) !important;
+}
+
+html.light th,
+html.light td {
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+/* ─── Light mode: dropdown menus ─── */
+html.light .bg-\[\#120E24\]\/95,
+html.light .bg-purple-900\/95 {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+html.light .bg-purple-900\/40 {
+  background: var(--secondary) !important;
+}
+
+/* ─── Light mode: calendar & chart tooltips ─── */
+html.light .recharts-tooltip-wrapper,
+html.light [class*="tooltip"] {
+  color: var(--tooltip-fg) !important;
+}
+
+/* ─── Light mode: gradient buttons keep their gradient ─── */
+html.light button.bg-gradient-to-r {
+  color: #ffffff !important;
+}
+
+/* ─── Light mode: glassmorphic cards inside groups ─── */
+html.light .group.relative .relative.bg-purple-900\/90,
+html.light .group.relative .relative.bg-purple-900\/80,
+html.light .group.relative .relative.bg-purple-800\/50,
+html.light .group.relative .relative.bg-purple-800\/30 {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--card-foreground) !important;
+}
+
+html.light .group.relative .relative.bg-purple-900\/90 *,
+html.light .group.relative .relative.bg-purple-900\/80 * {
+  color: inherit !important;
+}
+
+/* ─── Light mode: header backgrounds ─── */
+html.light .bg-purple-900\/60 {
+  background: rgba(255, 255, 255, 0.8) !important;
   backdrop-filter: blur(12px) !important;
+  border-color: var(--border) !important;
 }
 
-.light .backdrop-blur-lg {
-  backdrop-filter: blur(10px) !important;
+/* ─── Light mode: code/pre blocks ─── */
+html.light code,
+html.light pre {
+  background: var(--secondary) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
 }
 
-/* Light mode gradient text */
-.light .text-transparent {
-  background-clip: text !important;
-  -webkit-background-clip: text !important;
-  color: transparent !important;
-}
-
-.light .bg-gradient-to-r.from-purple-600.to-blue-600 {
-  background: linear-gradient(to right, #7c3aed, #3b82f6) !important;
-}
-
-/* Light mode card backgrounds */
-.light [class*="bg-purple-"][class*="backdrop-blur"] {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode specific for glassmorphic cards */
-.light .relative.bg-purple-900\/90 {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .relative.bg-purple-900\/80 {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all purple backgrounds with opacity */
-.light [class*="bg-purple-"][class*="\/"] {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for solid purple backgrounds */
-.light .bg-purple-900,
-.light .bg-purple-800,
-.light .bg-purple-700,
-.light .bg-purple-600 {
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all elements with purple backgrounds */
-.light [class*="bg-purple"] {
-  color: #0f172a !important;
-}
-
-/* Light mode for nested elements in purple backgrounds */
-.light [class*="bg-purple"] * {
-  color: inherit !important;
-}
-
-/* Light mode specific text color overrides */
-.light .text-purple-300,
-.light .text-purple-400,
-.light .text-purple-500 {
-  color: #475569 !important;
-}
-
-.light .text-purple-600,
-.light .text-purple-700,
-.light .text-purple-800,
-.light .text-purple-900 {
-  color: #1e293b !important;
-}
-
-/* Light mode for all white text */
-.light .text-white {
-  color: #0f172a !important;
-}
-
-/* Light mode for icon colors */
-.light svg {
-  color: inherit !important;
-}
-
-.light [class*="text-purple"] svg {
+/* ─── Light mode: links ─── */
+html.light a {
   color: #7c3aed !important;
 }
 
-/* Light mode for gradient backgrounds with blur */
-.light .bg-gradient-to-r {
-  background: linear-gradient(to right, #f8fafc, #e2e8f0) !important;
-}
-
-.light .bg-gradient-to-br {
-  background: linear-gradient(to bottom right, #f8fafc, #e2e8f0, #cbd5e1) !important;
-}
-
-/* Light mode for absolute positioned elements (glassmorphic effects) */
-.light .absolute.-inset-0\.5 {
-  background: rgba(226, 232, 240, 0.5) !important;
-}
-
-.light .group:hover .absolute.-inset-0\.5 {
-  background: rgba(203, 213, 225, 0.6) !important;
-}
-
-/* Light mode for all card-like elements */
-.light .rounded-2xl {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .rounded-xl {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all text elements in light mode */
-.light h1,
-.light h2,
-.light h3,
-.light h4,
-.light h5,
-.light h6 {
-  color: #0f172a !important;
-}
-
-.light p,
-.light span,
-.light div {
-  color: inherit !important;
-}
-
-/* Light mode for specific component patterns */
-.light .group.relative .relative {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all flex items */
-.light .flex.items-center {
-  color: inherit !important;
-}
-
-.light .flex.items-center * {
-  color: inherit !important;
-}
-
-/* Light mode for all grid items */
-.light .grid * {
-  color: inherit !important;
-}
-
-/* Light mode for all button text */
-.light button {
-  color: #ffffff !important;
-}
-
-.light button span {
-  color: #ffffff !important;
-}
-
-/* Light mode for all badge elements */
-.light .badge {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-/* Light mode for all input elements */
-.light input {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-/* Light mode for all select elements */
-.light select {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-/* Light mode for all textarea elements */
-.light textarea {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-/* Light mode for all links */
-.light a {
-  color: #7c3aed !important;
-}
-
-.light a:hover {
+html.light a:hover {
   color: #6d28d9 !important;
 }
 
-/* Light mode for all table elements */
-.light table {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
+/* ─── Light mode: calendar day cells ─── */
+html.light .bg-purple-800\/30 {
+  background: var(--secondary) !important;
 }
 
-.light th,
-.light td {
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
+html.light .hover\:bg-purple-800\/50:hover {
+  background: var(--muted) !important;
 }
 
-/* Light mode for all list items */
-.light li {
+/* ─── Light mode: pagination buttons ─── */
+html.light .bg-purple-700 {
+  background: #cbd5e1 !important;
   color: #0f172a !important;
 }
 
-/* Light mode for all code elements */
-.light code {
-  background: rgba(241, 245, 249, 0.9) !important;
-  color: #0f172a !important;
+html.light .hover\:bg-purple-600:hover {
+  background: #94a3b8 !important;
 }
 
-.light pre {
-  background: rgba(241, 245, 249, 0.9) !important;
-  color: #0f172a !important;
-  border: 1px solid #e2e8f0 !important;
+/* ─── Light mode: selected tabs ─── */
+html.light .bg-purple-600\/30 {
+  background: rgba(124, 58, 237, 0.15) !important;
+  border-color: rgba(124, 58, 237, 0.4) !important;
 }
 
-/* Light mode for all elements with backdrop-blur */
-.light [class*="backdrop-blur"] {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
+html.light .border-purple-500\/60 {
+  border-color: rgba(124, 58, 237, 0.4) !important;
 }
 
-/* Light mode for all elements with shadow */
-.light [class*="shadow"] {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+/* ─── Light mode: error states ─── */
+html.light .bg-red-900\/30,
+html.light .bg-red-500\/10 {
+  background: rgba(239, 68, 68, 0.08) !important;
 }
 
-/* Light mode for all elements with border */
-.light [class*="border"] {
-  border-color: #e2e8f0 !important;
+html.light .text-red-400,
+html.light .text-red-300 {
+  color: #dc2626 !important;
 }
 
-/* Light mode for all elements with gradient */
-.light [class*="gradient"] {
-  background: linear-gradient(to right, #f8fafc, #e2e8f0) !important;
+html.light .border-red-500\/30 {
+  border-color: rgba(239, 68, 68, 0.3) !important;
 }
 
-/* Light mode for all elements with blur */
-.light [class*="blur"] {
-  background: rgba(255, 255, 255, 0.9) !important;
+/* ─── Light mode: green/success states ─── */
+html.light .bg-green-900\/30,
+html.light .bg-green-900\/20 {
+  background: rgba(34, 197, 94, 0.08) !important;
 }
 
-/* Light mode specific overrides for text colors */
-.light .text-white {
-  color: #0f172a !important;
+html.light .text-green-400 {
+  color: #16a34a !important;
 }
 
-.light .text-gray-100,
-.light .text-gray-200,
-.light .text-gray-300 {
-  color: #334155 !important;
+/* ─── Light mode: amber/warning states ─── */
+html.light .bg-amber-500\/10,
+html.light .bg-amber-500\/20 {
+  background: rgba(245, 158, 11, 0.08) !important;
 }
 
-.light .text-gray-400,
-.light .text-gray-500 {
+html.light .text-amber-300,
+html.light .text-amber-200 {
+  color: #b45309 !important;
+}
+
+/* ─── Light mode: gray/neutral text ─── */
+html.light .text-gray-400,
+html.light .text-gray-500 {
   color: #64748b !important;
 }
 
-/* Light mode for all purple color variants */
-.light .text-purple-50,
-.light .text-purple-100,
-.light .text-purple-200 {
-  color: #64748b !important;
-}
-
-.light .text-purple-300,
-.light .text-purple-400 {
+html.light .text-gray-300,
+html.light .text-gray-200 {
   color: #475569 !important;
 }
 
-.light .text-purple-500 {
+html.light .text-gray-100 {
   color: #334155 !important;
 }
 
-.light .text-purple-600,
-.light .text-purple-700 {
-  color: #1e293b !important;
+/* ─── Light mode: sidebar ─── */
+html.light [class*="sidebar"] .bg-purple-900,
+html.light [class*="sidebar"] .bg-purple-800 {
+  background: var(--card) !important;
 }
 
-.light .text-purple-800,
-.light .text-purple-900,
-.light .text-purple-950 {
-  color: #0f172a !important;
-}
-
-/* Light mode for specific component patterns */
-.light .group.relative .relative.bg-purple-900\/90 {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.light .group.relative .relative.bg-purple-900\/80 {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all elements with specific class combinations */
-.light .relative.bg-purple-900\/90,
-.light .relative.bg-purple-900\/80,
-.light .relative.bg-purple-800\/50,
-.light .relative.bg-purple-800\/30 {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all text elements within purple backgrounds */
-.light [class*="bg-purple"] .text-white,
-.light [class*="bg-purple"] .text-purple-300,
-.light [class*="bg-purple"] .text-purple-400 {
-  color: #0f172a !important;
-}
-
-/* Light mode for all heading elements */
-.light h1.text-white,
-.light h2.text-white,
-.light h3.text-white,
-.light h4.text-white,
-.light h5.text-white,
-.light h6.text-white {
-  color: #0f172a !important;
-}
-
-/* Light mode for all paragraph elements */
-.light p.text-white,
-.light p.text-purple-300,
-.light p.text-purple-400 {
-  color: #0f172a !important;
-}
-
-/* Light mode for all span elements */
-.light span.text-white,
-.light span.text-purple-300,
-.light span.text-purple-400 {
-  color: #0f172a !important;
-}
-
-/* Light mode for all div elements with text classes */
-.light div.text-white,
-.light div.text-purple-300,
-.light div.text-purple-400 {
-  color: #0f172a !important;
-}
-
-/* Light mode for all elements with specific text color combinations */
-.light .text-white,
-.light .text-purple-200,
-.light .text-purple-300,
-.light .text-purple-400 {
-  color: #0f172a !important;
-}
-
-/* Light mode for all button elements with gradient backgrounds */
-.light button.bg-gradient-to-r {
-  background: linear-gradient(to right, #7c3aed, #3b82f6) !important;
-}
-
-.light button.bg-gradient-to-r span {
-  color: #ffffff !important;
-}
-
-/* Light mode for all elements with specific background patterns */
-.light .bg-purple-900\/90.backdrop-blur-xl,
-.light .bg-purple-800\/90.backdrop-blur-xl {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Light mode for all elements within glassmorphic containers */
-.light .relative .relative {
-  color: #0f172a !important;
-}
-
-.light .relative .relative * {
-  color: inherit !important;
-}
-
-/* Light mode for all metric cards */
-.light .group.relative .relative.bg-purple-900\/90 * {
-  color: #0f172a !important;
-}
-
-.light .group.relative .relative.bg-purple-900\/80 * {
-  color: #0f172a !important;
-}
-
-/* Light mode for all chart containers */
-.light .bg-purple-900\/90 .text-white {
-  color: #0f172a !important;
-}
-
-.light .bg-purple-900\/90 .text-purple-300 {
-  color: #475569 !important;
-}
-
-.light .bg-purple-900\/90 .text-purple-400 {
-  color: #64748b !important;
-}
-
-/* Custom scrollbar for Ark Intelligence */
+/* ─── Custom scrollbar ─── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -714,14 +386,45 @@ body {
   background: var(--ring);
 }
 
-/* Custom selection colors */
+/* ─── Custom selection colors ─── */
 ::selection {
   background: var(--primary);
   color: var(--primary-foreground);
 }
 
-/* Focus styles for accessibility */
+/* ─── Focus styles for accessibility ─── */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* ─── Light mode: recharts / chart specific overrides ─── */
+html.light .recharts-cartesian-grid-horizontal line,
+html.light .recharts-cartesian-grid-vertical line {
+  stroke: var(--chart-grid) !important;
+  opacity: 0.3;
+}
+
+html.light .recharts-text {
+  fill: var(--chart-axis) !important;
+}
+
+html.light .recharts-cartesian-axis-line,
+html.light .recharts-cartesian-axis-tick-line {
+  stroke: var(--chart-axis) !important;
+}
+
+html.light .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--tooltip-bg) !important;
+  border-color: var(--tooltip-border) !important;
+  color: var(--tooltip-fg) !important;
+  border-radius: 8px;
+}
+
+/* ─── Reduce motion for users who prefer it ─── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

@@ -40,15 +40,6 @@ export interface SessionBrief {
 }
 
 
-// Edge Factor Types
-export interface EdgeFactorData {
-  overallScore: number;
-  macroScore: number;
-  technicalScore: number;
-  sentimentScore: number;
-  lastUpdated: string;
-}
-
 // Market Regime Types
 export type MarketRegime = "Trending" | "Ranging" | "High Volatility" | "Risk-Off";
 
