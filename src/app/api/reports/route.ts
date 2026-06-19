@@ -49,7 +49,10 @@ type ReportDirection = 'beat' | 'miss' | 'inline' | null;
 async function fetchFredSeries(seriesId: string, apiKey: string) {
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&limit=3&sort_order=desc`;
   const res = await fetch(url, { next: { revalidate: 3600 } });
-  if (!res.ok) throw new Error(`FRED error for ${seriesId}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`FRED error for ${seriesId}: ${res.status} ${res.statusText} - ${errorText}`);
+  }
   const data = await res.json();
   return data.observations || [];
 }
@@ -90,58 +93,66 @@ function computeDirection(seriesId: string, actualValue: number | null, previous
 }
 
 export async function GET() {
-  const apiKey = process.env.FRED_API_KEY;
-  if (!apiKey || apiKey === '') {
+  try {
+    const apiKey = process.env.FRED_API_KEY;
+    if (!apiKey || apiKey === '') {
+      return NextResponse.json(
+        { error: 'FRED_API_KEY is missing. Please add your FRED API key to .env.local. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html' },
+        { status: 500 }
+      );
+    }
+
+    const results = await Promise.allSettled(
+      FRED_SERIES.map(async (series) => {
+        const obs = await fetchFredSeries(series.id, apiKey);
+        // obs[0] = most recent, obs[1] = previous, obs[2] = two periods ago
+        const latest = obs[0];
+        const previous = obs[1];
+
+        const releaseDate = latest ? new Date(latest.date) : null;
+        const actualValue = latest?.value !== '.' ? parseFloat(latest?.value) : null;
+        const previousValue = previous?.value !== '.' ? parseFloat(previous?.value) : null;
+        const direction = computeDirection(series.id, actualValue, previousValue);
+        const nextRelease = releaseDate ? computeNextRelease(series.id, releaseDate) : null;
+
+        return {
+          ...series,
+          releaseDate: latest?.date,
+          actual: actualValue,
+          previous: previousValue,
+          isReleased: true,
+          nextRelease,
+          scheduleDescription: RELEASE_SCHEDULE[series.id]?.description ?? 'Estimated from latest observation',
+          unit: deriveUnit(series.id),
+          direction,
+        };
+      })
+    );
+
+    const reports = results
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => (r as PromiseFulfilledResult<object>).value);
+
+    const released = reports
+      .filter((r: any) => r.actual !== null)
+      .sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+
+    const upcoming = reports.map((r: any) => ({
+      ...r,
+      actual: null,
+      isReleased: false,
+      releaseDate: r.nextRelease,
+      direction: null,
+    })).sort((a: any, b: any) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
+
+    return NextResponse.json({ released, upcoming, fetchedAt: Date.now() });
+  } catch (error) {
+    console.error('Reports API error:', error);
     return NextResponse.json(
-      { error: 'FRED_API_KEY is missing. Please add your FRED API key to .env.local. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html' },
+      { error: error instanceof Error ? error.message : 'Unknown error occurred', details: String(error) },
       { status: 500 }
     );
   }
-
-  const results = await Promise.allSettled(
-    FRED_SERIES.map(async (series) => {
-      const obs = await fetchFredSeries(series.id, apiKey);
-      // obs[0] = most recent, obs[1] = previous, obs[2] = two periods ago
-      const latest = obs[0];
-      const previous = obs[1];
-
-      const releaseDate = latest ? new Date(latest.date) : null;
-      const actualValue = latest?.value !== '.' ? parseFloat(latest?.value) : null;
-      const previousValue = previous?.value !== '.' ? parseFloat(previous?.value) : null;
-      const direction = computeDirection(series.id, actualValue, previousValue);
-      const nextRelease = releaseDate ? computeNextRelease(series.id, releaseDate) : null;
-
-      return {
-        ...series,
-        releaseDate: latest?.date,
-        actual: actualValue,
-        previous: previousValue,
-        isReleased: true,
-        nextRelease,
-        scheduleDescription: RELEASE_SCHEDULE[series.id]?.description ?? 'Estimated from latest observation',
-        unit: deriveUnit(series.id),
-        direction,
-      };
-    })
-  );
-
-  const reports = results
-    .filter((r) => r.status === 'fulfilled')
-    .map((r) => (r as PromiseFulfilledResult<object>).value);
-
-  const released = reports
-    .filter((r: any) => r.actual !== null)
-    .sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
-
-  const upcoming = reports.map((r: any) => ({
-    ...r,
-    actual: null,
-    isReleased: false,
-    releaseDate: r.nextRelease,
-    direction: null,
-  })).sort((a: any, b: any) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
-
-  return NextResponse.json({ released, upcoming, fetchedAt: Date.now() });
 }
 
 function deriveUnit(seriesId: string): string {

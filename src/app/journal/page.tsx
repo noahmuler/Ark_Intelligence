@@ -268,13 +268,14 @@ export default function Journal() {
             {['all', '30d', '7d'].map((period) => (
               <button
                 key={period}
+                onClick={() => setSelectedPeriod(period as 'all' | '30d' | '7d')}
                 className={`px-3 py-1 text-sm rounded border transition-colors ${
-                  period === 'all'
+                  period === selectedPeriod
                     ? 'bg-purple-600/30 border-purple-500/60 text-white'
                     : 'bg-purple-900/30 border-purple-800/40 text-purple-400 hover:bg-purple-800/40'
                 }`}
               >
-                {period === 'all' ? 'All Time' : period === '30d' ? '30 Days' : '7 Days'}
+                {period === selectedPeriod ? 'All Time' : period === '30d' ? '30 Days' : '7 Days'}
               </button>
             ))}
           </div>
@@ -551,14 +552,7 @@ export default function Journal() {
                   <h3 className="text-xl font-semibold text-white mb-6">P&L Distribution</h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={[
-                        { name: '< -$500', value: allTrades?.filter(t => t.profit < -500).length ?? 0 },
-                        { name: '-$500 to -$200', value: allTrades?.filter(t => t.profit >= -500 && t.profit < -200).length ?? 0 },
-                        { name: '-$200 to $0', value: allTrades?.filter(t => t.profit >= -200 && t.profit < 0).length ?? 0 },
-                        { name: '$0 to $200', value: allTrades?.filter(t => t.profit >= 0 && t.profit < 200).length ?? 0 },
-                        { name: '$200 to $500', value: allTrades?.filter(t => t.profit >= 200 && t.profit < 500).length ?? 0 },
-                        { name: '>$500', value: allTrades?.filter(t => t.profit >= 500).length ?? 0 },
-                      ]}>
+                      <BarChart data={pnlDistributionData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
                         <XAxis dataKey="name" stroke="#a78bfa" tick={{ fontSize: 10 }} />
                         <YAxis stroke="#a78bfa" />
@@ -599,16 +593,7 @@ export default function Journal() {
                 <h3 className="text-xl font-semibold text-white mb-6">R-Multiple Distribution</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[
-                      { name: '-3R', value: 0 },
-                      { name: '-2R', value: 0 },
-                      { name: '-1R', value: 0 },
-                      { name: '0', value: 0 },
-                      { name: '+1R', value: 0 },
-                      { name: '+2R', value: 0 },
-                      { name: '+3R', value: 0 },
-                      { name: '+4R+', value: 0 },
-                    ]}>
+                    <BarChart data={rMultipleData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#7c3aed" opacity={0.3} />
                       <XAxis dataKey="name" stroke="#a78bfa" />
                       <YAxis stroke="#a78bfa" />
@@ -940,3 +925,11 @@ export default function Journal() {
     </MainLayout>
   );
 }
+
+
+
+
+
+
+
+
