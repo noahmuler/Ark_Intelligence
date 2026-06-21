@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 
-interface ReportData {
+import { getReportAnalysis, getAssetImpacts } from "@/lib/reportAnalysis";
+
+export interface ReportData {
   id: string;
   name: string;
   category: string;
@@ -25,6 +27,8 @@ interface ReportsResponse {
   released: ReportData[];
   upcoming: ReportData[];
   fetchedAt: number;
+  source?: string;
+  warnings?: string[];
   error?: string;
   details?: string;
   help?: string;
@@ -106,7 +110,14 @@ export default function Reports() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Economic Reports</h1>
-              <p className="text-purple-300">US economic calendar with FRED data</p>
+              <div className="flex items-center gap-2">
+                <p className="text-purple-300">US economic calendar with FRED data</p>
+                {data?.source && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-800/50 border border-purple-700/40 text-purple-300">
+                    Source: {data.source}
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => refetch()}
@@ -117,13 +128,16 @@ export default function Reports() {
             </button>
           </div>
 
-          {/* API Error */}
+          {/* API Error with diagnostics */}
           {isError && (
             <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3 text-red-400">
               <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold mb-2">Failed to load reports</p>
-                <p className="text-sm">{error instanceof Error ? error.message : 'Failed to load reports'}</p>
+                <p className="text-sm mb-2">{error instanceof Error ? error.message : 'Failed to load reports'}</p>
+                <p className="text-xs text-red-300/70">
+                  Diagnose: <a href="/api/reports/test" target="_blank" className="underline hover:text-red-200">/api/reports/test</a>
+                </p>
               </div>
             </div>
           )}
@@ -262,6 +276,41 @@ export default function Reports() {
                           {report.direction === 'miss' && 'Missed previous'}
                           {report.direction === 'inline' && 'In line with previous'}
                         </span>
+                      </div>
+                    )}
+
+                    {/* 3-Sentence Analysis */}
+                    {report.isReleased && (
+                      <div className="mt-4 pt-3 border-t border-purple-800/30">
+                        <p className="text-sm text-purple-200 leading-relaxed">
+                          {getReportAnalysis(report)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Asset Impact */}
+                    {report.isReleased && (
+                      <div className="mt-3 pt-3 border-t border-purple-800/30">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-xs text-purple-400 mr-2">Asset Impact:</span>
+                          {Object.entries(getAssetImpacts(report)).map(([asset, impact]) => (
+                            <span
+                              key={asset}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${
+                                impact === 'bullish'
+                                  ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                  : impact === 'bearish'
+                                  ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                                  : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                              }`}
+                            >
+                              {impact === 'bullish' && <TrendingUp className="h-3 w-3" />}
+                              {impact === 'bearish' && <TrendingDown className="h-3 w-3" />}
+                              {impact === 'neutral' && <Minus className="h-3 w-3" />}
+                              {asset}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </motion.div>
