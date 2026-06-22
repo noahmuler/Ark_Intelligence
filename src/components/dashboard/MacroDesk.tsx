@@ -1,24 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useMarketPrices } from "@/hooks/useMarketPrices";
 import { 
   TrendingUp, 
   TrendingDown, 
   Minus, 
-  Filter,
   RefreshCw,
   ChevronDown,
   ChevronUp,
   Eye,
   Brain,
   ArrowRight,
-  DollarSign,
-  BarChart3,
-  Activity
+  DollarSign
 } from "lucide-react";
 
 type AssetCategory = "forex" | "crypto" | "stocks" | "metals";
@@ -52,12 +48,34 @@ interface Asset {
 const getAssetCategory = (symbol: string): AssetCategory => {
   const cryptoSymbols = ['BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOTUSD'];
   const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NQ', 'ES'];
-  const metalsSymbols = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'WTIUSD']; // Gold, Silver, Platinum, Palladium, Oil
+  const metalsSymbols = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'];
+  const oilSymbols = ['WTIUSD'];
+  const yieldSymbols = ['US10Y'];
   
   if (cryptoSymbols.includes(symbol)) return 'crypto';
   if (stockSymbols.includes(symbol)) return 'stocks';
   if (metalsSymbols.includes(symbol)) return 'metals';
-  return 'forex'; // Default to forex for currency pairs, indices, etc.
+  if (oilSymbols.includes(symbol)) return 'metals';
+  if (yieldSymbols.includes(symbol)) return 'forex';
+  return 'forex';
+};
+
+const getAssetDisplayName = (symbol: string): string => {
+  const names: Record<string, string> = {
+    XAUUSD: "Gold / US Dollar",
+    XAGUSD: "Silver / US Dollar",
+    BTCUSD: "Bitcoin / US Dollar",
+    WTIUSD: "WTI Crude Oil",
+    US10Y: "US 10Y Treasury",
+    ES: "S&P 500 Futures",
+    NQ: "Nasdaq 100 Futures",
+    DXY: "US Dollar Index",
+    EURUSD: "EUR / USD",
+    GBPUSD: "GBP / USD",
+    USDJPY: "USD / JPY",
+    ETHUSD: "Ethereum / USD",
+  };
+  return names[symbol] || symbol;
 };
 
 /**
@@ -468,38 +486,191 @@ const getFallbackAssets = (): Asset[] => [
       bollinger: 143.5
     },
     category: "stocks"
+  },
+  {
+    symbol: "US10Y",
+    name: "US 10Y Treasury",
+    price: 4.32,
+    dayChange: -0.05,
+    overallChange: -1.14,
+    sentiment: "Bearish",
+    confidence: 72,
+    aiAnalysis: "Treasury yields face pressure from mixed economic signals. Range trading likely between 4.20-4.45%.",
+    volume: "N/A",
+    marketCap: "N/A",
+    dayHigh: 4.35,
+    dayLow: 4.28,
+    weekHigh: 4.45,
+    weekLow: 4.20,
+    technicalIndicators: { rsi: 45.2, macd: -0.3, bollinger: 4.38 },
+    category: "forex"
+  },
+  {
+    symbol: "DXY",
+    name: "US Dollar Index",
+    price: 105.82,
+    dayChange: 1.24,
+    overallChange: 3.67,
+    sentiment: "Bullish",
+    confidence: 85,
+    aiAnalysis: "Dollar strength continues as economic data outperforms expectations. Break above 106.50 could trigger further upside.",
+    volume: "89.2K",
+    marketCap: "N/A",
+    dayHigh: 105.80,
+    dayLow: 104.95,
+    weekHigh: 106.20,
+    weekLow: 104.50,
+    technicalIndicators: { rsi: 68.7, macd: 2.4, bollinger: 104.2 },
+    category: "forex"
+  },
+  {
+    symbol: "EURUSD",
+    name: "Euro / US Dollar",
+    price: 1.0845,
+    dayChange: -0.0042,
+    overallChange: -1.23,
+    sentiment: "Bearish",
+    confidence: 72,
+    aiAnalysis: "Euro faces headwinds from ECB dovish stance while Fed remains hawkish. Support at 1.0800 critical.",
+    volume: "145.8K",
+    marketCap: "N/A",
+    dayHigh: 1.0892,
+    dayLow: 1.0820,
+    weekHigh: 1.0950,
+    weekLow: 1.0750,
+    technicalIndicators: { rsi: 38.5, macd: -8.7, bollinger: 1.0892 },
+    category: "forex"
+  },
+  {
+    symbol: "GBPUSD",
+    name: "British Pound / US Dollar",
+    price: 1.2734,
+    dayChange: 0.0018,
+    overallChange: 0.56,
+    sentiment: "Neutral",
+    confidence: 65,
+    aiAnalysis: "Pound stabilizes as Bank of England maintains cautious stance. Range trading likely between 1.2650-1.2800.",
+    volume: "98.3K",
+    marketCap: "N/A",
+    dayHigh: 1.2768,
+    dayLow: 1.2710,
+    weekHigh: 1.2850,
+    weekLow: 1.2650,
+    technicalIndicators: { rsi: 52.1, macd: 1.2, bollinger: 1.2768 },
+    category: "forex"
+  },
+  {
+    symbol: "USDJPY",
+    name: "US Dollar / Japanese Yen",
+    price: 148.92,
+    dayChange: 0.85,
+    overallChange: 2.45,
+    sentiment: "Bullish",
+    confidence: 81,
+    aiAnalysis: "Yen weakens as BOJ maintains ultra-loose policy while Fed stays hawkish. Intervention risk remains above 150.00.",
+    volume: "112.6K",
+    marketCap: "N/A",
+    dayHigh: 149.50,
+    dayLow: 148.20,
+    weekHigh: 150.50,
+    weekLow: 147.50,
+    technicalIndicators: { rsi: 71.3, macd: 3.8, bollinger: 147.5 },
+    category: "forex"
+  },
+  {
+    symbol: "ETHUSD",
+    name: "Ethereum / US Dollar",
+    price: 3524.78,
+    dayChange: 124.67,
+    overallChange: 8.34,
+    sentiment: "Bullish",
+    confidence: 76,
+    aiAnalysis: "Ethereum benefits from network upgrades and DeFi growth. Resistance at $3,600, support at $3,400.",
+    volume: "1.2M",
+    marketCap: "423.5B",
+    dayHigh: 3580.00,
+    dayLow: 3450.00,
+    weekHigh: 3600.00,
+    weekLow: 3400.00,
+    technicalIndicators: { rsi: 65.4, macd: 85.6, bollinger: 3450.0 },
+    category: "crypto"
   }
 ];
 
 export function MacroDesk({ className = "" }: { className?: string }) {
   const router = useRouter();
   const { theme } = useTheme();
-  
-  // Fetch real data from Convex
-  const priceRecords = useQuery(api.actions.getAllPrices) ?? [];
-  const briefs = useQuery(api.asset_briefs.getAll) ?? [];
+  const { data: marketData } = useMarketPrices();
   
   const [assets, setAssets] = useState<Asset[]>(getFallbackAssets());
-  const [selectedCategory, setSelectedCategory] = useState<AssetCategory | 'all'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [expandingCard, setExpandingCard] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // resizeTimeout is intentionally not used (avoid extra renders while animating)
-  const [resizeTimeout] = useState<NodeJS.Timeout | null>(null);
   const [modalPhase, setModalPhase] = useState<'closed' | 'opening' | 'open' | 'closing'>('closed');
 
-  // Filter assets by selected category
-  const filteredAssets = selectedCategory === 'all' 
-    ? assets 
-    : assets.filter(asset => asset.category === selectedCategory);
+  // Desired order: 4 major at top, then many more
+  const DESIRED_SYMBOLS = [
+    // 4 Major assets
+    "XAUUSD", "BTCUSD", "WTIUSD", "US10Y",
+    // Additional assets
+    "XAGUSD", "DXY", "EURUSD", "GBPUSD", "USDJPY", "ES", "NQ", "ETHUSD",
+  ];
 
-  // Get asset counts for each category
-  const getCategoryCount = (category: AssetCategory | 'all') => {
-    if (category === 'all') return assets.length;
-    return assets.filter(asset => asset.category === category).length;
-  };
+  const MAJOR_SYMBOLS = new Set(["XAUUSD", "BTCUSD", "WTIUSD", "US10Y"]);
+
+  // Build assets from real-time market prices + fallback
+  useEffect(() => {
+    if (!marketData?.prices) return;
+    
+    const prices = marketData.prices as Record<string, any>;
+    const newAssets: Asset[] = [];
+    
+    for (const symbol of DESIRED_SYMBOLS) {
+      const p = prices[symbol];
+      if (p && p.price > 0) {
+        const change = p.changePercent ?? 0;
+        const sentiment: Asset["sentiment"] = change > 1 ? "Bullish" : change < -1 ? "Bearish" : "Neutral";
+        const confidence = Math.min(95, Math.max(50, Math.abs(change) * 10 + 50));
+        
+        newAssets.push({
+          symbol,
+          name: getAssetDisplayName(symbol),
+          price: p.price,
+          dayChange: p.change ?? 0,
+          overallChange: change,
+          sentiment,
+          confidence: Math.round(confidence),
+          aiAnalysis: `${getAssetDisplayName(symbol)} is trading at $${p.price.toFixed(2)} with a ${change.toFixed(2)}% change. ${sentiment} sentiment detected with ${Math.round(confidence)}% confidence.`,
+          volume: "1.2M",
+          marketCap: symbol === "BTCUSD" ? "835.2B" : symbol === "XAUUSD" ? "14.2T" : "N/A",
+          dayHigh: p.high ?? p.price * 1.01,
+          dayLow: p.low ?? p.price * 0.99,
+          weekHigh: p.high ? p.high * 1.05 : p.price * 1.05,
+          weekLow: p.low ? p.low * 0.95 : p.price * 0.95,
+          technicalIndicators: { rsi: 50 + change * 2, macd: change * 10, bollinger: p.price },
+          category: getAssetCategory(symbol)
+        });
+      } else {
+        // Use fallback for missing data
+        const fallback = getFallbackAssets().find(a => a.symbol === symbol);
+        if (fallback) newAssets.push(fallback);
+      }
+    }
+    
+    if (newAssets.length > 0) setAssets(newAssets);
+  }, [marketData]);
+
+  // Filter to only desired symbols, ordered
+  const filteredAssets = useMemo(() => {
+    const ordered: Asset[] = [];
+    for (const symbol of DESIRED_SYMBOLS) {
+      const asset = assets.find(a => a.symbol === symbol);
+      if (asset) ordered.push(asset);
+    }
+    return ordered;
+  }, [assets]);
 
 
 
@@ -521,18 +692,7 @@ export function MacroDesk({ className = "" }: { className?: string }) {
   /* eslint-enable react-hooks/set-state-in-effect */
 
 
-  // Transform Convex data to assets
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (priceRecords.length > 0) {
-      const transformedAssets = priceRecords.map((price) => {
-        const brief = briefs.find(b => b.symbol === price.symbol);
-        return transformConvexToAsset(price, brief);
-      });
-      setAssets(transformedAssets);
-    }
-  }, [priceRecords, briefs]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  // Assets are now populated by the useMarketPrices hook effect above
 
 
   const getSentimentIcon = (sentiment: string) => {
@@ -701,108 +861,12 @@ export function MacroDesk({ className = "" }: { className?: string }) {
             >
               <RefreshCw className="h-4 w-4 text-purple-400" />
             </button>
-            <button
-              className="p-2 rounded-lg hover:bg-purple-800 transition-colors"
-              aria-label="Filter assets"
-            >
-              <Filter className="h-4 w-4 text-purple-400" />
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2 p-1 bg-purple-900/30 rounded-xl backdrop-blur-sm border border-purple-800/50">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-              selectedCategory === 'all'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              <span>All</span>
-              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
-                {getCategoryCount('all')}
-              </span>
-            </div>
-          </button>
-          
-          <button
-            onClick={() => setSelectedCategory('forex')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-              selectedCategory === 'forex'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4" />
-              <span>Forex</span>
-              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
-                {getCategoryCount('forex')}
-              </span>
-            </div>
-          </button>
-          
-          <button
-            onClick={() => setSelectedCategory('crypto')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-              selectedCategory === 'crypto'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              <span>Crypto</span>
-              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
-                {getCategoryCount('crypto')}
-              </span>
-            </div>
-          </button>
-          
-          <button
-            onClick={() => setSelectedCategory('metals')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-              selectedCategory === 'metals'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4" />
-              <span>Metals</span>
-              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
-                {getCategoryCount('metals')}
-              </span>
-            </div>
-          </button>
-          
-          <button
-            onClick={() => setSelectedCategory('stocks')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-              selectedCategory === 'stocks'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              <span>Stocks</span>
-              <span className="bg-purple-700/50 px-2 py-0.5 rounded-full text-xs">
-                {getCategoryCount('stocks')}
-              </span>
-            </div>
-          </button>
-        </div>
-      </div>
-
       {/* Asset Cards Grid */}
-  <div className={`w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-3 gap-4 lg:gap-6 transition-transform duration-300 ease-out ${
+      <div className={`w-full grid grid-cols-3 gap-4 lg:gap-6 transition-transform duration-300 ease-out ${
         isModalOpen ? 'opacity-80' : 'opacity-100'
       }`}>
         {filteredAssets.map((asset) => {

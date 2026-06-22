@@ -27,8 +27,13 @@ const FINNHUB_SYMBOLS: Record<string, string> = {
   EURUSD: 'OANDA:EUR_USD',
   GBPUSD: 'OANDA:GBP_USD',
   USDJPY: 'OANDA:USD_JPY',
+  AUDUSD: 'OANDA:AUD_USD',
+  USDCAD: 'OANDA:USD_CAD',
+  USDCHF: 'OANDA:USD_CHF',
+  NZDUSD: 'OANDA:NZD_USD',
   BTCUSD: 'BINANCE:BTCUSDT',
   ETHUSD: 'BINANCE:ETHUSDT',
+  WTIUSD: 'OANDA:WTICO_USD',
 };
 
 function buildYahooPrice(name: string, symbol: string, quote: YahooQuote): PriceRecord | null {
@@ -58,7 +63,7 @@ export async function GET() {
 
   const entries = Object.entries(FINNHUB_SYMBOLS);
 
-  const [finnhubResults, yahooResults, us10yData] = await Promise.allSettled([
+  const [finnhubResults, yahooResults, us10yData, coingeckoData] = await Promise.allSettled([
     Promise.allSettled(
       entries.map(async ([name, symbol]) => {
         const res = await fetch(
@@ -120,6 +125,34 @@ export async function GET() {
         timestamp: new Date(obs?.[0]?.date).getTime() / 1000,
       } satisfies PriceRecord;
     })(),
+    // CoinGecko fallback for BTC
+    (async () => {
+      const cgKey = process.env.COINGECKO_API_KEY;
+      if (!cgKey) return null;
+      try {
+        const url = cgKey.startsWith('CG-') 
+          ? `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&x_cg_demo_api_key=${cgKey}`
+          : `https://pro-api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&x_cg_pro_api_key=${cgKey}`;
+        const res = await fetch(url, { next: { revalidate: 60 } });
+        const data = await res.json();
+        const btc = data.bitcoin;
+        if (!btc?.usd) return null;
+        const price = btc.usd;
+        const changePercent = btc.usd_24h_change ?? 0;
+        const prevClose = price / (1 + changePercent / 100);
+        return {
+          name: 'BTCUSD',
+          symbol: 'BTC-USD',
+          price,
+          prevClose,
+          change: price - prevClose,
+          changePercent,
+          timestamp: Math.floor(Date.now() / 1000),
+        } satisfies PriceRecord;
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   const prices: Record<string, PriceRecord> = {};
@@ -139,6 +172,13 @@ export async function GET() {
 
   if (us10yData.status === 'fulfilled' && us10yData.value) {
     prices.US10Y = us10yData.value;
+  }
+
+  // Use CoinGecko BTC if Finnhub BTC failed or is missing
+  if (coingeckoData.status === 'fulfilled' && coingeckoData.value) {
+    if (!prices.BTCUSD || prices.BTCUSD.price === 0) {
+      prices.BTCUSD = coingeckoData.value;
+    }
   }
 
   return NextResponse.json({ prices, fetchedAt: Date.now() });

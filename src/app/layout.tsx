@@ -17,13 +17,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        {/* Inject dark background style immediately — runs before body renders */}
-        <script
-          id="theme-init"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var d=true;try{var t=localStorage.getItem('ark-theme');if(t==='light')d=false;else if(t!=='dark')d=window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}var s=document.documentElement;s.classList.remove('light','dark');s.classList.add(d?'dark':'light');s.style.colorScheme=d?'dark':'light';var c=document.createElement('style');c.textContent='html,body{background-color:'+(d?'#0f0f23':'#f8fafc')+'!important;color:'+(d?'#ffffff':'#0f172a')+'!important}';document.head.appendChild(c);})();`,
-          }}
-        />
+        {/* Dark background applied BEFORE body renders — prevents white flash */}
+        <style>{`
+          html, body {
+            background-color: #0f0f23 !important;
+            color: #ffffff !important;
+          }
+          html.light, html.light body {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+          }
+        `}</style>
       </head>
       <body className={`${inter.variable} min-h-full flex flex-col font-sans`}>
         <QueryProvider>

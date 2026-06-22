@@ -31,9 +31,17 @@ const ASSET_DISPLAY: Record<string, { name: string; description: string }> = {
   BTCUSD: { name: "Bitcoin / USD", description: "Dominant cryptocurrency. Often trades as high-beta risk exposure." },
   ETHUSD: { name: "Ethereum / USD", description: "Smart contract asset. Usually tracks BTC with higher beta." },
   US10Y: { name: "US 10Y Yield", description: "Benchmark yield. Rising yields often support USD and pressure gold." },
+  WTIUSD: { name: "WTI Crude Oil", description: "West Texas Intermediate crude. Sensitive to supply/demand and geopolitics." },
   EURUSD: { name: "EUR / USD", description: "Most liquid forex pair and a major inverse DXY input." },
   GBPUSD: { name: "GBP / USD", description: "Sterling-dollar pair driven by UK rates, growth, and USD regime." },
   USDJPY: { name: "USD / JPY", description: "Tracks US-Japan yield differential and safe-haven flows." },
+};
+
+const FALLBACK_PRICES: Record<string, MarketPrice> = {
+  XAUUSD: { price: 2748.32, change: 15.23, changePercent: 0.55 },
+  BTCUSD: { price: 67845.32, change: 2341.57, changePercent: 3.58 },
+  WTIUSD: { price: 82.35, change: 1.67, changePercent: 2.07 },
+  US10Y: { price: 4.32, change: -0.05, changePercent: -1.14 },
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -44,15 +52,17 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   // Track previous prices to detect changes
   const previousPricesRef = useRef<Map<string, number>>(new Map());
 
-  // Build asset cards from live data
+  // Build asset cards from live data with fallback
   const ASSETS: AssetCard[] = useMemo(() => {
-    if (!marketData?.prices) return [];
-
-    const desiredOrder = ["XAUUSD", "DXY", "BTCUSD", "US10Y", "EURUSD", "XAGUSD"];
-    const prices = marketData.prices as Record<string, MarketPrice>;
+    const desiredOrder = ["XAUUSD", "BTCUSD", "WTIUSD", "US10Y"];
+    const prices = (marketData?.prices || {}) as Record<string, MarketPrice>;
 
     return desiredOrder.map((symbol) => {
-      const p = prices[symbol];
+      // Use real price if available, otherwise fallback
+      let p = prices[symbol];
+      if (!p || !p.price || p.price === 0) {
+        p = FALLBACK_PRICES[symbol];
+      }
       if (!p) return null;
 
       const display = ASSET_DISPLAY[symbol];
@@ -63,7 +73,6 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
       const sentiment: Sentiment = delta > 0 ? "Bullish" : delta < 0 ? "Bearish" : "Neutral";
       const confidence = Math.min(100, Math.max(0, Math.round(Math.abs(delta) * 10)));
 
-      // Detect if price changed
       const previousPrice = previousPricesRef.current.get(symbol);
       const priceChanged = previousPrice !== undefined && previousPrice !== p.price;
       previousPricesRef.current.set(symbol, p.price);
@@ -97,15 +106,14 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
   const SentimentIcon = ({ sentiment }: { sentiment: Sentiment }) => {
     if (sentiment === "Bullish") return <TrendingUp className="h-4.5 w-4.5 text-emerald-400" />;
     if (sentiment === "Bearish") return <TrendingDown className="h-4.5 w-4.5 text-rose-400" />;
-    return <TrendingUp className="h-4.5 w-4.5 text-amber-400 rotate-90" />; // Neutral fallback
+    return <TrendingUp className="h-4.5 w-4.5 text-amber-400 rotate-90" />;
   };
 
   return (
     <div className="bg-purple-950/30 backdrop-blur-[12px] rounded-xl border border-white/10 p-4 min-h-[340px] hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 ease-in-out">
       {!isMounted ? (
-        // Glassmorphic skeleton grid – six placeholders matching the final layout
         <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-32 bg-purple-900/30 animate-pulse rounded-xl" />
           ))}
         </div>
@@ -123,7 +131,7 @@ export const DashboardMacroDesk = React.memo(function DashboardMacroDesk() {
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {ASSETS.map((p) => {
               const c = sentimentColor(p.sentiment);
               const up = p.deltaPercentText.startsWith("+");
