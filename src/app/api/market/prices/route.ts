@@ -90,14 +90,18 @@ export async function GET() {
     ),
     (async () => {
       const { default: yahooFinance } = await import('yahoo-finance2');
-      const [dxyQuote, vixQuote] = await Promise.allSettled([
+      const [dxyQuote, vixQuote, esQuote, nqQuote] = await Promise.allSettled([
         yahooFinance.quote('DX-Y.NYB') as Promise<YahooQuote>,
         yahooFinance.quote('^VIX') as Promise<YahooQuote>,
+        yahooFinance.quote('ES=F') as Promise<YahooQuote>,
+        yahooFinance.quote('NQ=F') as Promise<YahooQuote>,
       ]);
 
       return {
         DXY: dxyQuote.status === 'fulfilled' ? buildYahooPrice('DXY', 'DX-Y.NYB', dxyQuote.value) : null,
         VIX: vixQuote.status === 'fulfilled' ? buildYahooPrice('VIX', '^VIX', vixQuote.value) : null,
+        ES: esQuote.status === 'fulfilled' ? buildYahooPrice('ES', 'ES=F', esQuote.value) : null,
+        NQ: nqQuote.status === 'fulfilled' ? buildYahooPrice('NQ', 'NQ=F', nqQuote.value) : null,
       };
     })(),
     (async () => {
@@ -168,6 +172,8 @@ export async function GET() {
   if (yahooResults.status === 'fulfilled') {
     if (yahooResults.value.DXY) prices.DXY = yahooResults.value.DXY;
     if (yahooResults.value.VIX) prices.VIX = yahooResults.value.VIX;
+    if (yahooResults.value.ES) prices.ES = yahooResults.value.ES;
+    if (yahooResults.value.NQ) prices.NQ = yahooResults.value.NQ;
   }
 
   if (us10yData.status === 'fulfilled' && us10yData.value) {

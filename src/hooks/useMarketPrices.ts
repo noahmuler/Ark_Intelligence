@@ -8,8 +8,8 @@ export function useMarketPrices() {
       if (!res.ok) throw new Error('Failed to fetch prices');
       return res.json();
     },
-    refetchInterval: 15_000,   // Poll every 15 seconds
-    staleTime: 10_000,
+    refetchInterval: 5_000,   // Poll every 5 seconds for near real-time
+    staleTime: 3_000,
     retry: 2,
   });
 }

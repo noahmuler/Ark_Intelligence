@@ -398,6 +398,24 @@ html.light [class*="sidebar"] .bg-purple-800 {
   outline-offset: 2px;
 }
 
+/* ─── Light mode: layout component overrides ─── */
+html.light .ark-shell-bg {
+  background-image: linear-gradient(to bottom right, #f9fafb, #eff6ff, #dbeafe) !important;
+}
+html.light .ark-shell-glow {
+  opacity: 0.3 !important;
+}
+html.light .ark-main-content {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+html.light .ark-main-glow-overlay {
+  opacity: 0 !important;
+}
+html.light .ark-asset-card {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(229, 231, 235, 0.5) !important;
+}
+
 /* ─── Light mode: recharts / chart specific overrides ─── */
 html.light .recharts-cartesian-grid-horizontal line,
 html.light .recharts-cartesian-grid-vertical line {

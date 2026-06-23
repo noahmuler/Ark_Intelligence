@@ -9,25 +9,29 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const THEME_INIT_SCRIPT = `
+(function() {
+  try {
+    var stored = localStorage.getItem('ark-theme');
+    var theme = (stored === 'light' || stored === 'dark') ? stored : 'dark';
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+    document.documentElement.style.colorScheme = theme;
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Dark background applied BEFORE body renders — prevents white flash */}
-        <style>{`
-          html, body {
-            background-color: #0f0f23 !important;
-            color: #ffffff !important;
-          }
-          html.light, html.light body {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-          }
-        `}</style>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={`${inter.variable} min-h-full flex flex-col font-sans`}>
         <QueryProvider>

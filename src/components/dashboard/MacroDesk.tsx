@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { useMarketPrices } from "@/hooks/useMarketPrices";
 import { 
   TrendingUp, 
@@ -599,7 +598,6 @@ const getFallbackAssets = (): Asset[] => [
 
 export function MacroDesk({ className = "" }: { className?: string }) {
   const router = useRouter();
-  const { theme } = useTheme();
   const { data: marketData } = useMarketPrices();
   
   const [assets, setAssets] = useState<Asset[]>(getFallbackAssets());
@@ -882,9 +880,7 @@ export function MacroDesk({ className = "" }: { className?: string }) {
           className={`group relative backdrop-blur-xl rounded-2xl border p-4 transition-[transform,box-shadow] duration-300 ease-out hover:shadow-xl hover:transform-gpu hover:scale-[1.01] ${
                 isExpanding ? 'scale-105 shadow-xl z-40' : 'shadow-lg'
               } ${
-                theme === 'dark' 
-                  ? 'bg-purple-950/90 border-purple-900/50' 
-                  : 'bg-white/90 border-gray-200/50'
+                  `ark-asset-card bg-purple-950/90 border-purple-900/50`
               }`}
             >
               {/* Enhanced ambient glow effect */}
@@ -924,15 +920,13 @@ export function MacroDesk({ className = "" }: { className?: string }) {
                       <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
                     </div>
                     <div>
-                      <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{asset.symbol}</div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-purple-400' : 'text-gray-600'}`}>{asset.name}</p>
+                      <div className="text-sm font-semibold text-white">{asset.symbol}</div>
+                      <p className="text-xs text-purple-400">{asset.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <DollarSign className="h-4 w-4 text-purple-400" />
-                    <span className={`text-lg font-bold font-mono ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-800'
-                    }`}>
+                    <span className="text-lg font-bold font-mono text-white">
                       {asset.price.toFixed(2)}
                     </span>
                   </div>

@@ -1,15 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { TrendingUp, TrendingDown, Minus, Clock, Calendar, Target, AlertTriangle } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMarketPrices } from "@/hooks/useMarketPrices";
-
-interface MarketMover {
-  symbol: string;
-  change: number;
-  price: number;
-}
 
 function getCurrentSession(): string {
   const now = new Date();
@@ -28,11 +22,168 @@ function formatTimeAgo(timestamp: number): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+interface ReportEvent {
+  id: string;
+  name: string;
+  releaseDate: string;
+  impact: "high" | "medium" | "low";
+}
+
+interface ReportsResponse {
+  upcoming?: ReportEvent[];
+}
+
+interface BriefResult {
+  session: string;
+  timestamp: number;
+  riskTone: string;
+  riskColor: string;
+  keyDriver: string;
+  driverColor: string;
+  watch: string;
+  watchColor: string;
+  avoid: string;
+  avoidColor: string;
+}
+
+function computeBrief(
+  marketData: { prices: Record<string, any>; fetchedAt: number } | undefined | null,
+  reportsData: ReportsResponse | undefined | null
+): BriefResult | null {
+  if (!marketData?.prices) return null;
+
+  const prices = marketData.prices;
+  const vix = prices.VIX;
+  const dxy = prices.DXY;
+  const us10y = prices.US10Y;
+
+  if (!vix || !dxy || !us10y) return null;
+
+  const now = new Date();
+  const upcoming = reportsData?.upcoming || [];
+  const highEvents = upcoming
+    .filter((e) => e.impact === "high" && new Date(e.releaseDate) > now)
+    .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
+
+  const nextEvent = highEvents[0];
+  const hoursUntil = nextEvent
+    ? (new Date(nextEvent.releaseDate).getTime() - now.getTime()) / (1000 * 60 * 60)
+    : Infinity;
+
+  const vixLevel = vix.price ?? 0;
+  const dxyChange = dxy.changePercent ?? 0;
+  const yieldChange = us10y.changePercent ?? 0;
+  const dxyStr = `${dxyChange >= 0 ? "+" : ""}${dxyChange.toFixed(2)}%`;
+  const yieldStr = `${yieldChange >= 0 ? "+" : ""}${yieldChange.toFixed(2)}%`;
+
+  // 1. Risk Tone — derived from VIX level + upcoming high-impact event proximity
+  let riskTone: string;
+  let riskColor: string;
+  if (vixLevel > 25) {
+    riskTone = `Elevated — VIX at ${vixLevel.toFixed(1)}`;
+    riskColor = "bg-rose-500";
+  } else if (vixLevel > 18) {
+    riskTone = `Moderate — VIX at ${vixLevel.toFixed(1)}`;
+    riskColor = "bg-amber-400";
+  } else {
+    riskTone = `Calm — VIX at ${vixLevel.toFixed(1)}`;
+    riskColor = "bg-emerald-400";
+  }
+  if (nextEvent && hoursUntil < 4) {
+    riskTone += `, ${nextEvent.name} in ${Math.ceil(hoursUntil)}h`;
+  }
+
+  // 2. Key Driver — derived from DXY trend + US10Y yield direction
+  let keyDriver: string;
+  let driverColor: string;
+  if (Math.abs(dxyChange) < 0.1 && Math.abs(yieldChange) < 0.01) {
+    keyDriver = `Sideways macro — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-gray-400";
+  } else if (dxyChange > 0 && yieldChange > 0) {
+    keyDriver = `Dollar strength + rising yields — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-blue-400";
+  } else if (dxyChange > 0 && yieldChange < 0) {
+    keyDriver = `Dollar strength, yields falling — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-blue-400";
+  } else if (dxyChange < 0 && yieldChange > 0) {
+    keyDriver = `Dollar weaker, yields rising — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-purple-400";
+  } else if (dxyChange < 0 && yieldChange < 0) {
+    keyDriver = `Dollar weakness + falling yields — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-purple-400";
+  } else if (dxyChange > 0) {
+    keyDriver = `Dollar strength — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-blue-400";
+  } else if (dxyChange < 0) {
+    keyDriver = `Dollar weakness — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-purple-400";
+  } else if (yieldChange > 0) {
+    keyDriver = `Rising yields — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-amber-400";
+  } else {
+    keyDriver = `Falling yields — DXY ${dxyStr}, US10Y ${yieldStr}`;
+    driverColor = "bg-emerald-400";
+  }
+
+  // 3. Watch — next high-impact event from the reports API
+  let watch: string;
+  let watchColor: string;
+  if (nextEvent) {
+    if (hoursUntil < 1) {
+      watch = `${nextEvent.name} — imminent`;
+    } else if (hoursUntil < 24) {
+      watch = `${nextEvent.name} — in ${Math.floor(hoursUntil)}h`;
+    } else {
+      watch = `${nextEvent.name} — in ${Math.floor(hoursUntil / 24)}d`;
+    }
+    watchColor = hoursUntil < 1 ? "bg-rose-500" : hoursUntil < 4 ? "bg-amber-400" : "bg-gray-400";
+  } else {
+    watch = "No high-impact events on the horizon";
+    watchColor = "bg-gray-400";
+  }
+
+  // 4. Avoid — contextual trading advice based on the above
+  let avoid: string;
+  let avoidColor: string;
+  if (vixLevel > 25 && hoursUntil < 2) {
+    avoid = `Low-liquidity pairs / high leverage (VIX ${vixLevel.toFixed(1)}, event imminent)`;
+    avoidColor = "bg-rose-500";
+  } else if (vixLevel > 20) {
+    avoid = `Low-liquidity crosses (VIX ${vixLevel.toFixed(1)})`;
+    avoidColor = "bg-amber-400";
+  } else if (Math.abs(dxyChange) > 0.5 && Math.abs(yieldChange) > 0.05) {
+    avoid = `Counter-trend exposure (DXY ${dxyStr}, US10Y ${yieldStr})`;
+    avoidColor = "bg-amber-400";
+  } else if (dxyChange > 0.3) {
+    avoid = `Short-dollar positions (DXY ${dxyStr})`;
+    avoidColor = "bg-amber-400";
+  } else if (yieldChange > 0.05) {
+    avoid = `Rate-sensitive longs (US10Y ${yieldStr})`;
+    avoidColor = "bg-amber-400";
+  } else {
+    avoid = `Over-leveraging in quiet conditions (VIX ${vixLevel.toFixed(1)})`;
+    avoidColor = "bg-gray-400";
+  }
+
+  return {
+    session: getCurrentSession(),
+    timestamp: marketData.fetchedAt,
+    riskTone,
+    riskColor,
+    keyDriver,
+    driverColor,
+    watch,
+    watchColor,
+    avoid,
+    avoidColor,
+  };
+}
+
 export const AISessionBrief = React.memo(function AISessionBrief({ className = "" }: { className?: string }) {
   const { data: marketData } = useMarketPrices();
 
-  const { data: reportsData } = useQuery({
-    queryKey: ["session-brief-reports"],
+  const { data: reportsData } = useQuery<ReportsResponse | null>({
+    queryKey: ["/api/reports"],
     queryFn: async () => {
       const res = await fetch("/api/reports");
       if (!res.ok) return null;
@@ -42,68 +193,43 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
     retry: 1,
   });
 
-  const brief = useMemo(() => {
-    if (!marketData?.prices) return null;
-
-    const prices = marketData.prices as Record<string, any>;
-    const session = getCurrentSession();
-
-    // Find major movers
-    const movers: MarketMover[] = [];
-    for (const [key, p] of Object.entries(prices)) {
-      if (p?.changePercent !== undefined) {
-        movers.push({ symbol: key, change: p.changePercent, price: p.price });
-      }
-    }
-    movers.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-
-    const topGainer = movers.find((m) => m.change > 0);
-    const topLoser = movers.find((m) => m.change < 0);
-    const dxy = prices.DXY;
-    const vix = prices.VIX;
-
-    // Today's economic events
-    const todayEvents = (reportsData?.upcoming || [])
-      .filter((e: any) => {
-        const d = new Date(e.releaseDate);
-        const now = new Date();
-        return d.toDateString() === now.toDateString();
-      })
-      .slice(0, 3);
-
-    return {
-      session,
-      topGainer,
-      topLoser,
-      dxyChange: dxy?.changePercent ?? 0,
-      vixLevel: vix?.price ?? 0,
-      events: todayEvents,
-      timestamp: marketData.fetchedAt,
-    };
-  }, [marketData, reportsData]);
+  const brief = useMemo(() => computeBrief(marketData, reportsData), [marketData, reportsData]);
 
   if (!brief) {
     return (
       <div className={`bg-purple-950/20 rounded-lg border border-white/10 p-2.5 backdrop-blur-[12px] ${className}`}>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold text-white/90 tracking-wider uppercase">Pre-Session Brief</h2>
+          <div>
+            <h2 className="text-xs font-semibold text-white/90 tracking-wider uppercase">Pre-Session Brief</h2>
+            <div className="h-2.5 w-32 rounded bg-purple-900/40 animate-pulse mt-0.5" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-purple-400/60" />
+            <span className="text-xs text-purple-300/50 tracking-tight">--</span>
+          </div>
         </div>
-        <div className="space-y-2">
-          <div className="h-3 w-2/3 rounded bg-purple-900/40 animate-pulse" />
-          <div className="h-3 w-1/2 rounded bg-purple-900/40 animate-pulse" />
-          <div className="h-10 rounded bg-purple-900/40 animate-pulse" />
+        <div className="space-y-2.5">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i}>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-900/40 animate-pulse" />
+                <span className="h-2.5 w-16 rounded bg-purple-900/40 animate-pulse" />
+              </div>
+              <div className="h-4 w-5/6 rounded bg-purple-900/40 animate-pulse mt-1" />
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  const vixText =
-    brief.vixLevel > 25 ? "Elevated fear" : brief.vixLevel > 18 ? "Moderate anxiety" : "Calm markets";
-
   return (
     <div className={`bg-purple-950/20 rounded-lg border border-white/10 p-2.5 backdrop-blur-[12px] ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-semibold text-white/90 tracking-wider uppercase">Pre-Session Brief</h2>
+        <div>
+          <h2 className="text-xs font-semibold text-white/90 tracking-wider uppercase">Pre-Session Brief</h2>
+          <span className="text-[10px] text-purple-300/60 font-medium tracking-tight block">{brief.session}</span>
+        </div>
         <div className="flex items-center gap-1.5">
           <Clock className="w-3 h-3 text-purple-400/60" />
           <span className="text-xs text-purple-300/50 tracking-tight">
@@ -113,77 +239,29 @@ export const AISessionBrief = React.memo(function AISessionBrief({ className = "
       </div>
 
       <div className="space-y-2.5">
-        {/* Session */}
         <div className="flex items-center gap-2">
-          <Calendar className="h-3.5 w-3.5 text-purple-400" />
-          <span className="text-xs text-purple-300/70">Session:</span>
-          <span className="text-xs font-bold text-white/90">{brief.session}</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${brief.riskColor}`} />
+          <span className="text-[10px] text-purple-400/70 uppercase tracking-wider font-bold">Risk Tone</span>
         </div>
+        <p className="text-sm font-semibold text-white -mt-1">{brief.riskTone}</p>
 
-        {/* Major Movers */}
-        <div className="space-y-1.5">
-          <div className="text-[10px] text-purple-400/60 uppercase tracking-wider font-bold">Major Movers</div>
-          {brief.topGainer && (
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-3 w-3 text-emerald-400" />
-              <span className="text-xs font-mono text-white/90">{brief.topGainer.symbol}</span>
-              <span className="text-xs text-emerald-400 font-bold">+{brief.topGainer.change.toFixed(2)}%</span>
-            </div>
-          )}
-          {brief.topLoser && (
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-3 w-3 text-rose-400" />
-              <span className="text-xs font-mono text-white/90">{brief.topLoser.symbol}</span>
-              <span className="text-xs text-rose-400 font-bold">{brief.topLoser.change.toFixed(2)}%</span>
-            </div>
-          )}
-          {!brief.topGainer && !brief.topLoser && (
-            <div className="flex items-center gap-2 text-purple-400/50">
-              <Minus className="h-3 w-3" />
-              <span className="text-xs">No significant movers</span>
-            </div>
-          )}
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${brief.driverColor}`} />
+          <span className="text-[10px] text-purple-400/70 uppercase tracking-wider font-bold">Key Driver</span>
         </div>
+        <p className="text-sm font-semibold text-white -mt-1">{brief.keyDriver}</p>
 
-        {/* DXY & VIX */}
-        <div className="flex gap-2">
-          <div className="flex-1 bg-purple-900/30 rounded-lg px-2 py-1.5 border border-purple-500/10">
-            <div className="text-[10px] text-purple-400/60 uppercase tracking-wider">DXY</div>
-            <div className={`text-xs font-bold ${brief.dxyChange >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-              {brief.dxyChange >= 0 ? "+" : ""}{brief.dxyChange.toFixed(2)}%
-            </div>
-          </div>
-          <div className="flex-1 bg-purple-900/30 rounded-lg px-2 py-1.5 border border-purple-500/10">
-            <div className="text-[10px] text-purple-400/60 uppercase tracking-wider">VIX</div>
-            <div className="text-xs font-bold text-white/90">{brief.vixLevel.toFixed(1)}</div>
-            <div className="text-[10px] text-purple-400/60">{vixText}</div>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${brief.watchColor}`} />
+          <span className="text-[10px] text-purple-400/70 uppercase tracking-wider font-bold">Watch</span>
         </div>
+        <p className="text-sm font-semibold text-white -mt-1">{brief.watch}</p>
 
-        {/* Today's Events */}
-        {brief.events.length > 0 && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5">
-              <Target className="h-3 w-3 text-amber-400" />
-              <span className="text-[10px] text-amber-400/80 uppercase tracking-wider font-bold">Today's Events</span>
-            </div>
-            {brief.events.map((e: any) => (
-              <div key={e.id} className="flex items-center justify-between text-xs">
-                <span className="text-white/80 truncate">{e.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${e.impact === "high" ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300"}`}>
-                  {e.impact}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {brief.events.length === 0 && (
-          <div className="flex items-center gap-1.5 text-purple-400/50">
-            <AlertTriangle className="h-3 w-3" />
-            <span className="text-xs">No major USD events today</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${brief.avoidColor}`} />
+          <span className="text-[10px] text-purple-400/70 uppercase tracking-wider font-bold">Avoid</span>
+        </div>
+        <p className="text-sm font-semibold text-white -mt-1">{brief.avoid}</p>
       </div>
     </div>
   );

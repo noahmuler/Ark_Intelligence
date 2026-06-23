@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { TrendingUp, TrendingDown, DollarSign, Target, ArrowLeft, BrainCircuit, ShieldAlert, ShieldCheck } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import { ChartTooltip, ChartTooltipContent } from "@/components/charts/chart";
 
 // ─── Animated Counter ────────────────────────────────────────────────────────
@@ -63,6 +63,24 @@ function AnimatedCounter({
       {formattedCount}
       {suffix}
     </span>
+  );
+}
+
+// ─── MiniRing ────────────────────────────────────────────────────────────────
+function MiniRing({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = Math.max(0, Math.min(1, value / max));
+  const r = 22;
+  const circumference = 2 * Math.PI * r;
+  return (
+    <svg width="56" height="56" viewBox="0 0 56 56" className="flex-shrink-0">
+      <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(124,58,237,0.2)" strokeWidth="5" />
+      <circle
+        cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+        strokeDasharray={circumference} strokeDashoffset={circumference * (1 - pct)}
+        transform="rotate(-90 28 28)"
+        style={{ transition: "stroke-dashoffset 0.8s ease-out" }}
+      />
+    </svg>
   );
 }
 
@@ -362,6 +380,212 @@ export default function DeepAnalytics() {
     { name: "London–NY",    start: 8,  end: 12 },
   ];
 
+  // Performance insights
+  const performanceInsights = useMemo(() => {
+    if (!actualTrades || actualTrades.length === 0) {
+      return { focusActions: [], strengths: [], weaknesses: [] };
+    }
+
+    const focusActions: { title: string; detail: string; metric: string }[] = [];
+    const strengths: { title: string; detail: string; metric: string }[] = [];
+    const weaknesses: { title: string; detail: string; metric: string }[] = [];
+
+    // Session analysis
+    const sessionPerfs = sessions.map((s) => ({
+      name: s.name,
+      perf: getSessionPerformance(s.start, s.end),
+    }));
+
+    // Worst session
+    const worstSession = sessionPerfs
+      .filter((s) => s.perf.trades > 0)
+      .sort((a, b) => a.perf.winRate - b.perf.winRate)[0];
+    if (worstSession && worstSession.perf.winRate < 40) {
+      focusActions.push({
+        title: `Avoid ${worstSession.name} Session`,
+        detail: `Your win rate during the ${worstSession.name} session is only ${worstSession.perf.winRate.toFixed(1)}%. Consider skipping trades during this period.`,
+        metric: `${worstSession.perf.winRate.toFixed(1)}% WR`,
+      });
+    }
+
+    // Best session
+    const bestSession = sessionPerfs
+      .filter((s) => s.perf.trades >= 3)
+      .sort((a, b) => b.perf.winRate - a.perf.winRate)[0];
+    if (bestSession && bestSession.perf.winRate > 55) {
+      strengths.push({
+        title: `${bestSession.name} Session Edge`,
+        detail: `You perform strongest during the ${bestSession.name} session with a ${bestSession.perf.winRate.toFixed(1)}% win rate and $${bestSession.perf.totalPnL.toFixed(2)} P&L.`,
+        metric: `${bestSession.perf.winRate.toFixed(1)}% WR`,
+      });
+    }
+
+    // Direction analysis
+    if (longTrades.length > 0 && shortTrades.length > 0) {
+      const longWR = longTrades.length > 0 ? (winningTrades.filter((t) => t.type === "BUY").length / longTrades.length) * 100 : 0;
+      const shortWR = shortTrades.length > 0 ? (winningTrades.filter((t) => t.type === "SELL").length / shortTrades.length) * 100 : 0;
+      if (longWR < 40 && longTrades.length >= 3) {
+        weaknesses.push({
+          title: "Long Bias Weakness",
+          detail: `Your long trades only win ${longWR.toFixed(1)}% of the time. Review your bullish entry criteria.`,
+          metric: `${longWR.toFixed(1)}% WR`,
+        });
+      }
+      if (shortWR < 40 && shortTrades.length >= 3) {
+        weaknesses.push({
+          title: "Short Bias Weakness",
+          detail: `Your short trades only win ${shortWR.toFixed(1)}% of the time. Review your bearish entry criteria.`,
+          metric: `${shortWR.toFixed(1)}% WR`,
+        });
+      }
+      if (longWR > 55 && longTrades.length >= 3) {
+        strengths.push({
+          title: "Strong Long Game",
+          detail: `Your long trades win ${longWR.toFixed(1)}% of the time with $${longPnL.toFixed(2)} total P&L.`,
+          metric: `${longWR.toFixed(1)}% WR`,
+        });
+      }
+      if (shortWR > 55 && shortTrades.length >= 3) {
+        strengths.push({
+          title: "Strong Short Game",
+          detail: `Your short trades win ${shortWR.toFixed(1)}% of the time with $${shortPnL.toFixed(2)} total P&L.`,
+          metric: `${shortWR.toFixed(1)}% WR`,
+        });
+      }
+    }
+
+    // Weekday analysis
+    const worstWeekday = [...pnlByWeekdayData].sort((a, b) => a.totalPnL - b.totalPnL)[0];
+    if (worstWeekday && worstWeekday.totalPnL < 0 && worstWeekday.trades >= 2) {
+      focusActions.push({
+        title: `Skip ${worstWeekday.weekday}`,
+        detail: `${worstWeekday.weekday} is your worst trading day with $${worstWeekday.totalPnL.toFixed(2)} lost across ${worstWeekday.trades} trades.`,
+        metric: `-$${Math.abs(worstWeekday.totalPnL).toFixed(0)}`,
+      });
+    }
+
+    // Overall metrics
+    if ((metrics?.winRate ?? 0) < 45) {
+      weaknesses.push({
+        title: "Below-Average Win Rate",
+        detail: `Your overall win rate of ${(metrics?.winRate ?? 0).toFixed(1)}% is below the 50% threshold. Focus on higher-probability setups.`,
+        metric: `${(metrics?.winRate ?? 0).toFixed(1)}%`,
+      });
+    }
+    if ((metrics?.winRate ?? 0) > 55) {
+      strengths.push({
+        title: "Solid Win Rate",
+        detail: `Your ${(metrics?.winRate ?? 0).toFixed(1)}% win rate shows strong trade selection.`,
+        metric: `${(metrics?.winRate ?? 0).toFixed(1)}%`,
+      });
+    }
+    if ((metrics?.profitFactor ?? 0) > 1.5) {
+      strengths.push({
+        title: "Profitable Edge",
+        detail: `Your profit factor of ${(metrics?.profitFactor ?? 0).toFixed(2)} indicates a clear trading edge.`,
+        metric: `${(metrics?.profitFactor ?? 0).toFixed(2)}`,
+      });
+    }
+    if ((metrics?.profitFactor ?? 0) < 1 && (metrics?.profitFactor ?? 0) > 0) {
+      weaknesses.push({
+        title: "Negative Profit Factor",
+        detail: `Your profit factor of ${(metrics?.profitFactor ?? 0).toFixed(2)} means you lose more than you gain. Tighten risk management.`,
+        metric: `${(metrics?.profitFactor ?? 0).toFixed(2)}`,
+      });
+    }
+    if ((metrics?.maxDrawdown ?? 0) > 15) {
+      weaknesses.push({
+        title: "High Drawdown Risk",
+        detail: `Your max drawdown of ${(metrics?.maxDrawdown ?? 0).toFixed(2)}% exceeds safe limits. Reduce position size or improve stop placement.`,
+        metric: `${(metrics?.maxDrawdown ?? 0).toFixed(2)}%`,
+      });
+    }
+    if ((metrics?.expectancy ?? 0) > 0) {
+      strengths.push({
+        title: "Positive Expectancy",
+        detail: `Each trade averages $${(metrics?.expectancy ?? 0).toFixed(2)} in expected value.`,
+        metric: `+$${(metrics?.expectancy ?? 0).toFixed(2)}`,
+      });
+    } else {
+      focusActions.push({
+        title: "Fix Expectancy",
+        detail: `Your negative expectancy of $${(metrics?.expectancy ?? 0).toFixed(2)} per trade means your edge is broken. Review entry and exit rules.`,
+        metric: `-$${Math.abs(metrics?.expectancy ?? 0).toFixed(2)}`,
+      });
+    }
+
+    return { focusActions, strengths, weaknesses };
+  }, [actualTrades, metrics, sessions, getSessionPerformance, longTrades, shortTrades, winningTrades, losingTrades, longPnL, shortPnL, pnlByWeekdayData]);
+
+  // Trade Quality Radar scores
+  const tradeQualityScores = useMemo(() => {
+    if (!actualTrades || actualTrades.length === 0) {
+      return {
+        riskManagement: 0,
+        discipline: 0,
+        patience: 0,
+        entryTiming: 0,
+        exitTiming: 0,
+        execution: 0,
+        overall: 0,
+      };
+    }
+
+    // 1. Risk Management: % of trades with stop-loss set
+    const tradesWithSL = actualTrades.filter((t) => t.stopLoss && t.stopLoss > 0).length;
+    const riskManagement = (tradesWithSL / actualTrades.length) * 10;
+
+    // 2. Discipline: % of trades closed via SL/TP vs manual
+    const disciplinedExits = actualTrades.filter((t) => {
+      const reason = t.closeReason?.toLowerCase();
+      return reason === "sl" || reason === "tp";
+    }).length;
+    const discipline = actualTrades.length > 0 ? (disciplinedExits / actualTrades.length) * 10 : 0;
+
+    // 3. Patience: winners held longer than losers?
+    const winnerHoldTimes = winningTrades.map((t) => t.closeTime - t.openTime);
+    const loserHoldTimes = losingTrades.map((t) => t.closeTime - t.openTime);
+    const avgWinnerHold = winnerHoldTimes.length > 0 ? winnerHoldTimes.reduce((a, b) => a + b, 0) / winnerHoldTimes.length : 0;
+    const avgLoserHold = loserHoldTimes.length > 0 ? loserHoldTimes.reduce((a, b) => a + b, 0) / loserHoldTimes.length : 0;
+    const patience = avgLoserHold > 0 ? Math.min(10, (avgWinnerHold / avgLoserHold) * 5) : avgWinnerHold > 0 ? 10 : 0;
+
+    // 4. Entry Timing: simplified proxy — win rate scaled to 0-10
+    const entryTiming = (metrics?.winRate ?? 0) / 10;
+
+    // 5. Exit Timing: planned R vs actual R captured for winners
+    let exitTiming = 0;
+    if (avgWinningTrade > 0 && avgLosingTrade < 0) {
+      if (averageRR && averageRR > 0) {
+        const actualR = avgWinningTrade / Math.abs(avgLosingTrade);
+        exitTiming = Math.min(10, Math.max(0, (actualR / averageRR) * 10));
+      } else {
+        exitTiming = tpHitPercent / 10;
+      }
+    } else if (avgWinningTrade > 0) {
+      exitTiming = 10;
+    }
+
+    // 6. Execution: cost-drag efficiency
+    const totalCommission = actualTrades.reduce((s, t) => s + ((t as any).commission || 0), 0);
+    const totalSwap = actualTrades.reduce((s, t) => s + ((t as any).swap || 0), 0);
+    const hasCostData = totalCommission !== 0 || totalSwap !== 0;
+    const absTotalPnL = Math.abs(metrics?.totalPnL ?? 0);
+    const costDrag = hasCostData && absTotalPnL > 0 ? (Math.abs(totalCommission) + Math.abs(totalSwap)) / absTotalPnL : 0;
+    let execution = hasCostData ? Math.max(0, Math.min(10, 10 - costDrag * 100)) : 5;
+
+    const overall = Math.round((riskManagement + discipline + patience + entryTiming + exitTiming + execution) / 6 * 10) / 10;
+
+    return {
+      riskManagement: Math.round(riskManagement * 10) / 10,
+      discipline: Math.round(discipline * 10) / 10,
+      patience: Math.round(patience * 10) / 10,
+      entryTiming: Math.round(entryTiming * 10) / 10,
+      exitTiming: Math.round(exitTiming * 10) / 10,
+      execution: Math.round(execution * 10) / 10,
+      overall,
+    };
+  }, [actualTrades, metrics, winningTrades, losingTrades, averageRR, avgWinningTrade, avgLosingTrade, tpHitPercent]);
+
   // ── Not connected state ─────────────────────────────────────────────────────
   if (!isConnected) {
     return (
@@ -422,33 +646,82 @@ export default function DeepAnalytics() {
             </div>
           </div>
 
-          {/* ── AI Summary ── */}
-          <div className="mb-8">
+          {/* ── AI Analytics Summary ── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Focus Actions */}
             <div className="group relative">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
               <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 flex-shrink-0">
-                    <BrainCircuit className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2">AI Analytics Summary</h3>
-                    <p className="text-purple-300 text-sm leading-relaxed">
-                      Based on your trading data, you have executed{" "}
-                      <span className="text-white font-semibold">{metrics?.totalTrades ?? 0}</span> trades with a win
-                      rate of{" "}
-                      <span className="text-white font-semibold">{(metrics?.winRate ?? 0).toFixed(1)}%</span>. Your
-                      average winning trade is{" "}
-                      <span className="text-green-400 font-semibold">${avgWinningTrade.toFixed(2)}</span> while your
-                      average losing trade is{" "}
-                      <span className="text-red-400 font-semibold">${avgLosingTrade.toFixed(2)}</span>.{" "}
-                      {(metrics?.expectancy ?? 0) >= 0
-                        ? "Your positive expectancy indicates a profitable trading strategy."
-                        : "Your negative expectancy suggests reviewing your risk management approach."}{" "}
-                      The London session shows the highest activity with{" "}
-                      <span className="text-white font-semibold">{getSessionPerformance(3, 12).trades}</span> trades.
-                    </p>
-                  </div>
+                <h3 className="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">
+                  <BrainCircuit className="h-5 w-5" />
+                  Focus Actions
+                </h3>
+                <div className="space-y-3">
+                  {performanceInsights.focusActions.length > 0 ? (
+                    performanceInsights.focusActions.map((insight, i) => (
+                      <div key={i} className="bg-purple-800/30 rounded-xl p-4 border border-purple-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-white font-medium text-sm">{insight.title}</h4>
+                          <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-full">{insight.metric}</span>
+                        </div>
+                        <p className="text-purple-300 text-xs leading-relaxed">{insight.detail}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-purple-400 text-sm">No focus actions needed. Keep following your system.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Strengths */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Strengths
+                </h3>
+                <div className="space-y-3">
+                  {performanceInsights.strengths.length > 0 ? (
+                    performanceInsights.strengths.map((insight, i) => (
+                      <div key={i} className="bg-purple-800/30 rounded-xl p-4 border border-purple-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-white font-medium text-sm">{insight.title}</h4>
+                          <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full">{insight.metric}</span>
+                        </div>
+                        <p className="text-purple-300 text-xs leading-relaxed">{insight.detail}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-purple-400 text-sm">No standout strengths yet. Build consistency to reveal them.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Weaknesses */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5" />
+                  Weaknesses
+                </h3>
+                <div className="space-y-3">
+                  {performanceInsights.weaknesses.length > 0 ? (
+                    performanceInsights.weaknesses.map((insight, i) => (
+                      <div key={i} className="bg-purple-800/30 rounded-xl p-4 border border-purple-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-white font-medium text-sm">{insight.title}</h4>
+                          <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">{insight.metric}</span>
+                        </div>
+                        <p className="text-purple-300 text-xs leading-relaxed">{insight.detail}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-purple-400 text-sm">No major weaknesses detected. Stay disciplined.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -466,9 +739,12 @@ export default function DeepAnalytics() {
 
             {/* Win Rate */}
             <KPICard gradient="from-green-600 to-emerald-600" iconGrad="from-green-500 to-emerald-500" icon={<Target className="h-5 w-5 text-white" />}>
-              <p className={`text-3xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? "text-green-400" : "text-red-400"} mb-2`}>
-                <AnimatedCounter value={metrics?.winRate ?? 0} suffix="%" />
-              </p>
+              <div className="flex items-center gap-3 mb-2">
+                <MiniRing value={metrics?.winRate ?? 0} max={100} color={(metrics?.winRate ?? 0) >= 50 ? "#10b981" : "#ef4444"} />
+                <p className={`text-3xl font-bold ${(metrics?.winRate ?? 0) >= 50 ? "text-green-400" : "text-red-400"}`}>
+                  <AnimatedCounter value={metrics?.winRate ?? 0} suffix="%" />
+                </p>
+              </div>
               <p className="text-purple-300 text-sm font-medium">Win Rate</p>
             </KPICard>
 
@@ -478,6 +754,17 @@ export default function DeepAnalytics() {
                 <AnimatedCounter value={metrics?.expectancy ?? 0} prefix="$" />
               </p>
               <p className="text-purple-300 text-sm font-medium">Expectancy</p>
+            </KPICard>
+
+            {/* Profit Factor */}
+            <KPICard gradient="from-purple-600 to-blue-600" iconGrad="from-purple-500 to-blue-500" icon={<Target className="h-5 w-5 text-white" />}>
+              <div className="flex items-center gap-3 mb-2">
+                <MiniRing value={Math.min(metrics?.profitFactor ?? 0, 2)} max={2} color={(metrics?.profitFactor ?? 0) >= 1 ? "#10b981" : "#ef4444"} />
+                <p className="text-3xl font-bold text-white">
+                  <AnimatedCounter value={metrics?.profitFactor ?? 0} />
+                </p>
+              </div>
+              <p className="text-purple-300 text-sm font-medium">Profit Factor</p>
             </KPICard>
 
             {/* Average R:R */}
@@ -735,6 +1022,48 @@ export default function DeepAnalytics() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Trade Quality Radar ── */}
+          <div className="mb-8">
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white">Trade Quality Radar</h3>
+                  <span className="text-lg font-bold text-white bg-purple-800/50 px-3 py-1 rounded-lg border border-purple-700/50">
+                    {tradeQualityScores.overall} / 10
+                  </span>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={[
+                      { subject: "Risk Mgmt", score: tradeQualityScores.riskManagement, fullMark: 10 },
+                      { subject: "Discipline", score: tradeQualityScores.discipline, fullMark: 10 },
+                      { subject: "Patience", score: tradeQualityScores.patience, fullMark: 10 },
+                      { subject: "Entry Timing", score: tradeQualityScores.entryTiming, fullMark: 10 },
+                      { subject: "Exit Timing", score: tradeQualityScores.exitTiming, fullMark: 10 },
+                      { subject: "Execution", score: tradeQualityScores.execution, fullMark: 10 },
+                    ]}>
+                      <PolarGrid stroke="rgba(124,58,237,0.3)" />
+                      <PolarAngleAxis dataKey="subject" stroke="#a78bfa" fontSize={11} />
+                      <PolarRadiusAxis domain={[0, 10]} stroke="#a78bfa" fontSize={10} />
+                      <Radar
+                        name="Trade Quality"
+                        dataKey="score"
+                        stroke="#8b5cf6"
+                        fill="#8b5cf6"
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-purple-400 text-xs mt-4 text-center">
+                  Entry Timing and Patience are simplified proxies based on win rate and hold-time asymmetry — not intrabar analysis.
+                </p>
               </div>
             </div>
           </div>
