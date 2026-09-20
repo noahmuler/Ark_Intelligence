@@ -824,6 +824,48 @@ export default function DeepAnalytics() {
             </KPICard>
           </div>
 
+          {/* ── Trade Quality Radar ── */}
+          <div className="mb-8">
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
+              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-white">Trade Quality Radar</h3>
+                  <span className="text-lg font-bold text-white bg-purple-800/50 px-3 py-1 rounded-lg border border-purple-700/50">
+                    {tradeQualityScores.overall} / 10
+                  </span>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={[
+                      { subject: "Risk Mgmt", score: tradeQualityScores.riskManagement, fullMark: 10 },
+                      { subject: "Discipline", score: tradeQualityScores.discipline, fullMark: 10 },
+                      { subject: "Patience", score: tradeQualityScores.patience, fullMark: 10 },
+                      { subject: "Entry Timing", score: tradeQualityScores.entryTiming, fullMark: 10 },
+                      { subject: "Exit Timing", score: tradeQualityScores.exitTiming, fullMark: 10 },
+                      { subject: "Execution", score: tradeQualityScores.execution, fullMark: 10 },
+                    ]}>
+                      <PolarGrid stroke="rgba(124,58,237,0.3)" />
+                      <PolarAngleAxis dataKey="subject" stroke="#a78bfa" fontSize={11} />
+                      <PolarRadiusAxis domain={[0, 10]} stroke="#a78bfa" fontSize={10} />
+                      <Radar
+                        name="Trade Quality"
+                        dataKey="score"
+                        stroke="#8b5cf6"
+                        fill="#8b5cf6"
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-purple-400 text-xs mt-4 text-center">
+                  Entry Timing and Patience are simplified proxies based on win rate and hold-time asymmetry — not intrabar analysis.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* ── Charts: Monthly PnL & Total Orders ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Monthly PnL */}
@@ -1026,47 +1068,6 @@ export default function DeepAnalytics() {
             </div>
           </div>
 
-          {/* ── Trade Quality Radar ── */}
-          <div className="mb-8">
-            <div className="group relative">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300" />
-              <div className="relative bg-purple-900/90 backdrop-blur-xl rounded-2xl border border-purple-800/50 p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-white">Trade Quality Radar</h3>
-                  <span className="text-lg font-bold text-white bg-purple-800/50 px-3 py-1 rounded-lg border border-purple-700/50">
-                    {tradeQualityScores.overall} / 10
-                  </span>
-                </div>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={[
-                      { subject: "Risk Mgmt", score: tradeQualityScores.riskManagement, fullMark: 10 },
-                      { subject: "Discipline", score: tradeQualityScores.discipline, fullMark: 10 },
-                      { subject: "Patience", score: tradeQualityScores.patience, fullMark: 10 },
-                      { subject: "Entry Timing", score: tradeQualityScores.entryTiming, fullMark: 10 },
-                      { subject: "Exit Timing", score: tradeQualityScores.exitTiming, fullMark: 10 },
-                      { subject: "Execution", score: tradeQualityScores.execution, fullMark: 10 },
-                    ]}>
-                      <PolarGrid stroke="rgba(124,58,237,0.3)" />
-                      <PolarAngleAxis dataKey="subject" stroke="#a78bfa" fontSize={11} />
-                      <PolarRadiusAxis domain={[0, 10]} stroke="#a78bfa" fontSize={10} />
-                      <Radar
-                        name="Trade Quality"
-                        dataKey="score"
-                        stroke="#8b5cf6"
-                        fill="#8b5cf6"
-                        fillOpacity={0.35}
-                        strokeWidth={2}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="text-purple-400 text-xs mt-4 text-center">
-                  Entry Timing and Patience are simplified proxies based on win rate and hold-time asymmetry — not intrabar analysis.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* ── Institutional Metrics Summary Table ── */}
           <div>
