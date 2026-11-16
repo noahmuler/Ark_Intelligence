@@ -23,5 +23,11 @@ cron.interval(
   {}
 );
 
-export default cron;
+cron.interval(
+  "sync Exness account history",
+  { minutes: 1 },
+  api.exnessActions.syncExnessTrades,
+  {}
+);
 
+export default cron;

@@ -1,8 +1,10 @@
 "use node";
 
+import { timingSafeEqual } from "node:crypto";
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import { terminalTradeValidator } from "./mt5Validators";
 
 interface Trade {
   ticket: number;
@@ -22,157 +24,39 @@ interface Trade {
   closeReason?: string;
 }
 
-// Fetch trade history from MT5 API
-export const fetchTradeHistory = action({
+export const syncTradesFromTerminal = action({
   args: {
-    userId: v.string(),
+    syncToken: v.string(),
     serverName: v.string(),
     accountLogin: v.string(),
-    investorPassword: v.string(),
+    trades: v.array(terminalTradeValidator),
   },
-  handler: async (ctx, args) => {
-    try {
-      // Try MetaApi first
-      let trades: Trade[] = [];
-      let metaApiError: Error | null = null;
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; tradesCount: number; lastSynced: number }> => {
+    const expectedToken = process.env.MT5_SYNC_TOKEN;
+    const expected = Buffer.from(expectedToken ?? "");
+    const provided = Buffer.from(args.syncToken);
 
-      try {
-        trades = await fetchTradesFromMetaApi({
-          server: args.serverName,
-          login: args.accountLogin,
-          password: args.investorPassword,
-        });
-      } catch (error) {
-        metaApiError = error instanceof Error ? error : new Error(String(error));
-        console.error("MetaApi failed, trying alternative approach:", metaApiError);
-      }
-
-      // If MetaApi failed, try alternative approach
-      if (trades.length === 0 && metaApiError) {
-        try {
-          trades = await fetchTradesFromDirectAPI({
-            server: args.serverName,
-            login: args.accountLogin,
-            password: args.investorPassword,
-          });
-        } catch (error) {
-          console.error("Direct API also failed:", error);
-          throw new Error(
-            `Failed to fetch trades from both MetaApi and direct API. ` +
-            `MetaApi error: ${metaApiError.message}. ` +
-            `Please check your MT5 credentials and ensure your broker supports API access.`
-          );
-        }
-      }
-
-      if (!trades || trades.length === 0) {
-        return { success: true, tradesCount: 0, trades: [], message: "No trades found in the specified time range" };
-      }
-
-      // Store trades in database via mutation
-      for (const trade of trades) {
-        await ctx.runMutation(api.mt5.storeTrade, {
-          userId: args.userId,
-          ...trade,
-        });
-      }
-
-      return { success: true, tradesCount: trades.length, trades };
-    } catch (error) {
-      console.error("Failed to fetch trade history from MT5:", error);
-      throw new Error(`Failed to fetch trade history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (
+      !expectedToken ||
+      expected.length < 32 ||
+      expected.length !== provided.length ||
+      !timingSafeEqual(expected, provided)
+    ) {
+      throw new Error("Unauthorized MT5 sync request");
     }
+
+    const result: { success: boolean; tradesCount: number; lastSynced: number } =
+      await ctx.runMutation(internal.mt5.syncTradesFromTerminal, {
+        serverName: args.serverName,
+        accountLogin: args.accountLogin,
+        trades: args.trades,
+      });
+    return result;
   },
 });
-
-// Helper function to fetch trades from MetaApi
-async function fetchTradesFromMetaApi(credentials: {
-  server: string;
-  login: string;
-  password: string;
-}): Promise<Trade[]> {
-  const metaApiToken = process.env.METAAPI_TOKEN;
-
-  if (!metaApiToken) {
-    throw new Error("METAAPI_TOKEN environment variable is not set");
-  }
-
-  // Import MetaApi dynamically
-  const MetaApi = require('metaapi.cloud-sdk').default;
-  const metaApi = new MetaApi(metaApiToken);
-
-  // Try to get existing account first
-  const accounts = await metaApi.metatraderAccountApi.getAccounts();
-  let account = accounts.find((a: any) => a.login === credentials.login);
-
-  if (!account) {
-    // Create new account
-    account = await metaApi.metatraderAccountApi.createAccount({
-      id: `mt5-${credentials.login}`,
-      name: `MT5 Account ${credentials.login}`,
-      type: 'cloud-g1',
-      server: credentials.server,
-      login: credentials.login,
-      password: credentials.password,
-      magic: 0,
-      application: 'Ark Intelligence',
-    });
-  }
-
-  // Wait for connection with timeout
-  const TIMEOUT_MS = 30000; // 30 seconds
-  await Promise.race([
-    account.waitConnected(),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('waitConnected timed out after 30s')), TIMEOUT_MS)
-    ),
-  ]);
-
-  // Get account instance
-  const accountInstance = await account.connect();
-
-  // Fetch trade history
-  const historyOrders = await accountInstance.getHistoryOrdersByTimeRange(
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    new Date()
-  );
-
-  // Convert to our trade format
-  const trades: Trade[] = historyOrders
-    .filter((order: any) => order.type === 'ORDER_TYPE_BUY' || order.type === 'ORDER_TYPE_SELL')
-    .map((order: any) => ({
-      ticket: order.id,
-      symbol: order.symbol,
-      type: order.type === 'ORDER_TYPE_BUY' ? 'BUY' : 'SELL',
-      lots: order.volume,
-      openPrice: order.price,
-      closePrice: order.closePrice || order.currentPrice || order.price,
-      openTime: order.time,
-      closeTime: order.closeTime || order.doneTime || order.time,
-      profit: order.profit || 0,
-      commission: order.commission || 0,
-      swap: order.swap || 0,
-    }));
-
-  return trades;
-}
-
-// Alternative approach: Direct HTTP API (if broker supports it)
-async function fetchTradesFromDirectAPI(credentials: {
-  server: string;
-  login: string;
-  password: string;
-}): Promise<Trade[]> {
-  // This is a placeholder for direct broker API integration
-  // Many brokers provide REST APIs for accessing trade history
-  // You would need to implement this based on your specific broker's API
-
-  throw new Error(
-    "Direct API integration not implemented. " +
-    "Please implement fetchTradesFromDirectAPI based on your broker's API documentation. " +
-    "Alternatively, use the free CSV import feature by exporting trades from MT5 terminal."
-  );
-}
 
 // Free approach: CSV import from MT5 terminal (optimized for Exness)
 export const importTradesFromCSV = action({

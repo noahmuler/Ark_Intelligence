@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { terminalTradeValidator } from "./mt5Validators";
 
 // Connect to MT5 account
 export const connectMT5 = mutation({
@@ -7,7 +8,9 @@ export const connectMT5 = mutation({
     userId: v.string(),
     serverName: v.string(),
     accountLogin: v.string(),
-    investorPassword: v.string(),
+    method: v.optional(
+      v.union(v.literal("mt5"), v.literal("exness-api"), v.literal("csv")),
+    ),
   },
   handler: async (ctx, args) => {
     // Check if connection already exists
@@ -23,6 +26,7 @@ export const connectMT5 = mutation({
         accountLogin: args.accountLogin,
         isConnected: true,
         lastSynced: Date.now(),
+        method: args.method ?? "mt5",
       });
       return existingConnection._id;
     }
@@ -34,9 +38,62 @@ export const connectMT5 = mutation({
       accountLogin: args.accountLogin,
       isConnected: true,
       lastSynced: Date.now(),
+      method: args.method ?? "mt5",
     });
 
     return connectionId;
+  },
+});
+
+export const syncTradesFromTerminal = internalMutation({
+  args: {
+    serverName: v.string(),
+    accountLogin: v.string(),
+    trades: v.array(terminalTradeValidator),
+  },
+  handler: async (ctx, args) => {
+    const userId = "user-1";
+    const now = Date.now();
+    const connection = await ctx.db
+      .query("mt5_connections")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (connection) {
+      await ctx.db.patch(connection._id, {
+        serverName: args.serverName,
+        accountLogin: args.accountLogin,
+        isConnected: true,
+        lastSynced: now,
+        method: "mt5",
+      });
+    } else {
+      await ctx.db.insert("mt5_connections", {
+        userId,
+        serverName: args.serverName,
+        accountLogin: args.accountLogin,
+        isConnected: true,
+        lastSynced: now,
+        method: "mt5",
+      });
+    }
+
+    for (const trade of args.trades) {
+      const existing = await ctx.db
+        .query("mt5_trades")
+        .withIndex("by_userId_ticket", (q) =>
+          q.eq("userId", userId).eq("ticket", trade.ticket),
+        )
+        .unique();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, trade);
+      } else {
+        await ctx.db.insert("mt5_trades", { userId, ...trade });
+      }
+    }
+
+    return { success: true, tradesCount: args.trades.length, lastSynced: now };
   },
 });
 

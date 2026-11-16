@@ -13,14 +13,6 @@ type PriceRecord = {
   timestamp: number;
 };
 
-type YahooQuote = {
-  regularMarketPrice?: number;
-  regularMarketPreviousClose?: number;
-  regularMarketOpen?: number;
-  regularMarketDayHigh?: number;
-  regularMarketDayLow?: number;
-};
-
 const FINNHUB_SYMBOLS: Record<string, string> = {
   XAUUSD: 'OANDA:XAU_USD',
   XAGUSD: 'OANDA:XAG_USD',
@@ -36,18 +28,23 @@ const FINNHUB_SYMBOLS: Record<string, string> = {
   WTIUSD: 'OANDA:WTICO_USD',
 };
 
-function buildYahooPrice(name: string, symbol: string, quote: YahooQuote): PriceRecord | null {
-  const price = quote.regularMarketPrice ?? 0;
+function quoteNumber(quote: Record<string, unknown>, field: string, fallback: number): number {
+  const value = quote[field];
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function buildYahooPrice(name: string, symbol: string, quote: Record<string, unknown>): PriceRecord | null {
+  const price = quoteNumber(quote, 'regularMarketPrice', 0);
   if (price <= 0) return null;
 
-  const prevClose = quote.regularMarketPreviousClose ?? price;
+  const prevClose = quoteNumber(quote, 'regularMarketPreviousClose', price);
   return {
     name,
     symbol,
     price,
-    open: quote.regularMarketOpen ?? price,
-    high: quote.regularMarketDayHigh ?? price,
-    low: quote.regularMarketDayLow ?? price,
+    open: quoteNumber(quote, 'regularMarketOpen', price),
+    high: quoteNumber(quote, 'regularMarketDayHigh', price),
+    low: quoteNumber(quote, 'regularMarketDayLow', price),
     prevClose,
     change: price - prevClose,
     changePercent: prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0,
@@ -57,44 +54,46 @@ function buildYahooPrice(name: string, symbol: string, quote: YahooQuote): Price
 
 export async function GET() {
   const apiKey = process.env.FINNHUB_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'FINNHUB_API_KEY missing' }, { status: 500 });
-  }
-
+  const warnings = apiKey
+    ? []
+    : ['FINNHUB_API_KEY is not configured; Finnhub quotes are unavailable.'];
   const entries = Object.entries(FINNHUB_SYMBOLS);
 
   const [finnhubResults, yahooResults, us10yData, coingeckoData] = await Promise.allSettled([
-    Promise.allSettled(
-      entries.map(async ([name, symbol]) => {
-        const res = await fetch(
-          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`,
-          { next: { revalidate: 10 } }
-        );
-        const data = await res.json();
-        if (!data.c || data.c === 0) throw new Error(`No data for ${symbol}`);
+    apiKey
+      ? Promise.allSettled(
+          entries.map(async ([name, symbol]) => {
+            const res = await fetch(
+              `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`,
+              { next: { revalidate: 10 } }
+            );
+            const data = await res.json();
+            if (!data.c || data.c === 0) throw new Error(`No data for ${symbol}`);
 
-        const prevClose = data.pc ?? data.c;
-        return {
-          name,
-          symbol,
-          price: data.c,
-          open: data.o,
-          high: data.h,
-          low: data.l,
-          prevClose,
-          change: data.c - prevClose,
-          changePercent: prevClose > 0 ? ((data.c - prevClose) / prevClose) * 100 : 0,
-          timestamp: data.t,
-        } satisfies PriceRecord;
-      })
-    ),
+            const prevClose = data.pc ?? data.c;
+            return {
+              name,
+              symbol,
+              price: data.c,
+              open: data.o,
+              high: data.h,
+              low: data.l,
+              prevClose,
+              change: data.c - prevClose,
+              changePercent: prevClose > 0 ? ((data.c - prevClose) / prevClose) * 100 : 0,
+              timestamp: data.t,
+            } satisfies PriceRecord;
+          })
+        )
+      : Promise.resolve(null),
     (async () => {
-      const { default: yahooFinance } = await import('yahoo-finance2');
+      const { default: YahooFinance } = await import('yahoo-finance2');
+      const yahooFinance = new YahooFinance();
       const [dxyQuote, vixQuote, esQuote, nqQuote] = await Promise.allSettled([
-        yahooFinance.quote('DX-Y.NYB') as Promise<YahooQuote>,
-        yahooFinance.quote('^VIX') as Promise<YahooQuote>,
-        yahooFinance.quote('ES=F') as Promise<YahooQuote>,
-        yahooFinance.quote('NQ=F') as Promise<YahooQuote>,
+        yahooFinance.quote('DX-Y.NYB'),
+        yahooFinance.quote('^VIX'),
+        yahooFinance.quote('ES=F'),
+        yahooFinance.quote('NQ=F'),
       ]);
 
       return {
@@ -161,7 +160,7 @@ export async function GET() {
 
   const prices: Record<string, PriceRecord> = {};
 
-  if (finnhubResults.status === 'fulfilled') {
+  if (finnhubResults.status === 'fulfilled' && finnhubResults.value) {
     finnhubResults.value.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         prices[entries[index][0]] = result.value;
@@ -187,5 +186,12 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ prices, fetchedAt: Date.now() });
+  if (Object.keys(prices).length === 0) {
+    return NextResponse.json(
+      { error: 'No market prices could be fetched', warnings },
+      { status: 503 }
+    );
+  }
+
+  return NextResponse.json({ prices, fetchedAt: Date.now(), warnings });
 }

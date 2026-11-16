@@ -29,7 +29,7 @@ Ark Intelligence is a data-dense, AI-first platform that transforms raw market d
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 22.x (required for local Convex Node.js actions; Node.js 24.x is also supported)
 - npm or yarn
 
 ### Installation
@@ -145,12 +145,37 @@ NEXT_PUBLIC_CONVEX_SITE_URL=your_convex_site_url
 
 ## API Setup Instructions
 
+### Free Local MT5 Investor-Account Sync
+
+The Trading Journal can sync closed MT5 deals without MetaApi or another paid bridge. The MT5 terminal runs locally on the same Mac as the dashboard and keeps the investor password; the dashboard only receives read-only trade history over localhost.
+
+1. In `.env.local`, configure `MT5_SYNC_TOKEN` with a private value of at least 32 characters. Use a different value for each machine. After starting the local Convex deployment, run `node scripts/configureLocalMt5Sync.mjs` to safely copy the key into that local backend.
+2. Start the dashboard and open `http://localhost:3000/settings`. Download `ArkJournalSync.mq5` and copy the displayed local sync key.
+3. In MT5, sign in with the investor password, open **File → Open Data Folder**, and place the EA in `MQL5/Experts`. Open it in MetaEditor and compile.
+4. In MT5, allow `http://127.0.0.1:3000` under **Tools → Options → Expert Advisors → Allow WebRequest for listed URL**.
+5. Attach **ArkJournalSync** to a chart. Set its endpoint and sync key from Settings, then enable Algo Trading. Keep MT5 and the local dashboard running.
+
+The sync key authorizes updates to the local journal and should be treated like a password. Do not expose the Next.js server or share the key. Disconnecting in Settings does not stop the EA; remove it from the chart first.
+
+The Expert Advisor source is [`public/mt5/ArkJournalSync.mq5`](./public/mt5/ArkJournalSync.mq5). It must be compiled with MetaEditor on the user's MT5 installation; this project does not include MetaEditor.
+
+### Free Exness Trading API Sync (Recommended)
+
+The Settings page also supports Exness's read-only Trading API. Unlike a bearer-token API, Exness requires an API key ID, an Ed25519 private signing key, the trading account ID, and the HTTPS DNS gateway URL shown in Key Management. Ark discovers the account Access Point and reads account/deal history; it does not place or modify trades. API history sync runs every minute and initially imports up to the latest 90 days, subject to the age and range limits returned by Exness.
+
+1. In Exness Key Management, create a Trading API key scoped to the intended account with read-only permissions. Copy the API key ID, private key, account ID, and DNS widget gateway URL.
+2. Generate a 32-byte encryption key, for example with `node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64"))'`.
+3. Set `EXNESS_CREDENTIALS_ENCRYPTION_KEY` to that value in `.env.local` and in the active Convex deployment (`npx convex env set EXNESS_CREDENTIALS_ENCRYPTION_KEY "<same value>"`). Keep it private and do not commit it. The API key and signing key are encrypted with this key before they are stored.
+4. Restart the app, open Settings on this Mac, and enter the Exness credentials in the **Exness Africa API** card. Use the DNS widget gateway URL, not a copied Access Point host.
+
+The connection form and sync endpoints only accept same-origin requests on localhost. The MT5 Desktop method remains available as a free alternative below the API card. Only one method is active for the journal at a time to avoid overlapping imports from the same account; connecting either method switches the selected source.
+
 ### Required APIs for Full Functionality
 
 1. **Finnhub** (Prices, Forex, Crypto)
    - Register at: https://finnhub.io
    - Free tier: 60 calls/min
-   - Required for: Real-time asset prices (DXY, XAUUSD, XAGUSD, etc.)
+   - Provides: Forex, metals, and crypto quotes. Without this key, the dashboard uses available Yahoo Finance quotes and marks the price data as partial.
 
 2. **FRED** (Economic Data)
    - Register at: https://fred.stlouisfed.org/docs/api/api_key.html

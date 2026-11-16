@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/dashboard/MainLayout";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
   Settings as SettingsIcon,
@@ -21,81 +21,170 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  KeyRound,
+  RefreshCw,
+  LockKeyhole,
 } from "lucide-react";
 
 export default function Settings() {
-  const [mt5Connected, setMt5Connected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [serverName, setServerName] = useState("");
-  const [accountLogin, setAccountLogin] = useState("");
-  const [investorPassword, setInvestorPassword] = useState("");
+  const [syncSetup, setSyncSetup] = useState<{ endpoint: string; token: string } | null>(null);
+  const [syncSetupError, setSyncSetupError] = useState("");
+  const [syncTokenCopied, setSyncTokenCopied] = useState(false);
+  const [syncTokenVisible, setSyncTokenVisible] = useState(false);
   const [csvData, setCsvData] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [exnessApiKey, setExnessApiKey] = useState("");
+  const [exnessPrivateKey, setExnessPrivateKey] = useState("");
+  const [exnessAccountId, setExnessAccountId] = useState("");
+  const [exnessGateway, setExnessGateway] = useState("");
+  const [exnessBusy, setExnessBusy] = useState(false);
+  const [exnessError, setExnessError] = useState("");
+  const [exnessMessage, setExnessMessage] = useState("");
 
   // Convex mutations and actions
   const connectMT5 = useMutation(api.mt5.connectMT5);
   const disconnectMT5 = useMutation(api.mt5.disconnectMT5);
-  const fetchTradeHistory = useAction(api.mt5Actions.fetchTradeHistory);
   const importTradesFromCSV = useAction(api.mt5Actions.importTradesFromCSV);
+  const connection = useQuery(api.mt5.getMT5Connection, { userId: "user-1" });
+  const exnessConnection = useQuery(api.exness.getConnection, { userId: "user-1" });
+  const exnessConnected = exnessConnection?.isConnected ?? false;
+  const exnessConfigured = exnessConnection?.isConfigured ?? false;
+  const mt5Connected =
+    (connection?.isConnected ?? false) &&
+    (connection?.method === "mt5" || connection?.method === undefined);
 
-  // Load connection state from localStorage on mount
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const savedConnection = localStorage.getItem("mt5Connected");
-    const savedServerName = localStorage.getItem("mt5ServerName");
-    const savedAccountLogin = localStorage.getItem("mt5AccountLogin");
-
-    if (savedConnection === "true") {
-      setMt5Connected(true);
-      setServerName(savedServerName || "");
-      setAccountLogin(savedAccountLogin || "");
-    }
-  }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const handleConnect = async () => {
-    setIsConnecting(true);
+  const handleExnessConnect = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setExnessBusy(true);
+    setExnessError("");
+    setExnessMessage("");
     try {
-      const userId = "user-1"; // TODO: Get actual user ID from auth
-
-      // Store connection in Convex
-      await connectMT5({
-        userId,
-        serverName,
-        accountLogin,
-        investorPassword,
+      const response = await fetch("/api/exness/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: exnessApiKey,
+          privateKey: exnessPrivateKey,
+          accountId: exnessAccountId,
+          discoveryBaseUrl: exnessGateway,
+        }),
       });
-
-      // Fetch trade history from MT5 API
-      const result = await fetchTradeHistory({
-        userId,
-        serverName,
-        accountLogin,
-        investorPassword,
-      });
-
-      // Validate that fetch was successful
-      if (!result.success) {
-        throw new Error(result.message || "Failed to fetch trade history");
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "Could not connect Exness API";
+        throw new Error(message);
       }
 
-      // Handle case where no trades were found (non-fatal)
-      if (result.tradesCount === 0) {
-        console.warn("No trades found in the specified time range");
-        alert("Warning: No trades found in the specified time range. Connection saved but no trades imported.");
-      }
-
-      // Persist to localStorage
-      setMt5Connected(true);
-      localStorage.setItem("mt5Connected", "true");
-      localStorage.setItem("mt5ServerName", serverName);
-      localStorage.setItem("mt5AccountLogin", accountLogin);
-      setIsConnecting(false);
+      setExnessApiKey("");
+      setExnessPrivateKey("");
+      setExnessMessage("Exness account connected. Account history will sync every minute.");
     } catch (error) {
-      console.error("Failed to connect MT5 account:", error);
-      setIsConnecting(false);
-      alert(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setExnessError(error instanceof Error ? error.message : "Could not connect Exness API");
+    } finally {
+      setExnessBusy(false);
+    }
+  };
+
+  const handleExnessSync = async () => {
+    setExnessBusy(true);
+    setExnessError("");
+    setExnessMessage("");
+    try {
+      const response = await fetch("/api/exness/sync", { method: "POST" });
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "Could not sync Exness account";
+        throw new Error(message);
+      }
+      setExnessMessage("Exness account history synced.");
+    } catch (error) {
+      setExnessError(error instanceof Error ? error.message : "Could not sync Exness account");
+    } finally {
+      setExnessBusy(false);
+    }
+  };
+
+  const handleExnessDisconnect = async () => {
+    setExnessBusy(true);
+    setExnessError("");
+    setExnessMessage("");
+    try {
+      const response = await fetch("/api/exness/disconnect", { method: "POST" });
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "Could not disconnect Exness API";
+        throw new Error(message);
+      }
+      setExnessMessage("Exness API credentials removed.");
+    } catch (error) {
+      setExnessError(error instanceof Error ? error.message : "Could not disconnect Exness API");
+    } finally {
+      setExnessBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/mt5/sync", { signal: controller.signal })
+      .then(async (response) => {
+        const result: unknown = await response.json();
+        if (
+          !response.ok ||
+          typeof result !== "object" ||
+          result === null ||
+          !("endpoint" in result) ||
+          typeof result.endpoint !== "string" ||
+          !("token" in result) ||
+          typeof result.token !== "string"
+        ) {
+          const message =
+            typeof result === "object" &&
+            result !== null &&
+            "error" in result &&
+            typeof result.error === "string"
+              ? result.error
+              : "Could not load local MT5 sync settings";
+          throw new Error(message);
+        }
+        setSyncSetup({ endpoint: result.endpoint, token: result.token });
+        setSyncSetupError("");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setSyncSetupError(error instanceof Error ? error.message : "Could not load local MT5 sync settings");
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const handleCopySyncToken = async () => {
+    if (!syncSetup) return;
+    try {
+      await navigator.clipboard.writeText(syncSetup.token);
+      setSyncTokenCopied(true);
+      window.setTimeout(() => setSyncTokenCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy MT5 sync key:", error);
+      alert("Could not copy the sync key. Show it to copy it manually.");
     }
   };
 
@@ -106,16 +195,12 @@ export default function Settings() {
       // Disconnect from Convex
       await disconnectMT5({ userId });
 
-      // Clear localStorage
-      setMt5Connected(false);
       localStorage.removeItem("mt5Connected");
       localStorage.removeItem("mt5ServerName");
       localStorage.removeItem("mt5AccountLogin");
-      setServerName("");
-      setAccountLogin("");
-      setInvestorPassword("");
     } catch (error) {
       console.error("Failed to disconnect MT5 account:", error);
+      alert(`Failed to disconnect: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -155,13 +240,9 @@ export default function Settings() {
           userId,
           serverName: "CSV Import",
           accountLogin: "Imported",
-          investorPassword: "",
+          method: "csv",
         });
 
-        setMt5Connected(true);
-        localStorage.setItem("mt5Connected", "true");
-        localStorage.setItem("mt5ServerName", "CSV Import");
-        localStorage.setItem("mt5AccountLogin", "Imported");
       } else {
         alert(result.message || "No trades imported");
       }
@@ -321,6 +402,199 @@ export default function Settings() {
               </div>
             </div>
 
+            {/* Exness API Connection */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 opacity-40 blur transition duration-300 group-hover:opacity-60"></div>
+              <div className="relative rounded-2xl border border-emerald-700/60 bg-purple-900/95 p-6 shadow-2xl">
+                <div className="mb-5 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500">
+                      <KeyRound className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">Exness Africa API</h2>
+                      <p className="text-xs font-medium uppercase tracking-wide text-emerald-300">
+                        Recommended · Read-only account sync
+                      </p>
+                    </div>
+                  </div>
+                  {exnessConnected && (
+                    <span className="flex items-center gap-1 rounded-full bg-green-900/50 px-2.5 py-1 text-xs text-green-300">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Connected
+                    </span>
+                  )}
+                </div>
+
+                <p className="mb-4 text-sm text-purple-200">
+                  Connect with your Exness Trading API key instead of entering an MT5 investor password.
+                  Ark only reads account history; it does not place or manage trades. This free API
+                  connection is recommended; the free MT5 desktop method remains available below.
+                </p>
+
+                {exnessConnected && (
+                  <div className="mb-4 rounded-lg border border-green-700/50 bg-green-900/20 p-3 text-sm">
+                    <p className="text-white">
+                      Account {maskAccountNumber(exnessConnection?.accountId ?? "")}
+                      {exnessConnection?.accountCurrency ? ` · ${exnessConnection.accountCurrency}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-purple-300">
+                      Last sync:{" "}
+                      {exnessConnection?.lastSynced
+                        ? new Date(exnessConnection.lastSynced).toLocaleString()
+                        : "waiting"}
+                      {" · "}Automatic sync every minute
+                    </p>
+                  </div>
+                )}
+                {exnessConfigured && !exnessConnected && (
+                  <p className="mb-4 rounded-lg border border-amber-700/50 bg-amber-900/20 p-3 text-sm text-amber-200">
+                    Exness credentials are saved, but MT5 or CSV is currently selected for the journal.
+                    Connect Exness again below to switch methods.
+                  </p>
+                )}
+
+                <div className="mb-4 rounded-lg border border-purple-700 bg-purple-950/60 p-3 text-xs text-purple-300">
+                  <LockKeyhole className="mr-1 inline h-3.5 w-3.5 text-emerald-300" />
+                  Your key pair is sent to this local server, encrypted before storage, and never returned to
+                  the browser. Configure the encryption key as described in the README first.
+                  {" "}
+                  <a
+                    href="https://www.exness-api.com/authentication/api-key-and-host-setup"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-300 underline underline-offset-2"
+                  >
+                    Exness API setup guide
+                  </a>
+                </div>
+
+                <form onSubmit={handleExnessConnect} className="space-y-3">
+                  <div>
+                    <label htmlFor="exness-api-key" className="mb-1 block text-sm text-purple-200">
+                      API key ID
+                    </label>
+                    <input
+                      id="exness-api-key"
+                      type="password"
+                      autoComplete="off"
+                      value={exnessApiKey}
+                      onChange={(event) => setExnessApiKey(event.target.value)}
+                      required
+                      maxLength={512}
+                      placeholder="exnsk-…"
+                      className="w-full rounded-lg border border-purple-700 bg-purple-950 px-3 py-2 text-sm text-white placeholder-purple-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="exness-private-key" className="mb-1 block text-sm text-purple-200">
+                      Ed25519 private signing key
+                    </label>
+                    <textarea
+                      id="exness-private-key"
+                      value={exnessPrivateKey}
+                      onChange={(event) => setExnessPrivateKey(event.target.value)}
+                      required
+                      rows={3}
+                      maxLength={4096}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="128-character hex key or unencrypted PKCS#8 PEM"
+                      className="w-full resize-y rounded-lg border border-purple-700 bg-purple-950 px-3 py-2 font-mono text-xs text-white placeholder-purple-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="exness-account-id" className="mb-1 block text-sm text-purple-200">
+                      Trading account ID
+                    </label>
+                    <input
+                      id="exness-account-id"
+                      type="text"
+                      inputMode="numeric"
+                      value={exnessAccountId}
+                      onChange={(event) => setExnessAccountId(event.target.value)}
+                      required
+                      maxLength={20}
+                      pattern="[1-9][0-9]{0,19}"
+                      placeholder="Account ID from Key Management"
+                      className="w-full rounded-lg border border-purple-700 bg-purple-950 px-3 py-2 text-sm text-white placeholder-purple-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="exness-gateway" className="mb-1 block text-sm text-purple-200">
+                      Trading API DNS gateway URL
+                    </label>
+                    <input
+                      id="exness-gateway"
+                      type="url"
+                      value={exnessGateway}
+                      onChange={(event) => setExnessGateway(event.target.value)}
+                      required
+                      placeholder="https://api.exness.com (copy from the DNS widget)"
+                      className="w-full rounded-lg border border-purple-700 bg-purple-950 px-3 py-2 text-sm text-white placeholder-purple-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <p className="text-xs text-purple-400">
+                    Create a Trading API key with read access to this exact account. Enter the Main DNS
+                    hostname from Key Management with https:// in front (for example, https://api.exness.com).
+                    The account Access Point is discovered after connecting. Make sure the key allows this
+                    account and your current public IP.
+                  </p>
+
+                  {exnessError && (
+                    <p role="alert" className="text-sm text-red-300">
+                      {exnessError}
+                    </p>
+                  )}
+                  {exnessMessage && (
+                    <p role="status" className="text-sm text-emerald-300">
+                      {exnessMessage}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={exnessBusy}
+                    className="flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-2.5 font-semibold text-white transition-colors hover:from-emerald-700 hover:to-cyan-700 disabled:opacity-50"
+                  >
+                    {exnessBusy ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connecting…
+                      </>
+                    ) : (
+                      "Connect Exness API"
+                    )}
+                  </button>
+                </form>
+
+                {exnessConfigured && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {exnessConnected && (
+                      <button
+                        type="button"
+                        onClick={handleExnessSync}
+                        disabled={exnessBusy}
+                        className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`mr-1.5 inline h-4 w-4 ${exnessBusy ? "animate-spin" : ""}`} />
+                        Sync now
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleExnessDisconnect}
+                      disabled={exnessBusy}
+                      className={`rounded-lg border border-purple-600 px-3 py-2 text-sm font-semibold text-purple-200 hover:bg-purple-800 disabled:opacity-50 ${exnessConnected ? "" : "col-span-2"}`}
+                    >
+                      <XCircle className="mr-1.5 inline h-4 w-4" />
+                      Disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* MT5 Connection */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -329,90 +603,110 @@ export default function Settings() {
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 mr-3">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <h2 className="text-xl font-semibold text-white">MT5 Connection</h2>
+                  <h2 className="text-xl font-semibold text-white">MT5 Desktop Connection</h2>
                 </div>
 
-                {!mt5Connected ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-purple-300 text-sm font-medium mb-2">
-                        Broker Server Name
-                      </label>
-                      <input
-                        type="text"
-                        value={serverName}
-                        onChange={(e) => setServerName(e.target.value)}
-                        placeholder="e.g., MetaQuotes-Demo"
-                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-purple-300 text-sm font-medium mb-2">
-                        Account Login
-                      </label>
-                      <input
-                        type="number"
-                        value={accountLogin}
-                        onChange={(e) => setAccountLogin(e.target.value)}
-                        placeholder="Account number"
-                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-purple-300 text-sm font-medium mb-2">
-                        Investor Password
-                      </label>
-                      <input
-                        type="password"
-                        value={investorPassword}
-                        onChange={(e) => setInvestorPassword(e.target.value)}
-                        placeholder="Investor password"
-                        className="w-full bg-purple-800 text-white text-sm rounded-lg px-4 py-2.5 border border-purple-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 placeholder-purple-400/50"
-                      />
-                    </div>
-                    <button
-                      onClick={handleConnect}
-                      disabled={isConnecting || !serverName || !accountLogin || !investorPassword}
-                      className="w-full mt-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        "Connect Account"
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
+                <div className="space-y-4">
+                  <p className="text-purple-300 text-sm">
+                    Free automatic sync runs on this Mac through the official MT5 terminal. Enter your
+                    investor (read-only) password only in MT5; Ark never receives or stores it.
+                  </p>
+                  {mt5Connected && (
                     <div className="flex items-center justify-between p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
                       <div className="flex items-center">
                         <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
                         <div>
-                          <p className="text-white font-medium">MetaTrader 5 Connected</p>
-                          <p className="text-purple-300 text-sm">Account: {maskAccountNumber(accountLogin)}</p>
+                          <p className="text-white font-medium">MT5 history syncing</p>
+                          <p className="text-purple-300 text-sm">
+                            {connection?.serverName} · Account {maskAccountNumber(connection?.accountLogin ?? "")}
+                          </p>
+                          <p className="text-purple-400 text-xs">
+                            Last sync: {connection?.lastSynced ? new Date(connection.lastSynced).toLocaleString() : "waiting"}
+                          </p>
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleDisconnect}
-                        className="flex-1 bg-purple-700 hover:bg-purple-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center"
+                  )}
+
+                  {syncSetup ? (
+                    <div className="space-y-3 rounded-lg border border-purple-700 bg-purple-950/60 p-4">
+                      <a
+                        href="/mt5/ArkJournalSync.mq5"
+                        download
+                        className="inline-flex items-center rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600"
                       >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Disconnect
-                      </button>
-                      <button
-                        onClick={handleDisconnect}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center"
-                      >
-                        Switch Account
-                      </button>
+                        Download ArkJournalSync.mq5
+                      </a>
+                      <div>
+                        <label className="mb-1 block text-xs text-purple-300">Local sync endpoint</label>
+                        <code className="block break-all text-xs text-white">{syncSetup.endpoint}</code>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-purple-300">Local sync key (keep private)</label>
+                        {syncTokenVisible ? (
+                          <code className="mb-2 block break-all rounded-lg border border-purple-700 bg-purple-900 px-3 py-2 text-xs text-white">
+                            {syncSetup.token}
+                          </code>
+                        ) : (
+                          <p className="mb-2 text-xs text-purple-400">Hidden. Copy the key directly into the EA input.</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCopySyncToken}
+                            className="rounded-lg bg-purple-700 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-600"
+                          >
+                            {syncTokenCopied ? "Copied" : "Copy key"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSyncTokenVisible((visible) => !visible)}
+                            aria-expanded={syncTokenVisible}
+                            className="rounded-lg border border-purple-600 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-800"
+                          >
+                            {syncTokenVisible ? "Hide key" : "Show key"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p role="alert" className="text-sm text-amber-300">
+                      {syncSetupError || "Loading local sync settings…"}
+                      {" "}Open Settings from this Mac at http://localhost:3000/settings.
+                    </p>
+                  )}
+
+                  <ol className="list-decimal space-y-2 pl-5 text-sm text-purple-300">
+                    <li>
+                      In MT5, log into your account with the investor password. This login stays inside MT5.
+                    </li>
+                    <li>
+                      In MT5 choose <strong>File → Open Data Folder</strong>, then place the downloaded file in
+                      <code className="mx-1 text-purple-200">MQL5/Experts</code> and compile it in MetaEditor.
+                    </li>
+                    <li>
+                      In <strong>Tools → Options → Expert Advisors</strong>, allow WebRequest for
+                      <code className="mx-1 text-purple-200">http://127.0.0.1:3000</code>.
+                    </li>
+                    <li>
+                      Attach <strong>ArkJournalSync</strong> to a chart. In its Inputs, set the endpoint above
+                      and paste the sync key. Enable Algo Trading.
+                    </li>
+                  </ol>
+                  <p className="text-xs text-purple-400">
+                    The EA uploads closed deals to this Mac every minute over localhost. Keep MT5 and this
+                    app running. Stop/remove the EA in MT5 before disconnecting.
+                  </p>
+                  {mt5Connected && (
+                    <button
+                      onClick={handleDisconnect}
+                      className="w-full rounded-lg bg-purple-700 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-purple-800"
+                    >
+                      <XCircle className="mr-2 inline h-4 w-4" />
+                      Disconnect
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

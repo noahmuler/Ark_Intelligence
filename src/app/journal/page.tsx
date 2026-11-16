@@ -61,7 +61,7 @@ interface TradingMetrics {
 }
 
 interface Trade {
-  ticket: number;
+  ticket: number | string;
   symbol: string;
   type: string;
   lots: number;
@@ -76,7 +76,6 @@ interface Trade {
 
 export default function Journal() {
   const router = useRouter();
-  const [isConnected, setIsConnected] = useState(false);
   const [calendarView, setCalendarView] = useState<'weekly' | 'monthly'>('monthly');
   const [currentPage, setCurrentPage] = useState(1);
   const [symbolFilter, setSymbolFilter] = useState('');
@@ -87,6 +86,7 @@ export default function Journal() {
 
   // Fetch data from Convex
   const connection = useQuery(api.mt5.getMT5Connection, { userId: "user-1" });
+  const isConnected = connection?.isConnected ?? false;
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
   const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
   const equityCurve = useQuery(api.mt5Queries.getEquityCurve, { userId: "user-1" });
@@ -177,18 +177,6 @@ export default function Journal() {
   );
 
   const trades = paginatedTrades;
-
-  // Check connection status
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const savedConnection = localStorage.getItem("mt5Connected");
-    if (savedConnection === "true" && connection) {
-      setIsConnected(true);
-    } else {
-      setIsConnected(false);
-    }
-  }, [connection]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!isConnected) {
     return (
@@ -929,8 +917,6 @@ export default function Journal() {
     </MainLayout>
   );
 }
-
-
 
 
 

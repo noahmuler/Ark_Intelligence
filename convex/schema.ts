@@ -46,12 +46,15 @@ export default defineSchema({
     accountLogin: v.string(), // Account number (masked)
     isConnected: v.boolean(), // Connection status
     lastSynced: v.number(), // Last sync timestamp
+    method: v.optional(
+      v.union(v.literal("mt5"), v.literal("exness-api"), v.literal("csv")),
+    ),
   }).index("by_userId", ["userId"]),
 
   // MT5 trade history
   mt5_trades: defineTable({
     userId: v.string(), // User identifier
-    ticket: v.number(), // Trade ticket ID
+    ticket: v.union(v.number(), v.string()), // Trade ticket or provider deal ID
     symbol: v.string(), // Trading symbol (e.g., "XAUUSD")
     type: v.string(), // "BUY" or "SELL" or "DEPOSIT" or "WITHDRAWAL"
     lots: v.number(), // Lot size
@@ -68,6 +71,38 @@ export default defineSchema({
     closeReason: v.optional(v.string()), // Close reason (e.g. "sl", "tp", "user")
   }).index("by_userId", ["userId"])
    .index("by_userId_ticket", ["userId", "ticket"]),
+
+  // Exness API credentials are encrypted before being stored.
+  exness_connections: defineTable({
+    userId: v.string(),
+    accountId: v.string(),
+    encryptedCredentials: v.string(),
+    iv: v.string(),
+    authTag: v.string(),
+    accessPoint: v.string(),
+    accountCurrency: v.optional(v.string()),
+    lastSynced: v.number(),
+    isConnected: v.boolean(),
+  }).index("by_userId", ["userId"]),
+
+  // Current Exness positions used to match later close deals to their entries.
+  exness_open_positions: defineTable({
+    userId: v.string(),
+    dealId: v.string(),
+    positionId: v.string(),
+    symbol: v.string(),
+    type: v.union(v.literal("BUY"), v.literal("SELL")),
+    lots: v.number(),
+    openPrice: v.number(),
+    openTime: v.number(),
+    stopLoss: v.optional(v.number()),
+    takeProfit: v.optional(v.number()),
+  }).index("by_userId_positionId", ["userId", "positionId"]),
+
+  exness_processed_deals: defineTable({
+    userId: v.string(),
+    dealId: v.string(),
+  }).index("by_userId_dealId", ["userId", "dealId"]),
 
   // Market prices from Yahoo Finance (cached)
   marketPrices: defineTable({

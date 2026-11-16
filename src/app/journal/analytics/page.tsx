@@ -87,20 +87,12 @@ function MiniRing({ value, max, color }: { value: number; max: number; color: st
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DeepAnalytics() {
   const router = useRouter();
-  const [isConnected, setIsConnected] = useState(false);
 
   // ── Convex queries ──────────────────────────────────────────────────────────
   const connection = useQuery(api.mt5.getMT5Connection, { userId: "user-1" });
+  const isConnected = connection?.isConnected ?? false;
   const metrics = useQuery(api.mt5Queries.getTradingMetrics, { userId: "user-1" });
   const allTrades = useQuery(api.mt5Queries.getAllTrades, { userId: "user-1" });
-
-  // ── Connection check ────────────────────────────────────────────────────────
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const saved = localStorage.getItem("mt5Connected");
-    setIsConnected(saved === "true" && !!connection);
-  }, [connection]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── Derived trade sets (ALL hooks ABOVE any early return) ───────────────────
   const actualTrades = useMemo(

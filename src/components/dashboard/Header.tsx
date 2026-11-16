@@ -26,31 +26,23 @@ import { useMarketPrices } from "@/hooks/useMarketPrices";
 import { motion, AnimatePresence } from "framer-motion";
 
 
-
-
-
-
-/**
- * Interface for ticker data structure from API
- */
-interface TickerData {
-  name: string;
-  symbol: string;
-  price: number;
-  open: number;
-  high: number;
-  low: number;
-  prevClose: number;
-  change: number;
-  changePercent: number;
-  timestamp: number;
-}
-
 /**
  * Live indicator component showing data freshness
  */
 function LiveIndicator({ fetchedAt }: { fetchedAt: number }) {
-  const age = Date.now() - fetchedAt;
+  const [age, setAge] = useState(0);
+
+  useEffect(() => {
+    const updateAge = () => setAge(Date.now() - fetchedAt);
+    const timeout = window.setTimeout(updateAge, 0);
+    const interval = window.setInterval(updateAge, 10_000);
+
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [fetchedAt]);
+
   const color = age < 30_000 ? 'bg-green-400' : age < 120_000 ? 'bg-amber-400' : 'bg-red-400';
   return (
     <span className="relative flex h-2 w-2">
@@ -407,12 +399,21 @@ return (
         </div>
       ) : isError ? (
         <div className="flex items-center space-x-2 text-rose-400">
-          <span className="text-sm">Failed to load prices</span>
+          <span className="text-sm">{error instanceof Error ? error.message : "Failed to load prices"}</span>
         </div>
       ) : (
         <div className="flex items-center space-x-2 lg:space-x-4 xl:space-x-6 overflow-x-auto">
+          {marketData && marketData.warnings.length > 0 && (
+            <span
+              role="status"
+              title={marketData.warnings.join(" ")}
+              className="shrink-0 rounded bg-amber-950/50 px-2 py-1 text-xs text-amber-300"
+            >
+              Partial price data
+            </span>
+          )}
           <AnimatePresence mode="popLayout">
-            {marketData?.prices && Object.entries(marketData.prices).map(([key, item]: [string, any]) => (
+            {marketData?.prices && Object.entries(marketData.prices).map(([key, item]) => (
               <motion.div
                 key={key}
                 initial={{ opacity: 0, y: -10 }}

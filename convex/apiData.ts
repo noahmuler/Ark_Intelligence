@@ -10,7 +10,8 @@ import { api } from "./_generated/api";
 export const fetchAndStorePrices = internalAction({
   args: {},
   handler: async (ctx) => {
-    const { default: yahooFinance } = await import('yahoo-finance2');
+    const { default: YahooFinance } = await import('yahoo-finance2');
+    const yahooFinance = new YahooFinance();
 
     const symbolMap = [
       { convexKey: 'XAU',  yahooSymbol: 'GC=F'      },
@@ -24,17 +25,22 @@ export const fetchAndStorePrices = internalAction({
     const results = [];
     for (const { convexKey, yahooSymbol } of symbolMap) {
       try {
-        const quote = await yahooFinance.quote(yahooSymbol) as any;
-        const price = quote.regularMarketPrice ?? 0;
-        const prev  = quote.regularMarketPreviousClose ?? price;
+        const quote = await yahooFinance.quote(yahooSymbol);
+        const quoteData: Record<string, unknown> = quote;
+        const priceValue = quoteData.regularMarketPrice;
+        const price = typeof priceValue === 'number' ? priceValue : 0;
+        const previousClose = quoteData.regularMarketPreviousClose;
+        const prev = typeof previousClose === 'number' ? previousClose : price;
         const change24h = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+        const dayHigh = quoteData.regularMarketDayHigh;
+        const dayLow = quoteData.regularMarketDayLow;
 
         await ctx.runMutation(api.actions.upsertPrice, {
           symbol: convexKey,
           price,
           change24h,
-          high: quote.regularMarketDayHigh ?? price,
-          low: quote.regularMarketDayLow ?? price,
+          high: typeof dayHigh === 'number' ? dayHigh : price,
+          low: typeof dayLow === 'number' ? dayLow : price,
           history: [],
           updatedAt: Date.now(),
         });
